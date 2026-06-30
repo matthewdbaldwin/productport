@@ -10,6 +10,7 @@ import { useEffect, useMemo, useState, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/contexts/AuthContext';
 import { api } from '@/lib/api';
+import { statusOf, orderedAreas, filterProducts } from '@/lib/catalogFilter';
 import s from './catalog.module.css';
 
 type ClearanceStatus = 'APPROVED' | 'IN_PROGRESS' | 'SUBMITTED' | 'NOT_APPROVED' | 'NONE';
@@ -37,14 +38,6 @@ interface Product {
 
 const REGIONS = ['CE', 'FDA', 'NMPA', 'PMDA'] as const;
 
-// Therapeutic-area display order (mirrors the standalone catalog's AREAS list).
-const AREA_ORDER = [
-  'Coronary', 'Structural Heart', 'Electrophysiology', 'Cardiac Rhythm Management',
-  'Neurovascular', 'Aortic & Peripheral', 'Extracorporeal Life Support',
-  'Surgical Robotics', 'Orthopedics', 'Endoscopy & Urology', 'Tumor Ablation',
-  'Endocrinology', 'Infusion & Vascular Access', 'Assisted Reproduction',
-];
-
 const STATUS_META: Record<ClearanceStatus, { label: string; bg: string; fg: string }> = {
   APPROVED:     { label: 'Cleared',     bg: 'var(--okb)', fg: 'var(--ok)' },
   IN_PROGRESS:  { label: 'In progress', bg: 'var(--amb)', fg: 'var(--am)' },
@@ -57,8 +50,6 @@ const STATUS_META: Record<ClearanceStatus, { label: string; bg: string; fg: stri
 // by web/scripts/optimize-images.mjs); the detail modal uses the full original.
 const thumbSrc = (p: Product) => (p.image ? `/products/thumbs/${p.image.replace(/\.(jpe?g|png)$/i, '.webp')}` : null);
 const fullSrc = (p: Product) => (p.image ? `/products/${p.image}` : null);
-const statusOf = (p: Product, region: string): ClearanceStatus =>
-  p.clearances.find((c) => c.region === region)?.status ?? 'NONE';
 const splitList = (v: string) => (v || '').split('|').map((x) => x.trim()).filter(Boolean);
 
 function Chip({ label, status }: { label: string; status: ClearanceStatus }) {
@@ -221,13 +212,7 @@ export default function CatalogPage() {
     return () => { alive = false; };
   }, [user]);
 
-  const areas = useMemo(() => {
-    if (!products) return [];
-    const present = new Set(products.map((p) => p.therapeuticArea));
-    const ordered = AREA_ORDER.filter((a) => present.has(a));
-    for (const a of [...present].sort()) if (!ordered.includes(a)) ordered.push(a);
-    return ordered;
-  }, [products]);
+  const areas = useMemo(() => orderedAreas(products ?? []), [products]);
   const subs = useMemo(() => [...new Set((products ?? []).map((p) => p.subsidiary))].sort(), [products]);
   const cats = useMemo(() => [...new Set((products ?? []).map((p) => p.category).filter(Boolean))].sort(), [products]);
   const countBy = useCallback(
@@ -235,21 +220,10 @@ export default function CatalogPage() {
     [products],
   );
 
-  const filtered = useMemo(() => {
-    if (!products) return [];
-    const term = q.trim().toLowerCase();
-    return products.filter((p) => {
-      if (fr && p.therapeuticArea !== fr) return false;
-      if (sub && p.subsidiary !== sub) return false;
-      if (cat && p.category !== cat) return false;
-      if (mk && !['APPROVED', 'IN_PROGRESS', 'SUBMITTED'].includes(statusOf(p, mk))) return false;
-      if (term) {
-        const hay = `${p.name} ${p.tagline} ${p.indication} ${p.category} ${p.type} ${p.subsidiary}`.toLowerCase();
-        if (!hay.includes(term)) return false;
-      }
-      return true;
-    });
-  }, [products, fr, sub, mk, cat, q]);
+  const filtered = useMemo(
+    () => filterProducts(products ?? [], { area: fr, subsidiary: sub, category: cat, market: mk, query: q }),
+    [products, fr, sub, mk, cat, q],
+  );
 
   const hasFilters = !!(fr || sub || mk || cat || q);
   const clearAll = () => { setFr(null); setSub(null); setMk(null); setCat(''); setQ(''); };

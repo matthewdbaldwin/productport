@@ -11,44 +11,9 @@
 'use strict';
 const express = require('express');
 const db = require('../lib/db');
+const { shapeProduct: shape } = require('../lib/shapeProduct');
 
 const router = express.Router();
-
-// Shape a Prisma product row into the client catalog contract (camelCase,
-// clearance flattened to region→status, trials as ordered rows).
-function shape(p) {
-  return {
-    id: p.slug, // stable, human-readable key the UI routes on
-    name: p.name,
-    subsidiary: p.subsidiary,
-    therapeuticArea: p.therapeuticArea,
-    category: p.category || '',
-    type: p.type || '',
-    tagline: p.tagline || '',
-    overview: p.overview || '',
-    features: p.features || '',
-    indication: p.indication || '',
-    patientPopulation: p.patientPopulation || '',
-    specs: p.specs || '',
-    regNotes: p.regNotes || '',
-    image: p.image || null,
-    status: p.status,
-    clearances: (p.clearances || [])
-      .slice()
-      .sort((a, b) => a.region.localeCompare(b.region))
-      .map((c) => ({ region: c.region, status: c.status, notes: c.notes || null })),
-    trials: (p.trials || [])
-      .slice()
-      .sort((a, b) => a.displayOrder - b.displayOrder)
-      .map((t) => ({
-        trial: t.trial,
-        identifier: t.identifier || '',
-        n: t.n || '',
-        design: t.design || '',
-        result: t.result || '',
-      })),
-  };
-}
 
 const WITH_RELATIONS = { clearances: true, trials: true };
 

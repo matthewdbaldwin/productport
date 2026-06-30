@@ -15,36 +15,13 @@ const fs = require('node:fs');
 const path = require('node:path');
 const { parse } = require('csv-parse/sync');
 const db = require('../src/lib/db');
+const { parseProductRow, parseTrialRow } = require('../src/lib/productRow');
 
 const DATA_DIR = path.join(__dirname, 'seed-data');
-const REGIONS = ['FDA', 'CE', 'NMPA', 'PMDA'];
-
-// Clearance word (Builder CSV) → ClearanceStatus enum. Mirrors the Builder's
-// MK_FROM_WORD map so the live catalog matches the offline HTML exactly.
-const STATUS_FROM_WORD = {
-  cleared: 'APPROVED',
-  approved: 'APPROVED',
-  'in progress': 'IN_PROGRESS',
-  in_progress: 'IN_PROGRESS',
-  submitted: 'SUBMITTED',
-  'not cleared': 'NOT_APPROVED',
-  not_approved: 'NOT_APPROVED',
-  '': 'NONE',
-  none: 'NONE',
-};
-
-function clearanceStatus(word) {
-  return STATUS_FROM_WORD[(word || '').trim().toLowerCase()] ?? 'NONE';
-}
 
 function readCsv(file) {
   const raw = fs.readFileSync(path.join(DATA_DIR, file), 'utf8');
   return parse(raw, { columns: true, bom: true, skip_empty_lines: true, trim: false });
-}
-
-function blankToNull(v) {
-  const s = (v == null ? '' : String(v)).trim();
-  return s === '' ? null : s;
 }
 
 async function main() {
@@ -68,58 +45,28 @@ async function main() {
   let trialCount = 0;
 
   for (const [i, r] of productRows.entries()) {
-    const slug = (r.id || '').trim();
+    let slug = (r.id || '').trim();
     try {
-      if (!slug) throw new Error('missing id/slug');
-      if (!r.name || !r.name.trim()) throw new Error('missing name');
-      if (!r.subsidiary || !r.subsidiary.trim()) throw new Error('missing subsidiary');
-      if (!r.therapeutic_area || !r.therapeutic_area.trim()) throw new Error('missing therapeutic_area');
-
-      const data = {
-        slug,
-        name: r.name.trim(),
-        subsidiary: r.subsidiary.trim(),
-        therapeuticArea: r.therapeutic_area.trim(),
-        category: blankToNull(r.category),
-        type: blankToNull(r.type),
-        tagline: blankToNull(r.tagline),
-        overview: blankToNull(r.overview),
-        features: blankToNull(r.features),
-        indication: blankToNull(r.indication),
-        patientPopulation: blankToNull(r.patient_population),
-        specs: blankToNull(r.specs),
-        regNotes: blankToNull(r.reg_notes),
-        image: blankToNull(r.image),
-        status: 'ACTIVE',
-      };
+      const parsed = parseProductRow(r);
+      slug = parsed.slug;
 
       const product = await db.product.upsert({
         where: { slug },
-        update: data,
-        create: data,
+        update: parsed.data,
+        create: parsed.data,
       });
 
       // Replace this product's clearance matrix (4 region rows).
       await db.regulatoryClearance.deleteMany({ where: { productId: product.id } });
-      const clearances = REGIONS.map((region) => ({
-        productId: product.id,
-        region,
-        status: clearanceStatus(r[region.toLowerCase()]),
-        notes: null,
-      }));
+      const clearances = parsed.clearances.map((c) => ({ ...c, productId: product.id }));
       await db.regulatoryClearance.createMany({ data: clearances });
       clearanceCount += clearances.length;
 
       // Replace this product's trial rows.
       await db.trial.deleteMany({ where: { productId: product.id } });
       const trials = (trialsBySlug.get(slug) || []).map((t, order) => ({
+        ...parseTrialRow(t, order),
         productId: product.id,
-        trial: (t.trial || '').trim() || '(unnamed trial)',
-        identifier: blankToNull(t.identifier),
-        n: blankToNull(t.n),
-        design: blankToNull(t.design),
-        result: blankToNull(t.result),
-        displayOrder: order,
       }));
       if (trials.length) {
         await db.trial.createMany({ data: trials });
