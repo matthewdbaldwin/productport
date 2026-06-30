@@ -1,41 +1,79 @@
-name: Deploy (prod)
+name: Deploy to AWS (prod)
+
+# Builds main into :latest images and rolls the productport service in the
+# microport (prod) cluster. Two-image fleet pattern: productport-api (root
+# Dockerfile) + productport-web (web/Dockerfile). Same OIDC role.
 
 on:
   push:
     branches: [main]
+    paths-ignore:
+      - 'docs/**'
+      - '*.md'
+      - 'LICENSE'
+      - '.gitignore'
+      - '.env.example'
+
+concurrency:
+  group: deploy-prod-${{ github.ref }}
+  cancel-in-progress: true
 
 permissions:
-  id-token: write   # OIDC
+  id-token: write
   contents: read
+  packages: read
 
 env:
   AWS_REGION: eu-central-1
-  ECR_REPO: productport
+  ECR_REGISTRY: 682624892433.dkr.ecr.eu-central-1.amazonaws.com
   ECS_CLUSTER: microport
-  ECS_SERVICE: productport        # bare-named, not <app>-api
+  ECS_SERVICE: productport
 
 jobs:
   deploy:
+    name: Build & Deploy (prod)
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: aws-actions/configure-aws-credentials@v4
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - name: Configure AWS credentials (OIDC)
+        uses: aws-actions/configure-aws-credentials@v6
         with:
-          role-to-assume: ${{ secrets.AWS_DEPLOY_ROLE_ARN }}   # OIDC role (create in Phase 7)
+          role-to-assume: arn:aws:iam::682624892433:role/GitHubActionsDeployRole
           aws-region: ${{ env.AWS_REGION }}
-      - uses: aws-actions/amazon-ecr-login@v2
-        id: ecr
-      - name: Build & push API image
+
+      - name: Log in to Amazon ECR
+        uses: aws-actions/amazon-ecr-login@v2
+
+      - name: Build and push productport-api:latest
         env:
-          REGISTRY: ${{ steps.ecr.outputs.registry }}
           NODE_AUTH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          IMAGE="$REGISTRY/$ECR_REPO:$GITHUB_SHA"
-          docker build --build-arg NODE_AUTH_TOKEN="$NODE_AUTH_TOKEN" -t "$IMAGE" .
-          docker push "$IMAGE"
-          echo "IMAGE=$IMAGE" >> "$GITHUB_ENV"
-      - name: Roll the ECS service
+          docker build --build-arg NODE_AUTH_TOKEN=$NODE_AUTH_TOKEN -t $ECR_REGISTRY/productport-api:latest .
+          docker push $ECR_REGISTRY/productport-api:latest
+
+      - name: Build and push productport-web:latest
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          aws ecs update-service --cluster "$ECS_CLUSTER" --service "$ECS_SERVICE" --force-new-deployment >/dev/null
-          # Verify the new task picks up the image — feedback_ecs_gha_stale_image.
-          aws ecs wait services-stable --cluster "$ECS_CLUSTER" --services "$ECS_SERVICE"
+          docker build \
+            --build-arg API_URL=http://localhost:4006 \
+            --build-arg NODE_AUTH_TOKEN=$NODE_AUTH_TOKEN \
+            -t $ECR_REGISTRY/productport-web:latest ./web
+          docker push $ECR_REGISTRY/productport-web:latest
+
+      - name: Deploy to ECS (prod)
+        run: |
+          aws ecs update-service \
+            --cluster $ECS_CLUSTER \
+            --service $ECS_SERVICE \
+            --force-new-deployment \
+            --output json \
+            --query "service.{service:serviceName,status:status}" \
+            | cat
+
+      - name: Wait for ECS rollover (prod)
+        run: |
+          aws ecs wait services-stable --cluster $ECS_CLUSTER --services $ECS_SERVICE --region $AWS_REGION \
+          || aws ecs wait services-stable --cluster $ECS_CLUSTER --services $ECS_SERVICE --region $AWS_REGION

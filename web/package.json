@@ -4,8 +4,9 @@
   "private": true,
   "scripts": {
     "dev": "next dev -p 3100",
+    "//start-note": "PORT env set to 3000 by the task def (fleet web container_port)",
     "build": "next build",
-    "start": "next start -p 3100",
+    "start": "next start -p ${PORT:-3000}",
     "lint": "eslint .",
     "e2e": "playwright test"
   },
