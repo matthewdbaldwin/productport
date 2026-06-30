@@ -8,7 +8,7 @@ const nextConfig = {
   reactStrictMode: true,
   async rewrites() {
     // Proxy /api → the ProductPort API so the web app stays same-origin.
-    return [{ source: '/api/:path*', destination: `${process.env.API_ORIGIN || 'http://localhost:4100'}/api/:path*` }];
+    return [{ source: '/api/:path*', destination: `${process.env.API_ORIGIN || 'http://localhost:4006'}/api/:path*` }];
   },
 };
 
