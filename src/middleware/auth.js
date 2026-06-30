@@ -9,7 +9,8 @@
 const db = require('../lib/db');
 const logger = require('../lib/logger');
 const { createVerifier } = require('@matthewdbaldwin/microport-auth');
-const { SsoClaims, mapContractRole } = require('@matthewdbaldwin/microport-contracts');
+// contracts exports `mapRole`; alias to mapContractRole to match the fleet.
+const { SsoClaims, mapRole: mapContractRole } = require('@matthewdbaldwin/microport-contracts');
 
 const COOKIE_NAME = 'productport_token';
 const AUDIENCE    = ['productport', 'microport-apps'];
@@ -50,7 +51,10 @@ async function requireAuth(req, res, next) {
     }
 
     // ONE role map for the whole platform; null = not granted → 403 (not a loop).
-    const role = mapContractRole('productport', payload);
+    // Extract this app's wire role from the SSO claims, then map it to the Prisma
+    // enum value via the contract (mapRole takes the wire-role STRING).
+    const wireRole = payload.app_roles?.productport;
+    const role = wireRole ? mapContractRole('productport', wireRole) : null;
     if (!role) {
       return res.status(403).json({
         error: 'You do not have access to ProductPort. Ask your admin to grant access in SalesPort.',
