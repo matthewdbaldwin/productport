@@ -53,7 +53,10 @@ const STATUS_META: Record<ClearanceStatus, { label: string; bg: string; fg: stri
   NONE:         { label: '—',           bg: '#eef0f3',    fg: '#6b7280' },
 };
 
-const imgSrc = (p: Product) => (p.image ? `/products/${p.image}` : null);
+// Grid cards use a lightweight ~240px WebP thumbnail (products/thumbs/, generated
+// by web/scripts/optimize-images.mjs); the detail modal uses the full original.
+const thumbSrc = (p: Product) => (p.image ? `/products/thumbs/${p.image.replace(/\.(jpe?g|png)$/i, '.webp')}` : null);
+const fullSrc = (p: Product) => (p.image ? `/products/${p.image}` : null);
 const statusOf = (p: Product, region: string): ClearanceStatus =>
   p.clearances.find((c) => c.region === region)?.status ?? 'NONE';
 const splitList = (v: string) => (v || '').split('|').map((x) => x.trim()).filter(Boolean);
@@ -76,9 +79,9 @@ function MarketChips({ p }: { p: Product }) {
   return <>{chips}</>;
 }
 
-function ProductImg({ p }: { p: Product }) {
-  const src = imgSrc(p);
-  if (src) return <img src={src} alt={p.name} />;
+function ProductImg({ p, thumb }: { p: Product; thumb?: boolean }) {
+  const src = thumb ? thumbSrc(p) : fullSrc(p);
+  if (src) return <img src={src} alt={p.name} loading={thumb ? 'lazy' : undefined} />;
   return (
     <div className={s.ph}>
       <img src="/products/logo.jpg" alt="" />
@@ -360,7 +363,7 @@ export default function CatalogPage() {
                   data-testid={`product-card-${p.id}`}
                   onClick={() => setOpenId(p.id)}
                 >
-                  <div className={s.cimg}><ProductImg p={p} /></div>
+                  <div className={s.cimg}><ProductImg p={p} thumb /></div>
                   <div className={s.cb}>
                     <div className={s.ftag}>{p.therapeuticArea}</div>
                     <div className={s.cn}>{p.name}</div>
