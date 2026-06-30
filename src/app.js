@@ -53,8 +53,9 @@ app.use('/api/webhooks', require('./routes/webhooks'));
 app.use('/api/auth', require('./routes/auth'));
 
 // ── Authenticated business routes ────────────────────────────────────────────
-app.use('/api/sample', requireAuth, require('./routes/sample'));
-// SCAFFOLD: mount the platform's own routers here, each behind requireAuth.
+// Every authenticated employee is at least a `viewer` — the catalog read API is
+// open to all of them; editing lives in a role-gated router (P1 tail).
+app.use('/api/products', requireAuth, require('./routes/products'));
 
 // Outbound bug reports forward to the SalesPort central queue (signed).
 app.use('/api/cross-app', require('./routes/crossApp'));

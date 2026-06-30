@@ -10,3 +10,4 @@ playwright-report/
 prisma/*.db
 .DS_Store
 *.tsbuildinfo
+next-env.d.ts

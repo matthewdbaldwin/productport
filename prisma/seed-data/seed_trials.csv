@@ -1,0 +1,30 @@
+product_id,trial,identifier,n,design,result
+firehawk,TARGET IV,NCT04562532,"1,720","Multicenter 1:1 RCT, non-inferiority vs 2nd-gen DES",12-mo TLF 3.4% vs 3.3% — non-inferior
+firehawk,TARGET PK,—,14,Open human PK study (United States),Cmax 287.3 pg/ml; t½ 210.2 h
+firehawk,TARGET AC,—,"1,653",All-comers RCT vs Xience (10 EU countries),1-yr TLF 6.1% vs 5.9% — non-inferior
+firehawk,TARGET FIRST,NCT04753749,"1,942","RCT, 40 EU sites; P2Y12 mono vs DAPT",Non-inferior MACE; less bleeding (HR 0.46)
+firehawk_liberty,TARGET FIRST,NCT04753749,"1,942","RCT, 40 EU sites; P2Y12 mono vs DAPT",Non-inferior MACE; less bleeding at 1 yr
+firesorb,FUTURE-I,NCT02659254,45,Prospective single-center,TLF 0% to 2 yr; 2.2% at 3–5 yr
+firesorb,FUTURE-II,NCT02890160,430,Multicenter RCT (1:1),1-yr LLL 0.17 vs 0.19 mm — non-inferior
+firesorb,FUTURE-III,NCT03660202,990,Multicenter single-arm,1-yr TLF 1.92%
+firelimus,PROMISE-BIF,NCT04918615,236,"Multicenter RCT, non-inferiority",9-mo %DS 29.3% vs 29.5% — non-inferior
+fireraptor,CORECT,NCT05447585,224,RCT / registry,Non-inferior (event-rate difference −0.1%)
+tomahawk,VIGOUR,NCT05818098,189,Registry,Procedure success 95% CI 89.9–97.4%
+firespear,VITAL,—,149,Registry (core-lab adjudicated),Device success 93.3% (>70% goal)
+vitaflow,TAVI I,NCT04655742,110,"Multicenter single-arm, 5-yr",All-cause mortality 2.7% at 12 mo; 18.2% at 5 yr
+vitaflow_liberty,TAVI II,NCT04414878,163,"Multicenter single-arm, OPC-controlled",12-mo all-cause mortality 6.1% (vs 27% threshold)
+anchorman,SAFE-PROTECT,NCT04479722,211,Multicenter RCT vs Watchman,1-yr clinical success 98.1% — non-inferior
+columbus,China pre-market,—,167,Multicenter non-randomized,Overall success rate 100%
+trueforce,China RFA-PAF,—,120,Multicenter single-arm,12-mo success 81.7%; 100% isolation
+trueforce,China PFA-SVT,NCT05820035,164,Multicenter,6-mo success 97.4%
+easyecho,China,ChiCTR2500099249,134,"RCT, non-inferiority vs CartoSound",100% good-image rate — non-inferior
+pulsemagic_cath,China,ChiCTR2400090647,149,Multicenter single-arm,Clinical follow-up in progress
+pulsemagic_gen,China,ChiCTR2400090647,149,Multicenter single-arm,Clinical follow-up in progress
+optimablate_gen,China RCT,—,140,RCT 1:1 vs EP Shuttle RF (J&J),100% acute success; no significant difference
+cratos,China,ChiCTR2200064412,89,Multicenter single-arm,30-day MAE 3.4%; 12-mo branch patency 95.1%
+cratos,CEDAR,—,—,European registry,Ongoing
+hector,China FIH,—,11,Single-center,0% mortality; 100% branch patency
+hector,China pivotal,ChiCTR2500108805,96,Multicenter single-arm,Ongoing
+talos,China,ChiCTR2500107084,137,Multicenter single-arm,12-mo treatment success 97.1%
+minos,China,—,136,Multicenter single-arm,12-mo clinical success 89%
+minos,PEARL,—,—,European registry,Ongoing

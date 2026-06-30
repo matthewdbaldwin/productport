@@ -5,18 +5,24 @@
 // all hand-written SQL must match. feedback_prisma_migration_fk_table_naming_per_repo.
 
 generator client {
-  provider        = "prisma-client-js"
-  previewFeatures = ["driverAdapters"]
+  provider = "prisma-client-js"
 }
 
 datasource db {
+  // Prisma 7.8 removed `url` from the schema — the connection URL lives in
+  // prisma.config.mjs (Migrate) + the PrismaPg adapter (runtime). See
+  // feedback_prisma_config_mjs_not_ts.
   provider = "postgresql"
-  url      = env("DATABASE_URL")
 }
 
+// Role model (PRD §5). Every authenticated employee is a `viewer` by default
+// (read-only browse); editing is role-gated. Mirror these values in
+// microport-contracts ROLE_CONTRACTS.productport (Phase 4) — the SSO role map
+// must agree or hires 403 / unknown_role at login.
 enum Role {
-  product
-  admin
+  viewer
+  product        // edit descriptive fields + trials + images
+  product_admin  // + regulatory-clearance matrix, taxonomy, lifecycle
   superuser
 }
 
@@ -24,15 +30,122 @@ model User {
   id          Int       @id @default(autoincrement())
   email       String    @unique
   name        String?
-  role        Role      @default(product)
+  role        Role      @default(viewer)
   active      Boolean   @default(true)
   locale      String?   @default("en-US")
   password    String?   // null for SSO-only users
   createdAt   DateTime  @default(now())
   updatedAt   DateTime  @updatedAt
   sessions    Session[]
+  audits      ProductAudit[]
 
   @@map("User")
+}
+
+// ── Catalog (ProductPort-owned master) ─────────────────────────────────────
+// PRD §4 object model. ProductPort is the system of record for product
+// descriptive + regulatory-clearance + clinical-evidence data. MDMcode is the
+// (later) mesh join key, minted by SalesPort — nullable until the P2 mapping.
+
+enum ProductStatus {
+  ACTIVE
+  DISCONTINUED
+  DRAFT
+}
+
+enum ClearanceStatus {
+  APPROVED       // "cleared"
+  IN_PROGRESS    // "in progress"
+  SUBMITTED      // "submitted"
+  NOT_APPROVED   // "not cleared"
+  NONE           // no status on file
+}
+
+model Product {
+  id               String        @id @default(cuid())
+  // The original catalog key from the standalone tool (e.g. "accusniper").
+  // Stable, human-readable, used in URLs + the seed image filename.
+  slug             String        @unique
+  name             String
+  subsidiary       String
+  therapeuticArea  String
+  category         String?
+  type             String?
+  tagline          String?
+  overview         String?       @db.Text
+  features         String?       @db.Text  // pipe-delimited list (legacy format)
+  indication       String?       @db.Text
+  patientPopulation String?      @db.Text
+  specs            String?       @db.Text  // pipe-delimited "key: value" list
+  regNotes         String?       @db.Text
+  image            String?                 // primary image filename (served from web/public/products)
+  mdmCode          String?       @unique    // mesh join key (P2) — minted by SalesPort
+  status           ProductStatus @default(ACTIVE)
+  createdAt        DateTime      @default(now())
+  updatedAt        DateTime      @updatedAt
+  deletedAt        DateTime?
+
+  clearances       RegulatoryClearance[]
+  trials           Trial[]
+  audits           ProductAudit[]
+
+  @@index([therapeuticArea])
+  @@index([subsidiary])
+  @@index([category])
+  @@index([status])
+  @@map("products")
+}
+
+// Per-product, per-region clearance row (PRD §4). Modelled as rows (not four
+// boolean columns) so a 5th regulatory body is one INSERT, not a migration —
+// `region` is a free string validated in app code against the known set.
+model RegulatoryClearance {
+  id         String          @id @default(cuid())
+  productId  String
+  product    Product         @relation(fields: [productId], references: [id], onDelete: Cascade)
+  region     String          // FDA | CE | NMPA | PMDA | …
+  status     ClearanceStatus @default(NONE)
+  notes      String?
+  updatedAt  DateTime        @updatedAt
+
+  @@unique([productId, region])
+  @@index([region, status])
+  @@map("regulatory_clearances")
+}
+
+model Trial {
+  id           String   @id @default(cuid())
+  productId    String
+  product      Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
+  trial        String
+  identifier   String?
+  n            String?  // free-text in the seed ("1,114", "N/A", ranges)
+  design       String?
+  result       String?  @db.Text
+  displayOrder Int      @default(0)
+
+  @@index([productId])
+  @@map("trials")
+}
+
+// Append-only edit log — net-new vs the single-user SQLite tool, required for a
+// multi-user authoritative master (PRD §4).
+model ProductAudit {
+  id         String   @id @default(cuid())
+  productId  String?
+  product    Product? @relation(fields: [productId], references: [id], onDelete: SetNull)
+  userId     Int?
+  user       User?    @relation(fields: [userId], references: [id], onDelete: SetNull)
+  userEmail  String
+  action     String   // created | updated | deleted | clearance.updated | trial.added | …
+  field      String?
+  oldValue   String?  @db.Text
+  newValue   String?  @db.Text
+  createdAt  DateTime @default(now())
+
+  @@index([productId])
+  @@index([createdAt])
+  @@map("product_audits")
 }
 
 // Server-side session for jti-bearing tokens (B1 Phase 4b) — revocation + UI.
