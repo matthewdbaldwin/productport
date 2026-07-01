@@ -6,6 +6,9 @@ import { LocaleProvider } from '@/components/LocaleProvider';
 import { BugReportButton } from '@/components/BugReportButton';
 
 export const metadata = {
+  // Absolute-URL base so relative og:image / og:url resolve for social scrapers.
+  // Env-overridable; the fallback is the canonical AWS prod host.
+  metadataBase: new URL(process.env.NEXT_PUBLIC_APP_URL ?? 'https://product.microport.com'),
   title: { default: 'ProductPort', template: '%s · ProductPort' },
   description: 'MicroPort product catalog — internal use only.',
   // Icon set lives in web/public (served statically).
