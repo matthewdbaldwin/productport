@@ -8,12 +8,12 @@
 -- slug still exists. Image filenames keep their underscores (real files on disk).
 -- Prisma 7 + adapter-pg: migrations are NOT transactional, so each statement
 -- stands alone and is individually safe to re-run.
-UPDATE "Product" SET slug = 'firehawk-liberty'   WHERE slug = 'firehawk_liberty';
-UPDATE "Product" SET slug = 'firefighter-pro'    WHERE slug = 'firefighter_pro';
-UPDATE "Product" SET slug = 'firefighter-ncpro'  WHERE slug = 'firefighter_ncpro';
-UPDATE "Product" SET slug = 'vitaflow-liberty'   WHERE slug = 'vitaflow_liberty';
-UPDATE "Product" SET slug = 'vitaflow-flex'      WHERE slug = 'vitaflow_flex';
-UPDATE "Product" SET slug = 'pulsemagic-cath'    WHERE slug = 'pulsemagic_cath';
-UPDATE "Product" SET slug = 'pulsemagic-gen'     WHERE slug = 'pulsemagic_gen';
-UPDATE "Product" SET slug = 'optimablate-gen'    WHERE slug = 'optimablate_gen';
-UPDATE "Product" SET slug = 'optimablate-pump'   WHERE slug = 'optimablate_pump';
+UPDATE "products" SET slug = 'firehawk-liberty'   WHERE slug = 'firehawk_liberty';
+UPDATE "products" SET slug = 'firefighter-pro'    WHERE slug = 'firefighter_pro';
+UPDATE "products" SET slug = 'firefighter-ncpro'  WHERE slug = 'firefighter_ncpro';
+UPDATE "products" SET slug = 'vitaflow-liberty'   WHERE slug = 'vitaflow_liberty';
+UPDATE "products" SET slug = 'vitaflow-flex'      WHERE slug = 'vitaflow_flex';
+UPDATE "products" SET slug = 'pulsemagic-cath'    WHERE slug = 'pulsemagic_cath';
+UPDATE "products" SET slug = 'pulsemagic-gen'     WHERE slug = 'pulsemagic_gen';
+UPDATE "products" SET slug = 'optimablate-gen'    WHERE slug = 'optimablate_gen';
+UPDATE "products" SET slug = 'optimablate-pump'   WHERE slug = 'optimablate_pump';
