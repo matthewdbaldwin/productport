@@ -10,9 +10,11 @@
 //   aws ecs run-task ... --overrides '{"containerOverrides":[{"name":"productport-api",
 //     "command":["node","scripts/import-brochure.js"]}]}'
 //
-// Guard rail: NODE_ENV is "production" even on dev ECS, so gate on the DB NAME in
-// DATABASE_URL (must contain "dev"). Set ALLOW_PROD_IMPORT=1 to override for the
-// eventual prod load. DRY_RUN=1 classifies created/updated with NO writes.
+// Guard rail: NODE_ENV is "production" even on dev ECS, and the dev DB NAME is
+// plain "productport" (the dev-ness is in the HOST: platform-db-dev), so gate on
+// the whole DATABASE_URL containing "-dev". Prod's URL lives in Secrets Manager
+// with host platform-db (no "-dev"). Set ALLOW_PROD_IMPORT=1 for the prod load.
+// DRY_RUN=1 classifies created/updated with NO writes.
 'use strict';
 const fs = require('node:fs');
 const path = require('node:path');
@@ -26,19 +28,20 @@ const DRY_RUN = process.env.DRY_RUN === '1';
 
 function assertDbTarget() {
   const url = process.env.DATABASE_URL || '';
-  const dbName = (url.split('/').pop() || '').split('?')[0];
-  if (dbName.includes('dev') || process.env.ALLOW_PROD_IMPORT === '1') return dbName;
+  const host = (url.replace(/^[a-z]+:\/\/[^@]*@/i, '').split('/')[0] || '').split('?')[0];
+  const isDev = url.includes('-dev');
+  if (isDev || process.env.ALLOW_PROD_IMPORT === '1') return host || '(unknown host)';
   throw new Error(
-    `refusing to import into "${dbName}" — DB name has no "dev". Set ALLOW_PROD_IMPORT=1 to load prod.`,
+    `refusing to import — host "${host}" is not a dev host (no "-dev"). Set ALLOW_PROD_IMPORT=1 to load prod.`,
   );
 }
 
 async function main() {
-  const dbName = assertDbTarget();
+  const host = assertDbTarget();
   const rows = parse(fs.readFileSync(CSV_PATH, 'utf8'), {
     columns: true, bom: true, skip_empty_lines: true, trim: false,
   });
-  console.log(`[import-brochure] target=${dbName} rows=${rows.length} dryRun=${DRY_RUN}`);
+  console.log(`[import-brochure] target=${host} rows=${rows.length} dryRun=${DRY_RUN}`);
 
   // Real write, or dry-run classify (read-only findUnique, no upsert).
   const upsertRow = DRY_RUN
