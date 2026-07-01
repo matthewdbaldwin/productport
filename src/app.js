@@ -57,8 +57,9 @@ app.use('/api/auth', require('./routes/auth'));
 // open to all of them; editing lives in a role-gated router (P1 tail).
 app.use('/api/products', requireAuth, require('./routes/products'));
 
-// Outbound bug reports forward to the SalesPort central queue (signed).
-app.use('/api/cross-app', require('./routes/crossApp'));
+// Outbound bug reports forward SYNCHRONOUSLY to the SalesPort central queue
+// (signed, fleet pattern). bug-report-fanout.
+app.use('/api/bug-reports', require('./routes/bugReports'));
 
 // Error handler LAST — 5xx → generic body (no leak), 4xx surface their message,
 // err.status/.code honored. From microport-auth.

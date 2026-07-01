@@ -1,7 +1,7 @@
 'use client';
 
 // Floating "Report a bug" — every authed user can file; forwards to the
-// SalesPort central queue via /api/cross-app/bug-report.
+// SalesPort central queue via /api/bug-reports (synchronous signed fanout).
 //
 // Rendered via createPortal to document.body so it isn't clipped by any
 // overflow/transform ancestor, and Firefox actually paints it. Positioned
@@ -25,9 +25,16 @@ export function BugReportButton() {
   if (!mounted) return null;
 
   async function submit() {
-    await api('/api/cross-app/bug-report', {
+    await api('/api/bug-reports', {
       method: 'POST',
-      body: JSON.stringify({ title, detail, url: window.location.href }),
+      body: JSON.stringify({
+        title,
+        description: detail,
+        pageUrl: window.location.href,
+        browserAgent: navigator.userAgent,
+        viewportSize: `${window.innerWidth}x${window.innerHeight}`,
+        priority: 'normal',
+      }),
     }).catch(() => {});
     setSent(true);
     setTitle(''); setDetail('');
