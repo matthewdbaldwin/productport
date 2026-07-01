@@ -57,6 +57,31 @@ export const updateProduct = (slug: string, input: ProductInput) =>
 export const deleteProduct = (slug: string) =>
   api<{ ok: true }>(`products/${encodeURIComponent(slug)}`, { method: 'DELETE' });
 
+// Upload a product image (multipart). Uses raw fetch, not the api() wrapper,
+// because the wrapper forces Content-Type: application/json — for FormData the
+// browser must set the multipart boundary itself. Keeps the CSRF header + cookie.
+export async function uploadProductImage(slug: string, file: File): Promise<{ product: unknown }> {
+  const fd = new FormData();
+  fd.append('file', file);
+  const res = await fetch(`/api/products/${encodeURIComponent(slug)}/image`, {
+    method: 'POST',
+    headers: { 'X-Requested-With': 'productport-web' },
+    body: fd,
+    credentials: 'include',
+  });
+  const text = await res.text();
+  const body = text ? (() => { try { return JSON.parse(text); } catch { return { error: text }; } })() : null;
+  if (!res.ok) throw new Error((body && (body.error || body.message)) || `Upload failed (${res.status})`);
+  return body as { product: unknown };
+}
+
+// The <img src> for a product image: uploaded (s3:) images resolve through the
+// API's presigned-redirect endpoint; legacy filenames stay on the static path.
+export const productImageSrc = (slug: string, image?: string | null): string | null => {
+  if (!image) return null;
+  return image.startsWith('s3:') ? `/api/products/${encodeURIComponent(slug)}/image` : `/products/${image}`;
+};
+
 export interface ImportResult {
   total: number;
   created: number;

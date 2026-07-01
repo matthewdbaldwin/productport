@@ -60,8 +60,15 @@ const STATUS_META: Record<ClearanceStatus, { label: string; bg: string; fg: stri
 
 // Grid cards use a lightweight ~240px WebP thumbnail (products/thumbs/, generated
 // by web/scripts/optimize-images.mjs); the detail modal uses the full original.
-const thumbSrc = (p: Product) => (p.image ? `/products/thumbs/${p.image.replace(/\.(jpe?g|png)$/i, '.webp')}` : null);
-const fullSrc = (p: Product) => (p.image ? `/products/${p.image}` : null);
+// Uploaded (s3:) images resolve through the API's presigned redirect (no static
+// thumb variant — the full image is served for both); legacy filenames keep the
+// optimized /products/thumbs/*.webp + /products/<file> static paths.
+const thumbSrc = (p: Product) => (!p.image ? null
+  : p.image.startsWith('s3:') ? `/api/products/${encodeURIComponent(p.id)}/image`
+  : `/products/thumbs/${p.image.replace(/\.(jpe?g|png)$/i, '.webp')}`);
+const fullSrc = (p: Product) => (!p.image ? null
+  : p.image.startsWith('s3:') ? `/api/products/${encodeURIComponent(p.id)}/image`
+  : `/products/${p.image}`);
 const splitList = (v: string) => (v || '').split('|').map((x) => x.trim()).filter(Boolean);
 
 function Chip({ label, status }: { label: string; status: ClearanceStatus }) {

@@ -9,7 +9,7 @@ import { useState } from 'react';
 import { useModalEsc, useFocusTrap } from '@matthewdbaldwin/microport-ui';
 import s from './catalog.module.css';
 import {
-  createProduct, updateProduct, deleteProduct, THERAPEUTIC_AREAS,
+  createProduct, updateProduct, deleteProduct, uploadProductImage, productImageSrc, THERAPEUTIC_AREAS,
   type ProductInput, type ProductTier, type ProductClassification, type ProductStatus,
 } from '@/lib/products';
 
@@ -37,8 +37,26 @@ export function ProductEditModal({ mode, initial, onClose, onSaved }: {
   const [saving, setSaving] = useState(false);
   const [err, setErr] = useState('');
   const [confirmDel, setConfirmDel] = useState(false);
+  const [uploading, setUploading] = useState(false);
   useModalEsc(onClose);
   const trapRef = useFocusTrap<HTMLDivElement>();
+
+  // Image upload targets the existing product (POST /:slug/image), so it stamps
+  // + persists product.image server-side immediately. Reflect it in the form.
+  async function onPickImage(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    e.target.value = ''; // allow re-picking the same file
+    if (!file) return;
+    setUploading(true); setErr('');
+    try {
+      const { product } = await uploadProductImage(i.slug as string, file);
+      const img = (product as { image?: string }).image ?? '';
+      setF((p) => ({ ...p, image: img }));
+      onSaved(); // refresh the catalog thumbnail
+    } catch (er) {
+      setErr(er instanceof Error ? er.message : 'Image upload failed');
+    } finally { setUploading(false); }
+  }
 
   const set = (k: string) => (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) =>
     setF((p) => ({ ...p, [k]: e.target.value }));
@@ -127,6 +145,22 @@ export function ProductEditModal({ mode, initial, onClose, onSaved }: {
           </label>
           {text('developmentStatus', 'Development status')}
         </div>
+
+        {mode === 'edit' && (
+          <div className={s.efield} style={{ marginBottom: 12 }}>
+            <span>Product image</span>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginTop: 4 }}>
+              {productImageSrc(i.slug as string, f.image)
+                ? <img src={productImageSrc(i.slug as string, f.image) as string} alt="" style={{ width: 64, height: 64, objectFit: 'cover', borderRadius: 6, border: '1px solid var(--lgrey)' }} />
+                : <span style={{ width: 64, height: 64, display: 'grid', placeItems: 'center', borderRadius: 6, border: '1px dashed var(--lgrey)', color: 'var(--grey)', fontSize: 11 }}>none</span>}
+              <label className={s.ebtnGhost} style={{ cursor: 'pointer' }}>
+                {uploading ? 'Uploading…' : 'Upload image'}
+                <input type="file" accept="image/jpeg,image/png,image/webp" onChange={onPickImage} disabled={uploading} style={{ display: 'none' }} />
+              </label>
+              <em style={{ color: 'var(--grey)', fontWeight: 400, fontSize: 12 }}>JPEG / PNG / WebP, max 6 MB. Replaces immediately.</em>
+            </div>
+          </div>
+        )}
 
         {text('tagline', 'Tagline')}
         {area('overview', 'Overview')}

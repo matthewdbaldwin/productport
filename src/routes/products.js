@@ -16,10 +16,17 @@ const { validateProductWrite } = require('../lib/productWrite');
 const { importProducts } = require('../lib/importProducts');
 const { serializeProductRow, EXPORT_COLUMNS } = require('../lib/serializeProductRow');
 const { upsertProductRow } = require('../lib/productUpsert');
+const { putAsset, getDownloadUrl } = require('../lib/assetStorage');
+const { validateImageUpload, toImageValue, isS3Image, s3KeyOf } = require('../lib/productImage');
 const { requireProductAdmin } = require('../middleware/auth');
 const { parse: parseCsv } = require('csv-parse/sync');
+const multer = require('multer');
 
 const router = express.Router();
+
+// In-memory single-file upload → streamed to S3 in the handler (never touches
+// the container disk). 6 MB hard cap at the multer layer too.
+const uploadImage = multer({ storage: multer.memoryStorage(), limits: { fileSize: 6 * 1024 * 1024 } }).single('file');
 
 // Append-only edit trail. Never throws into the request path (a failed audit
 // write must not fail the mutation it records).
@@ -162,6 +169,44 @@ router.post(
     } catch (err) { next(err); }
   },
 );
+
+// GET /api/products/:slug/image — 302 to a fresh pre-signed URL for an uploaded
+// image (private bucket). Legacy filename images aren't served here — the web
+// points <img> straight at /products/<file> for those. Viewer-open (router auth).
+router.get('/:slug/image', async (req, res, next) => {
+  try {
+    const product = await db.product.findFirst({
+      where: { slug: req.params.slug, deletedAt: null }, select: { image: true },
+    });
+    if (!product || !isS3Image(product.image)) return res.status(404).json({ error: 'No uploaded image' });
+    res.redirect(302, await getDownloadUrl(s3KeyOf(product.image)));
+  } catch (err) { next(err); }
+});
+
+// POST /api/products/:slug/image — admin image upload (multipart 'file').
+// Streams to S3 under products/<sha>.<ext>, stamps product.image = s3:<key>.
+router.post('/:slug/image', requireProductAdmin, (req, res, next) => {
+  uploadImage(req, res, (merrUpload) => {
+    if (merrUpload) {
+      const status = merrUpload.code === 'LIMIT_FILE_SIZE' ? 413 : 400;
+      return res.status(status).json({ error: merrUpload.code === 'LIMIT_FILE_SIZE' ? 'image too large (max 6 MB)' : merrUpload.message });
+    }
+    (async () => {
+      const target = await db.product.findFirst({ where: { slug: req.params.slug, deletedAt: null } });
+      if (!target) return res.status(404).json({ error: 'Product not found' });
+      let meta;
+      try { meta = validateImageUpload(req.file); }
+      catch (e) { return res.status(e.status || 400).json({ error: e.message }); }
+
+      const { key } = await putAsset(req.file.buffer, `img.${meta.ext}`, meta.mimeType, { prefix: 'products' });
+      const updated = await db.product.update({
+        where: { id: target.id }, data: { image: toImageValue(key) }, include: WITH_RELATIONS,
+      });
+      await audit(req, 'image', updated.id, { key });
+      res.json({ product: shape(updated) });
+    })().catch(next);
+  });
+});
 
 // DELETE /api/products/:slug — soft-delete (sets deletedAt; recoverable).
 router.delete('/:slug', requireProductAdmin, async (req, res, next) => {
