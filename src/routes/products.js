@@ -15,6 +15,7 @@ const { shapeProduct: shape } = require('../lib/shapeProduct');
 const { validateProductWrite } = require('../lib/productWrite');
 const { importProducts } = require('../lib/importProducts');
 const { serializeProductRow, EXPORT_COLUMNS } = require('../lib/serializeProductRow');
+const { upsertProductRow } = require('../lib/productUpsert');
 const { requireProductAdmin } = require('../middleware/auth');
 const { parse: parseCsv } = require('csv-parse/sync');
 
@@ -136,14 +137,9 @@ router.patch('/:slug', requireProductAdmin, async (req, res, next) => {
 // The client POSTs the raw file contents (no multipart/multer needed — csv-parse
 // handles it). Upsert-on-slug + per-row error isolation via importProducts; the
 // response is 2xx even with per-row errors (they're data-level, downloadable).
-async function upsertRowToDb({ slug, data, clearances }) {
-  const existing = await db.product.findUnique({ where: { slug }, select: { id: true } });
-  const product = await db.product.upsert({ where: { slug }, update: data, create: data });
-  // Replace this product's clearance matrix (5 region rows).
-  await db.regulatoryClearance.deleteMany({ where: { productId: product.id } });
-  await db.regulatoryClearance.createMany({ data: clearances.map((c) => ({ ...c, productId: product.id })) });
-  return existing ? 'updated' : 'created';
-}
+// The per-row DB write is the shared upsertProductRow (also used by the one-off
+// bulk loaders) so the endpoint and the scripts persist rows identically.
+const upsertRowToDb = (row) => upsertProductRow(db, row);
 
 router.post(
   '/import',
