@@ -82,6 +82,7 @@ function ProductImg({ p, thumb }: { p: Product; thumb?: boolean }) {
 }
 
 function DetailModal({ p, onClose }: { p: Product; onClose: () => void }) {
+  const [copied, setCopied] = useState(false);
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose(); };
     document.addEventListener('keydown', onKey);
@@ -89,6 +90,16 @@ function DetailModal({ p, onClose }: { p: Product; onClose: () => void }) {
     document.body.style.overflow = 'hidden';
     return () => { document.removeEventListener('keydown', onKey); document.body.style.overflow = prev; };
   }, [onClose]);
+
+  // Canonical, shareable URL for this product — the link hub.microport.com (and
+  // anyone else) uses to deep-link straight to it. product.id === slug.
+  const copyLink = () => {
+    const href = `${window.location.origin}/?product=${p.id}`;
+    (navigator.clipboard?.writeText(href) ?? Promise.reject()).then(
+      () => { setCopied(true); setTimeout(() => setCopied(false), 1600); },
+      () => { window.prompt('Copy this product link', href); },
+    );
+  };
 
   const feats = splitList(p.features);
   const specs = splitList(p.specs).map((line) => {
@@ -111,6 +122,19 @@ function DetailModal({ p, onClose }: { p: Product; onClose: () => void }) {
               {p.tagline}<br />{p.subsidiary}{p.type ? ` · ${p.type}` : ''}
             </div>
             <div className={s.chips}><MarketChips p={p} /></div>
+            <button
+              type="button"
+              onClick={copyLink}
+              aria-label="Copy a shareable link to this product"
+              style={{
+                marginTop: 10, alignSelf: 'flex-start', cursor: 'pointer',
+                fontSize: 12, padding: '4px 10px', borderRadius: 6,
+                border: '1px solid var(--line, #d0d5dd)', background: 'transparent',
+                color: 'inherit',
+              }}
+            >
+              {copied ? '✓ Link copied' : '🔗 Copy link'}
+            </button>
           </div>
         </div>
         <div className={s.body}>
@@ -211,6 +235,29 @@ export default function CatalogPage() {
       .catch(() => { if (alive) setLoadError(true); });
     return () => { alive = false; };
   }, [user]);
+
+  // Canonical deep-link IN — open the product named in ?product=<slug> on load.
+  // product.id === slug (see shapeProduct), so this is the same key the modal
+  // routes on. Read window.location directly rather than useSearchParams so the
+  // static /catalog route never trips the client-hook prerender bailout.
+  useEffect(() => {
+    const slug = new URLSearchParams(window.location.search).get('product');
+    if (slug) setOpenId(slug);
+  }, []);
+
+  // Canonical deep-link OUT — reflect the open product in the URL (so a refresh
+  // or a copied link reopens it) and keep <link rel="canonical"> in sync. Uses
+  // replaceState (no history spam) and never triggers a navigation.
+  useEffect(() => {
+    const url = new URL(window.location.href);
+    if (openId) url.searchParams.set('product', openId);
+    else        url.searchParams.delete('product');
+    window.history.replaceState(null, '', url);
+
+    let link = document.querySelector<HTMLLinkElement>('link[rel="canonical"]');
+    if (!link) { link = document.createElement('link'); link.rel = 'canonical'; document.head.appendChild(link); }
+    link.href = openId ? `${url.origin}/?product=${openId}` : `${url.origin}/`;
+  }, [openId]);
 
   const areas = useMemo(() => orderedAreas(products ?? []), [products]);
   const subs = useMemo(() => [...new Set((products ?? []).map((p) => p.subsidiary))].sort(), [products]);
