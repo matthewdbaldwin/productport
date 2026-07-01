@@ -13,7 +13,10 @@ const express = require('express');
 const db = require('../lib/db');
 const { shapeProduct: shape } = require('../lib/shapeProduct');
 const { validateProductWrite } = require('../lib/productWrite');
+const { importProducts } = require('../lib/importProducts');
+const { serializeProductRow, EXPORT_COLUMNS } = require('../lib/serializeProductRow');
 const { requireProductAdmin } = require('../middleware/auth');
+const { parse: parseCsv } = require('csv-parse/sync');
 
 const router = express.Router();
 
@@ -49,6 +52,31 @@ router.get('/', async (_req, res, next) => {
   } catch (err) {
     next(err);
   }
+});
+
+// GET /api/products/export.csv — full catalog as a seed-format CSV (admin).
+// Registered BEFORE /:slug so the literal path isn't captured as a slug.
+router.get('/export.csv', requireProductAdmin, async (req, res, next) => {
+  try {
+    const products = await db.product.findMany({
+      where: { deletedAt: null },
+      include: { clearances: true },
+      orderBy: { name: 'asc' },
+    });
+    const esc = (v) => {
+      const str = String(v ?? '');
+      return /[",\n]/.test(str) ? `"${str.replace(/"/g, '""')}"` : str;
+    };
+    const lines = [EXPORT_COLUMNS.join(',')];
+    for (const p of products) {
+      const row = serializeProductRow(p, p.clearances);
+      lines.push(EXPORT_COLUMNS.map((c) => esc(row[c])).join(','));
+    }
+    await audit(req, 'export', null, { count: products.length });
+    res.setHeader('Content-Type', 'text/csv; charset=utf-8');
+    res.setHeader('Content-Disposition', 'attachment; filename="productport-catalog.csv"');
+    res.send(lines.join('\n'));
+  } catch (err) { next(err); }
 });
 
 // GET /api/products/:slug — single product (deep-link).
@@ -103,6 +131,41 @@ router.patch('/:slug', requireProductAdmin, async (req, res, next) => {
     res.json({ product: shape(updated) });
   } catch (err) { next(err); }
 });
+
+// POST /api/products/import — bulk upsert from a CSV body (text/csv).
+// The client POSTs the raw file contents (no multipart/multer needed — csv-parse
+// handles it). Upsert-on-slug + per-row error isolation via importProducts; the
+// response is 2xx even with per-row errors (they're data-level, downloadable).
+async function upsertRowToDb({ slug, data, clearances }) {
+  const existing = await db.product.findUnique({ where: { slug }, select: { id: true } });
+  const product = await db.product.upsert({ where: { slug }, update: data, create: data });
+  // Replace this product's clearance matrix (5 region rows).
+  await db.regulatoryClearance.deleteMany({ where: { productId: product.id } });
+  await db.regulatoryClearance.createMany({ data: clearances.map((c) => ({ ...c, productId: product.id })) });
+  return existing ? 'updated' : 'created';
+}
+
+router.post(
+  '/import',
+  requireProductAdmin,
+  express.text({ type: ['text/csv', 'text/plain', 'application/csv'], limit: '15mb' }),
+  async (req, res, next) => {
+    try {
+      const csv = typeof req.body === 'string' ? req.body : '';
+      if (!csv.trim()) return res.status(400).json({ error: 'Empty CSV body — POST the file contents as text/csv.' });
+
+      let rows;
+      try { rows = parseCsv(csv, { columns: true, bom: true, skip_empty_lines: true, trim: false }); }
+      catch (e) { return res.status(400).json({ error: `CSV parse failed: ${e.message}` }); }
+
+      const result = await importProducts(rows, upsertRowToDb);
+      await audit(req, 'import', null, {
+        total: result.total, created: result.created, updated: result.updated, errorCount: result.errors.length,
+      });
+      res.json(result);
+    } catch (err) { next(err); }
+  },
+);
 
 // DELETE /api/products/:slug — soft-delete (sets deletedAt; recoverable).
 router.delete('/:slug', requireProductAdmin, async (req, res, next) => {

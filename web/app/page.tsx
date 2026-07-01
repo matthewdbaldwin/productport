@@ -12,6 +12,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { api } from '@/lib/api';
 import { statusOf, orderedAreas, filterProducts } from '@/lib/catalogFilter';
 import { ProductEditModal } from './ProductEditModal';
+import { ImportCsvButton } from './ImportCsvButton';
 import type { ProductInput } from '@/lib/products';
 import s from './catalog.module.css';
 
@@ -345,6 +346,12 @@ export default function CatalogPage() {
             <button type="button" className={s.btn} data-testid="add-product" onClick={() => setEditState({ mode: 'create' })}>
               + Add product
             </button>
+          )}
+          {isAdmin && <ImportCsvButton onDone={loadProducts} />}
+          {isAdmin && (
+            <a className={s.btn} href="/api/products/export.csv" data-testid="export-csv" style={{ textDecoration: 'none' }}>
+              Export CSV
+            </a>
           )}
           <a className={s.hublink} href="https://hub.microport.com">← Hub</a>
         </div>

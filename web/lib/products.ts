@@ -40,3 +40,19 @@ export const updateProduct = (slug: string, input: ProductInput) =>
 
 export const deleteProduct = (slug: string) =>
   api<{ ok: true }>(`products/${encodeURIComponent(slug)}`, { method: 'DELETE' });
+
+export interface ImportResult {
+  total: number;
+  created: number;
+  updated: number;
+  errors: { row: number; slug: string; error: string }[];
+}
+
+// Bulk upsert-on-slug from a CSV. POSTs the raw file text (no multipart); the
+// server parses + reconciles. 2xx even with per-row errors (in `errors`).
+export const importProductsCsv = (csvText: string) =>
+  api<ImportResult>('products/import', {
+    method: 'POST',
+    headers: { 'Content-Type': 'text/csv' },
+    body: csvText,
+  });
