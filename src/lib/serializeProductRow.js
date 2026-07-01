@@ -23,6 +23,7 @@ const EXPORT_COLUMNS = [
   'id', 'name', 'subsidiary', 'therapeutic_area', 'category', 'type', 'tagline', 'overview',
   'features', 'indication', 'patient_population', 'specs', 'reg_notes', 'image',
   'tier', 'classification', 'business_segment', 'applicable_departments', 'model_numbers', 'development_status',
+  'status',
   'fda', 'ce', 'nmpa', 'pmda', 'tga',
 ];
 
@@ -53,6 +54,7 @@ function serializeProductRow(p, clearances = []) {
     applicable_departments: blank(p.applicableDepartments),
     model_numbers: blank(p.modelNumbers),
     development_status: blank(p.developmentStatus),
+    status: blank(p.status),                   // ACTIVE/DISCONTINUED/DRAFT — round-trips so re-import preserves it
     fda: byRegion.FDA ?? '',
     ce: byRegion.CE ?? '',
     nmpa: byRegion.NMPA ?? '',

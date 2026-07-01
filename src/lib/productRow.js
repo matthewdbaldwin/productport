@@ -10,6 +10,8 @@
 const { clearanceStatus } = require('./clearanceStatus');
 const { tierFromWord } = require('./tierPalette');
 const { classificationFromWord } = require('./classification');
+const { isTherapeuticArea, THERAPEUTIC_AREAS } = require('./therapeuticAreas');
+const { SLUG_RE, STATUSES, FIELD_MAX } = require('./productWrite');
 
 // TGA (Australia) added as a 5th region 2026-07-01 — the brochure carries it on
 // most products. RegulatoryClearance is region-generic, so this needs no schema
@@ -28,15 +30,23 @@ function blankToNull(v) {
 function parseProductRow(r) {
   const slug = (r.id || '').trim();
   if (!slug) throw new Error('missing id/slug');
+  // Same slug-format contract as the manual editor (productWrite.SLUG_RE) — a CSV
+  // id becomes the row's URL key, so it can't carry spaces/slashes/uppercase.
+  if (!SLUG_RE.test(slug)) throw new Error(`invalid id/slug "${slug}" (lowercase letters, digits, hyphens only)`);
   if (!r.name || !r.name.trim()) throw new Error('missing name');
   if (!r.subsidiary || !r.subsidiary.trim()) throw new Error('missing subsidiary');
-  if (!r.therapeutic_area || !r.therapeutic_area.trim()) throw new Error('missing therapeutic_area');
+  const therapeuticArea = (r.therapeutic_area || '').trim();
+  if (!therapeuticArea) throw new Error('missing therapeutic_area');
+  // Controlled vocabulary — the canonical 10, same gate the editor enforces.
+  if (!isTherapeuticArea(therapeuticArea)) {
+    throw new Error(`invalid therapeutic_area "${therapeuticArea}" (expected one of: ${THERAPEUTIC_AREAS.join('; ')})`);
+  }
 
   const data = {
     slug,
     name: r.name.trim(),
     subsidiary: r.subsidiary.trim(),
-    therapeuticArea: r.therapeutic_area.trim(),
+    therapeuticArea,
     category: blankToNull(r.category),
     type: blankToNull(r.type),
     tagline: blankToNull(r.tagline),
@@ -47,18 +57,33 @@ function parseProductRow(r) {
     specs: blankToNull(r.specs),
     regNotes: blankToNull(r.reg_notes),
     image: blankToNull(r.image),
-    // Optional strategic tier (Tier 1/2/3). Absent/blank/unknown → null (untiered).
-    tier: tierFromWord(r.tier),
-    // Brochure-derived dimensions (Slice 1.5); all optional.
-    classification: classificationFromWord(r.classification),
     businessSegment: blankToNull(r.business_segment),
     applicableDepartments: blankToNull(r.applicable_departments),
     modelNumbers: blankToNull(r.model_numbers),
     developmentStatus: blankToNull(r.development_status),
-    status: 'ACTIVE',
   };
 
-  // One clearance row per region (always 4), mapped through the enum.
+  // tier / classification / status: admin-managed fields. Include them ONLY when
+  // the CSV actually carries a value, so a blank cell on re-import PRESERVES what
+  // an admin set (create falls back to the schema default / null) instead of
+  // reverting it — the status-clobber + tier-null-on-blank traps (2026-07-01).
+  const tier = tierFromWord(r.tier);
+  if (tier) data.tier = tier;
+  const classification = classificationFromWord(r.classification);
+  if (classification) data.classification = classification;
+  const status = (r.status || '').trim().toUpperCase();
+  if (status) {
+    if (!STATUSES.includes(status)) throw new Error(`invalid status "${status}" (expected one of: ${STATUSES.join(', ')})`);
+    data.status = status;
+  }
+
+  // Length caps — mirror the editor validator so the bulk path can't write an
+  // over-long free-text cell that bloats a @db.Text column.
+  for (const [key, max] of Object.entries(FIELD_MAX)) {
+    if (data[key] != null && String(data[key]).length > max) throw new Error(`${key} too long (max ${max})`);
+  }
+
+  // One clearance row per region (all 5: FDA/CE/NMPA/PMDA/TGA), mapped through the enum.
   const clearances = REGIONS.map((region) => ({
     region,
     status: clearanceStatus(r[region.toLowerCase()]),

@@ -11,7 +11,7 @@ function csvRow(overrides = {}) {
     id: 'firehawk',
     name: 'Firehawk',
     subsidiary: 'MicroPort Cardiovascular',
-    therapeutic_area: 'Coronary',
+    therapeutic_area: 'Coronary and Structural Heart',
     category: 'Drug-Eluting Stent',
     type: '  ',
     tagline: 'Target-eluting',
@@ -53,14 +53,32 @@ describe('parseProductRow — required-field validation', () => {
   test('throws "missing therapeutic_area" when therapeutic_area is blank', () => {
     expect(() => parseProductRow(csvRow({ therapeutic_area: '' }))).toThrow(/missing therapeutic_area/);
   });
+  test('rejects a slug that is not url-safe (spaces/uppercase)', () => {
+    expect(() => parseProductRow(csvRow({ id: 'Fire Hawk' }))).toThrow(/slug/i);
+    expect(() => parseProductRow(csvRow({ id: 'fire_hawk' }))).toThrow(/slug/i);
+  });
+  test('rejects a therapeutic_area outside the canonical 10', () => {
+    expect(() => parseProductRow(csvRow({ therapeutic_area: 'Coronary' }))).toThrow(/therapeutic_area/i);
+  });
+  test('rejects an over-long free-text cell (length cap)', () => {
+    expect(() => parseProductRow(csvRow({ tagline: 'x'.repeat(600) }))).toThrow(/tagline.*long|too long/i);
+  });
 });
 
 describe('parseProductRow — payload shape', () => {
-  test('trims required fields and sets status ACTIVE', () => {
+  test('trims required fields; omits status when the CSV carries none (preserve-on-reimport)', () => {
     const { data } = parseProductRow(csvRow({ id: ' firehawk ', name: ' Firehawk ' }));
     expect(data.slug).toBe('firehawk');
     expect(data.name).toBe('Firehawk');
-    expect(data.status).toBe('ACTIVE');
+    // status is omitted, not forced to ACTIVE — create falls back to the schema
+    // default, update leaves an admin-set DISCONTINUED/DRAFT untouched.
+    expect('status' in data).toBe(false);
+  });
+
+  test('sets status only when the CSV provides it; rejects an invalid value', () => {
+    expect(parseProductRow(csvRow({ status: 'discontinued' })).data.status).toBe('DISCONTINUED');
+    expect(parseProductRow(csvRow({ status: 'DRAFT' })).data.status).toBe('DRAFT');
+    expect(() => parseProductRow(csvRow({ status: 'LIVE' }))).toThrow(/status/i);
   });
 
   test('blank optional fields become null (not empty string)', () => {
@@ -89,12 +107,12 @@ describe('parseProductRow — tier column', () => {
     expect(parseProductRow(csvRow({ tier: 'TIER3' })).data.tier).toBe('TIER3');
   });
 
-  test('a blank / missing / unknown tier is null (untiered), never a throw', () => {
-    expect(parseProductRow(csvRow({ tier: '' })).data.tier).toBeNull();
-    expect(parseProductRow(csvRow({ tier: 'platinum' })).data.tier).toBeNull();
+  test('a blank / missing / unknown tier is omitted (preserved on re-import), never a throw', () => {
+    expect('tier' in parseProductRow(csvRow({ tier: '' })).data).toBe(false);
+    expect('tier' in parseProductRow(csvRow({ tier: 'platinum' })).data).toBe(false);
     // The column is optional — a CSV without it at all still parses.
     const noTierRow = csvRow(); delete noTierRow.tier;
-    expect(parseProductRow(noTierRow).data.tier).toBeNull();
+    expect('tier' in parseProductRow(noTierRow).data).toBe(false);
   });
 });
 
@@ -118,13 +136,13 @@ describe('parseProductRow — brochure dimensions (Slice 1.5)', () => {
     expect(d.applicableDepartments).toBeNull();
     expect(d.modelNumbers).toBeNull();
     expect(d.developmentStatus).toBeNull();
-    expect(d.classification).toBeNull();
+    expect('classification' in d).toBe(false);  // omitted when blank (preserve on re-import)
   });
 
-  test('classification maps through classificationFromWord (Core → CORE, unknown → null)', () => {
+  test('classification maps through classificationFromWord (Core → CORE); blank/unknown omitted', () => {
     expect(parseProductRow(csvRow({ classification: 'Core' })).data.classification).toBe('CORE');
     expect(parseProductRow(csvRow({ classification: 'hi-po' })).data.classification).toBe('HIPO');
-    expect(parseProductRow(csvRow({ classification: 'platinum' })).data.classification).toBeNull();
+    expect('classification' in parseProductRow(csvRow({ classification: 'platinum' })).data).toBe(false);
   });
 
   test('emits a TGA clearance row (5 regions total: FDA/CE/NMPA/PMDA/TGA)', () => {

@@ -7,6 +7,7 @@
 // the standalone MVP: load the whole (small) catalog once, then search / filter
 // / detail entirely in memory. Every authenticated employee is a viewer.
 import { useEffect, useMemo, useState, useCallback } from 'react';
+import { useModalEsc, useFocusTrap } from '@matthewdbaldwin/microport-ui';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/contexts/AuthContext';
 import { api } from '@/lib/api';
@@ -116,13 +117,13 @@ function ProductImg({ p, thumb }: { p: Product; thumb?: boolean }) {
 
 function DetailModal({ p, onClose, onEdit }: { p: Product; onClose: () => void; onEdit?: () => void }) {
   const [copied, setCopied] = useState(false);
+  useModalEsc(onClose);
+  const trapRef = useFocusTrap<HTMLDivElement>();
   useEffect(() => {
-    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose(); };
-    document.addEventListener('keydown', onKey);
     const prev = document.body.style.overflow;
     document.body.style.overflow = 'hidden';
-    return () => { document.removeEventListener('keydown', onKey); document.body.style.overflow = prev; };
-  }, [onClose]);
+    return () => { document.body.style.overflow = prev; };
+  }, []);
 
   // Canonical, shareable URL for this product — the link hub.microport.com (and
   // anyone else) uses to deep-link straight to it. product.id === slug.
@@ -144,7 +145,7 @@ function DetailModal({ p, onClose, onEdit }: { p: Product; onClose: () => void; 
 
   return (
     <div className={s.ov} onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}>
-      <div className={s.modal} role="dialog" aria-modal="true" aria-labelledby="pp-modal-title">
+      <div ref={trapRef} className={s.modal} role="dialog" aria-modal="true" aria-labelledby="pp-modal-title" style={{ maxHeight: '92vh', overflowY: 'auto' }}>
         <button className={s.x} onClick={onClose} aria-label="Close">&times;</button>
         {onEdit && (
           <button

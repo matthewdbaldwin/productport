@@ -6,6 +6,7 @@
 // tier/classification/status are enums; empty inputs submit as null.
 
 import { useState } from 'react';
+import { useModalEsc, useFocusTrap } from '@matthewdbaldwin/microport-ui';
 import s from './catalog.module.css';
 import {
   createProduct, updateProduct, deleteProduct, THERAPEUTIC_AREAS,
@@ -36,6 +37,8 @@ export function ProductEditModal({ mode, initial, onClose, onSaved }: {
   const [saving, setSaving] = useState(false);
   const [err, setErr] = useState('');
   const [confirmDel, setConfirmDel] = useState(false);
+  useModalEsc(onClose);
+  const trapRef = useFocusTrap<HTMLDivElement>();
 
   const set = (k: string) => (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) =>
     setF((p) => ({ ...p, [k]: e.target.value }));
@@ -88,7 +91,7 @@ export function ProductEditModal({ mode, initial, onClose, onSaved }: {
 
   return (
     <div className={s.ov} onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}>
-      <div className={s.modal} role="dialog" aria-modal="true" style={{ maxWidth: 720, maxHeight: '92vh', overflowY: 'auto', padding: 24 }}>
+      <div ref={trapRef} className={s.modal} role="dialog" aria-modal="true" style={{ maxWidth: 720, maxHeight: '92vh', overflowY: 'auto', padding: 24 }}>
         <button className={s.x} onClick={onClose} aria-label="Close">&times;</button>
         <h2 style={{ margin: '4px 0 14px' }}>{mode === 'create' ? 'Add product' : `Edit ${i.name ?? ''}`}</h2>
 

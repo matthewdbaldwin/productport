@@ -7,11 +7,11 @@ const { serializeProductRow, EXPORT_COLUMNS } = require('../src/lib/serializePro
 const { parseProductRow } = require('../src/lib/productRow');
 
 const product = {
-  slug: 'firehawk', name: 'Firehawk', subsidiary: 'MicroPort CV', therapeuticArea: 'Coronary',
+  slug: 'firehawk', name: 'Firehawk', subsidiary: 'MicroPort CV', therapeuticArea: 'Coronary and Structural Heart',
   category: 'DES', type: 'Stent', tagline: 'Target-eluting', overview: 'o', features: 'a|b',
   indication: 'ind', patientPopulation: 'pp', specs: 'len: 3', regNotes: 'rn', image: 'firehawk.jpg',
   tier: 'TIER1', classification: 'CORE', businessSegment: 'Cardio', applicableDepartments: 'Cath Lab|ICU',
-  modelNumbers: 'M1|M2', developmentStatus: 'Under Development',
+  modelNumbers: 'M1|M2', developmentStatus: 'Under Development', status: 'DISCONTINUED',
 };
 const clearances = [
   { region: 'FDA', status: 'IN_PROGRESS' }, { region: 'CE', status: 'APPROVED' },
@@ -22,7 +22,7 @@ describe('serializeProductRow', () => {
   test('emits the seed CSV columns (id from slug) + the new dimension columns', () => {
     const row = serializeProductRow(product, clearances);
     expect(row.id).toBe('firehawk');
-    expect(row.therapeutic_area).toBe('Coronary');
+    expect(row.therapeutic_area).toBe('Coronary and Structural Heart');
     expect(row.tier).toBe('TIER1');
     expect(row.classification).toBe('CORE');
     expect(row.business_segment).toBe('Cardio');
@@ -53,6 +53,7 @@ describe('serializeProductRow', () => {
     expect(back.data.classification).toBe('CORE');
     expect(back.data.businessSegment).toBe('Cardio');
     expect(back.data.modelNumbers).toBe('M1|M2');
+    expect(back.data.status).toBe('DISCONTINUED'); // status now round-trips (preserve-on-reimport)
     const byRegion = Object.fromEntries(back.clearances.map((c) => [c.region, c.status]));
     expect(byRegion).toEqual({ FDA: 'IN_PROGRESS', CE: 'APPROVED', NMPA: 'APPROVED', PMDA: 'NONE', TGA: 'APPROVED' });
   });

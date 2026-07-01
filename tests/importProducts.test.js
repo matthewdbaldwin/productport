@@ -6,7 +6,7 @@
 const { importProducts } = require('../src/lib/importProducts');
 
 // Minimal valid CSV row (matches parseProductRow's required fields).
-const row = (o = {}) => ({ id: 'firehawk', name: 'Firehawk', subsidiary: 'MicroPort CV', therapeutic_area: 'Coronary', ...o });
+const row = (o = {}) => ({ id: 'firehawk', name: 'Firehawk', subsidiary: 'MicroPort CV', therapeutic_area: 'Coronary and Structural Heart', ...o });
 
 describe('importProducts', () => {
   test('creates new rows and updates existing ones (upsert on slug)', async () => {

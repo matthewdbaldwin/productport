@@ -80,4 +80,4 @@ function validateProductWrite(input, opts = {}) {
   return { data };
 }
 
-module.exports = { validateProductWrite, STATUSES, SLUG_RE };
+module.exports = { validateProductWrite, STATUSES, SLUG_RE, FIELD_MAX: TEXT_FIELDS };
