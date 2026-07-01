@@ -38,7 +38,12 @@ app.use(express.json({
 app.use(express.urlencoded({ extended: true }));
 app.use(cookieParser());
 
-app.get('/health', (_req, res) => res.json({ ok: true, service: 'productport-api', version: require('../package.json').version }));
+// Health check. Mounted at BOTH /health and /api/health (before the /api csrf +
+// requireAuth stack, so it never 401s or 403s): the ALB target group and other
+// callers hit /api/health, matching the rest of the fleet.
+const health = (_req, res) => res.json({ ok: true, service: 'productport-api', version: require('../package.json').version });
+app.get('/health', health);
+app.get('/api/health', health);
 
 // CSRF guard on /api, with BOOTSTRAP_PATHS bypassing signature-authed ingress
 // (webhooks/lifecycle verify their own HMAC). feedback_csrf_bootstrap_allowlist_drift.
