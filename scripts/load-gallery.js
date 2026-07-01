@@ -34,12 +34,18 @@ async function main() {
     ? JSON.parse(Buffer.from(raw, 'base64').toString('utf8'))
     : JSON.parse(fs.readFileSync(path.join(__dirname, 'gallery-manifest.json'), 'utf8'));
 
-  let created = 0, skipped = 0, primaries = 0;
+  let created = 0, skipped = 0, primaries = 0, removed = 0;
   const missing = [];
   for (const [slug, keys] of Object.entries(manifest)) {
     const product = await db.product.findFirst({ where: { slug, deletedAt: null }, include: { images: true } });
     if (!product) { missing.push(slug); continue; }
-    const have = new Set(product.images.map((i) => i.key));
+    // Reconcile: drop rows whose key is no longer in the manifest (e.g. superseded
+    // black-bg keys replaced by re-extracted transparent ones), then add the rest.
+    const wanted = new Set(keys);
+    for (const row of product.images) {
+      if (!wanted.has(row.key)) { await db.productImage.delete({ where: { id: row.id } }); removed++; }
+    }
+    const have = new Set(product.images.filter((i) => wanted.has(i.key)).map((i) => i.key));
     for (let idx = 0; idx < keys.length; idx++) {
       const key = keys[idx];
       if (have.has(key)) { skipped++; continue; }
@@ -56,7 +62,7 @@ async function main() {
       primaries++;
     }
   }
-  console.log(`[load-gallery] products=${Object.keys(manifest).length} created=${created} skipped=${skipped} primariesSet=${primaries}`);
+  console.log(`[load-gallery] products=${Object.keys(manifest).length} created=${created} removed=${removed} skipped=${skipped} primariesSet=${primaries}`);
   if (missing.length) console.warn(`[load-gallery] ${missing.length} slug(s) not found: ${missing.join(', ')}`);
 }
 
