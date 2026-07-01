@@ -53,6 +53,14 @@ enum ProductStatus {
   DRAFT
 }
 
+// Strategic product tier (single per product; null = untiered). Rendered as a
+// gold/silver/bronze badge — see src/lib/tierPalette.js.
+enum ProductTier {
+  TIER1
+  TIER2
+  TIER3
+}
+
 enum ClearanceStatus {
   APPROVED       // "cleared"
   IN_PROGRESS    // "in progress"
@@ -81,6 +89,7 @@ model Product {
   image            String?                 // primary image filename (served from web/public/products)
   mdmCode          String?       @unique    // mesh join key (P2) — minted by SalesPort
   status           ProductStatus @default(ACTIVE)
+  tier             ProductTier?              // strategic tier (gold/silver/bronze badge); null = untiered
   createdAt        DateTime      @default(now())
   updatedAt        DateTime      @updatedAt
   deletedAt        DateTime?
@@ -93,6 +102,7 @@ model Product {
   @@index([subsidiary])
   @@index([category])
   @@index([status])
+  @@index([tier])
   @@map("products")
 }
 

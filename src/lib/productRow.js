@@ -8,6 +8,7 @@
 // tests/productRow.test.js.
 'use strict';
 const { clearanceStatus } = require('./clearanceStatus');
+const { tierFromWord } = require('./tierPalette');
 
 const REGIONS = ['FDA', 'CE', 'NMPA', 'PMDA'];
 
@@ -42,6 +43,8 @@ function parseProductRow(r) {
     specs: blankToNull(r.specs),
     regNotes: blankToNull(r.reg_notes),
     image: blankToNull(r.image),
+    // Optional strategic tier (Tier 1/2/3). Absent/blank/unknown → null (untiered).
+    tier: tierFromWord(r.tier),
     status: 'ACTIVE',
   };
 

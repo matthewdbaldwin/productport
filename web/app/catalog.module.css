@@ -344,6 +344,20 @@
   border-radius: 5px;
 }
 
+/* Strategic tier badge (gold/silver/bronze). Colors are set inline from
+   TIER_META so the pill reads the same in every theme. */
+.tier {
+  display: inline-block;
+  margin-left: 6px;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.03em;
+  padding: 1px 7px;
+  border-radius: 999px;
+  vertical-align: middle;
+  text-transform: none;
+}
+
 /* ── Detail modal ────────────────────────────────────────────────────────── */
 .ov {
   position: fixed;

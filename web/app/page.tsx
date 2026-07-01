@@ -14,6 +14,7 @@ import { statusOf, orderedAreas, filterProducts } from '@/lib/catalogFilter';
 import s from './catalog.module.css';
 
 type ClearanceStatus = 'APPROVED' | 'IN_PROGRESS' | 'SUBMITTED' | 'NOT_APPROVED' | 'NONE';
+type ProductTier = 'TIER1' | 'TIER2' | 'TIER3';
 
 interface Clearance { region: string; status: ClearanceStatus; notes: string | null }
 interface Trial { trial: string; identifier: string; n: string; design: string; result: string }
@@ -32,6 +33,7 @@ interface Product {
   specs: string;
   regNotes: string;
   image: string | null;
+  tier: ProductTier | null;
   clearances: Clearance[];
   trials: Trial[];
 }
@@ -55,6 +57,28 @@ const splitList = (v: string) => (v || '').split('|').map((x) => x.trim()).filte
 function Chip({ label, status }: { label: string; status: ClearanceStatus }) {
   const m = STATUS_META[status];
   return <span className={s.chip} style={{ background: m.bg, color: m.fg }}>{label}</span>;
+}
+
+// Gold / Silver / Bronze medal palette — mirrors src/lib/tierPalette.js TIER_META.
+// Fixed hex (not theme tokens): a tier must read the same in every theme.
+const TIER_META: Record<ProductTier, { label: string; bg: string; fg: string }> = {
+  TIER1: { label: 'Tier 1', bg: '#E8B923', fg: '#3D2E00' },
+  TIER2: { label: 'Tier 2', bg: '#B8BEC7', fg: '#26292E' },
+  TIER3: { label: 'Tier 3', bg: '#C77B3B', fg: '#2E1600' },
+};
+
+function TierBadge({ tier }: { tier: ProductTier | null }) {
+  if (!tier) return null;
+  const m = TIER_META[tier];
+  return (
+    <span
+      className={s.tier}
+      style={{ background: m.bg, color: m.fg }}
+      data-testid={`tier-badge-${tier}`}
+    >
+      {m.label}
+    </span>
+  );
 }
 
 // Card market chips: approved → solid, in-progress / submitted → "• " suffix.
@@ -116,7 +140,7 @@ function DetailModal({ p, onClose }: { p: Product; onClose: () => void }) {
         <div className={s.mhead}>
           <div className={s.mimg}><ProductImg p={p} /></div>
           <div className={s.mbody}>
-            <div className={s.mft}>{p.therapeuticArea}{p.category ? ` · ${p.category}` : ''}</div>
+            <div className={s.mft}>{p.therapeuticArea}{p.category ? ` · ${p.category}` : ''}<TierBadge tier={p.tier} /></div>
             <h1 id="pp-modal-title">{p.name}</h1>
             <div className={s.msub}>
               {p.tagline}<br />{p.subsidiary}{p.type ? ` · ${p.type}` : ''}
@@ -382,7 +406,7 @@ export default function CatalogPage() {
                 >
                   <div className={s.cimg}><ProductImg p={p} thumb /></div>
                   <div className={s.cb}>
-                    <div className={s.ftag}>{p.therapeuticArea}</div>
+                    <div className={s.ftag}>{p.therapeuticArea}<TierBadge tier={p.tier} /></div>
                     <div className={s.cn}>{p.name}</div>
                     <div className={s.ct}>{p.tagline}</div>
                     <div className={s.cs}>{p.subsidiary}{p.category ? ` · ${p.category}` : ''}</div>

@@ -93,4 +93,12 @@ describe('shapeProduct — Prisma row → catalog contract', () => {
     shapeProduct(r);
     expect(r.clearances.map((c) => c.region)).toEqual(before);
   });
+
+  test('passes the tier enum through (and null when untiered / absent)', () => {
+    expect(shapeProduct(row({ tier: 'TIER1' })).tier).toBe('TIER1');
+    expect(shapeProduct(row({ tier: null })).tier).toBeNull();
+    // A row from before the tier column existed (undefined) → null, not undefined.
+    const r = row(); delete r.tier;
+    expect(shapeProduct(r).tier).toBeNull();
+  });
 });

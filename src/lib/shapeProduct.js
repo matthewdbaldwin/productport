@@ -28,6 +28,7 @@ function shapeProduct(p) {
     regNotes: p.regNotes || '',
     image: p.image || null,
     status: p.status,
+    tier: p.tier || null, // strategic tier enum; null = untiered
     clearances: (p.clearances || [])
       .slice()
       .sort((a, b) => a.region.localeCompare(b.region))

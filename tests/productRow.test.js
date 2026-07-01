@@ -82,6 +82,22 @@ describe('parseProductRow — payload shape', () => {
   });
 });
 
+describe('parseProductRow — tier column', () => {
+  test('maps a "tier" cell through tierFromWord (Tier 1 → TIER1)', () => {
+    expect(parseProductRow(csvRow({ tier: 'Tier 1' })).data.tier).toBe('TIER1');
+    expect(parseProductRow(csvRow({ tier: '2' })).data.tier).toBe('TIER2');
+    expect(parseProductRow(csvRow({ tier: 'TIER3' })).data.tier).toBe('TIER3');
+  });
+
+  test('a blank / missing / unknown tier is null (untiered), never a throw', () => {
+    expect(parseProductRow(csvRow({ tier: '' })).data.tier).toBeNull();
+    expect(parseProductRow(csvRow({ tier: 'platinum' })).data.tier).toBeNull();
+    // The column is optional — a CSV without it at all still parses.
+    const noTierRow = csvRow(); delete noTierRow.tier;
+    expect(parseProductRow(noTierRow).data.tier).toBeNull();
+  });
+});
+
 describe('parseTrialRow', () => {
   test('defaults a blank trial name to a placeholder and nulls blank optionals', () => {
     const t = parseTrialRow({ trial: '', identifier: 'NCT9', n: '', design: 'RCT', result: '' }, 3);
