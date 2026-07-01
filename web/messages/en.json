@@ -15,9 +15,21 @@
   },
   "bug": {
     "label": "Report a bug",
+    "titleLabel": "Title",
     "titlePlaceholder": "What went wrong?",
+    "detailLabel": "Details",
     "detailPlaceholder": "Steps, what you expected, what happened",
+    "priorityLabel": "Priority",
+    "priority_low": "Low",
+    "priority_normal": "Normal",
+    "priority_high": "High",
+    "priority_critical": "Critical",
+    "cancel": "Cancel",
     "send": "Send",
-    "thanks": "Thanks — your report was sent."
+    "sending": "Sending…",
+    "close": "Close",
+    "thanks": "Thanks — your report was sent.",
+    "errorTitle": "A title is required.",
+    "errorSend": "Could not send your report. Please try again."
   }
 }

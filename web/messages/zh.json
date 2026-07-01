@@ -15,9 +15,21 @@
   },
   "bug": {
     "label": "报告问题",
+    "titleLabel": "标题",
     "titlePlaceholder": "出了什么问题？",
+    "detailLabel": "详情",
     "detailPlaceholder": "操作步骤、您的预期、实际情况",
+    "priorityLabel": "优先级",
+    "priority_low": "低",
+    "priority_normal": "正常",
+    "priority_high": "高",
+    "priority_critical": "紧急",
+    "cancel": "取消",
     "send": "发送",
-    "thanks": "谢谢 — 您的报告已发送。"
+    "sending": "正在发送…",
+    "close": "关闭",
+    "thanks": "谢谢 — 您的报告已发送。",
+    "errorTitle": "请填写标题。",
+    "errorSend": "无法发送报告，请重试。"
   }
 }

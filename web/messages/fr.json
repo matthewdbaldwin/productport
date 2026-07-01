@@ -15,9 +15,21 @@
   },
   "bug": {
     "label": "Signaler un bug",
+    "titleLabel": "Titre",
     "titlePlaceholder": "Que s'est-il passé ?",
+    "detailLabel": "Détails",
     "detailPlaceholder": "Étapes, résultat attendu, résultat obtenu",
+    "priorityLabel": "Priorité",
+    "priority_low": "Basse",
+    "priority_normal": "Normale",
+    "priority_high": "Haute",
+    "priority_critical": "Critique",
+    "cancel": "Annuler",
     "send": "Envoyer",
-    "thanks": "Merci — votre signalement a été envoyé."
+    "sending": "Envoi…",
+    "close": "Fermer",
+    "thanks": "Merci — votre signalement a été envoyé.",
+    "errorTitle": "Un titre est requis.",
+    "errorSend": "Impossible d'envoyer votre signalement. Veuillez réessayer."
   }
 }
