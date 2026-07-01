@@ -8,10 +8,16 @@
 const SAFE_METHODS = new Set(['GET', 'HEAD', 'OPTIONS']);
 const EXPECTED = 'productport-web';
 
-// Paths (relative to the /api mount) that authenticate via signature, not cookie.
+// Paths (relative to the /api mount) that authenticate via signature or a
+// one-time code, not the session cookie/CSRF header.
 const BOOTSTRAP_PATHS = [
   /^\/webhooks(\/|$)/,
   /^\/sso\/lifecycle(\/|$)/,
+  // SSO code exchange — the 60s handoff code IS the credential; the browser
+  // POST has no session cookie or CSRF token yet. Matches the mounted path
+  // (/auth/sso/exchange) and the router-relative path (/sso/exchange).
+  /^\/auth\/sso\/exchange(\/|$)/,
+  /^\/sso\/exchange(\/|$)/,
 ];
 
 function csrfGuard(req, res, next) {

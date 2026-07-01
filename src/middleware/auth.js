@@ -11,6 +11,7 @@ const logger = require('../lib/logger');
 const { createVerifier } = require('@matthewdbaldwin/microport-auth');
 // contracts exports `mapRole`; alias to mapContractRole to match the fleet.
 const { SsoClaims, mapRole: mapContractRole } = require('@matthewdbaldwin/microport-contracts');
+const { resolveRole } = require('../lib/resolveRole');
 
 const COOKIE_NAME = 'productport_token';
 const AUDIENCE    = ['productport', 'microport-apps'];
@@ -50,17 +51,15 @@ async function requireAuth(req, res, next) {
       req.sessionId = session.id;
     }
 
-    // ONE role map for the whole platform; null = not granted → 403 (not a loop).
-    // Extract this app's wire role from the SSO claims, then map it to the Prisma
-    // enum value via the contract (mapRole takes the wire-role STRING).
-    const wireRole = payload.app_roles?.productport;
-    const role = wireRole ? mapContractRole('productport', wireRole) : null;
-    if (!role) {
-      return res.status(403).json({
-        error: 'You do not have access to ProductPort. Ask your admin to grant access in SalesPort.',
-        code:  'NO_productport_ROLE',
-      });
-    }
+    // ProductPort is a UNIVERSAL app — every authenticated employee gets at
+    // least `viewer` (it's the platform's source of truth for product info).
+    // An explicit `app_roles.productport` grant elevates (and is what surfaces
+    // ProductPort in the app-switcher, so only admins see the tile). A missing
+    // or unknown grant defaults to viewer, never 403. The wire-role → enum map
+    // is the ONE platform contract (mapRole takes the wire-role STRING).
+    // feedback: resolveRole; NOTE the SalesPort handoff still gates on the grant
+    // (universal-app hub change is the paired PRD item).
+    const role = resolveRole(payload.app_roles, mapContractRole);
 
     // JIT-provision against this platform's own User table.
     const user = await db.user.upsert({
