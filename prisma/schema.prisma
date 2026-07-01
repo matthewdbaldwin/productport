@@ -61,6 +61,15 @@ enum ProductTier {
   TIER3
 }
 
+// Business classification from the GloMatrix brochure (Core / Hi-po / Flagship).
+// Separate from `tier`; manually assigned (the brochure defines but never tags
+// these per-product). See src/lib/classification.js.
+enum ProductClassification {
+  CORE
+  HIPO
+  FLAGSHIP
+}
+
 enum ClearanceStatus {
   APPROVED       // "cleared"
   IN_PROGRESS    // "in progress"
@@ -90,6 +99,11 @@ model Product {
   mdmCode          String?       @unique    // mesh join key (P2) — minted by SalesPort
   status           ProductStatus @default(ACTIVE)
   tier             ProductTier?              // strategic tier (gold/silver/bronze badge); null = untiered
+  classification   ProductClassification?    // Core/Hi-po/Flagship (brochure); manual, separate from tier
+  businessSegment  String?                   // 12-way GloMatrix taxonomy above therapeuticArea
+  applicableDepartments String? @db.Text     // pipe-delimited (e.g. "Cardiology|ICU|Thoracic Surgery")
+  modelNumbers     String?       @db.Text     // pipe-delimited SKU/model list (first-class; was buried in specs)
+  developmentStatus String?                   // lifecycle free-text ("Under Development — est. cert Feb 2026"); null = marketed
   createdAt        DateTime      @default(now())
   updatedAt        DateTime      @updatedAt
   deletedAt        DateTime?
@@ -103,6 +117,8 @@ model Product {
   @@index([category])
   @@index([status])
   @@index([tier])
+  @@index([classification])
+  @@index([businessSegment])
   @@map("products")
 }
 

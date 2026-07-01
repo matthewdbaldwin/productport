@@ -9,8 +9,12 @@
 'use strict';
 const { clearanceStatus } = require('./clearanceStatus');
 const { tierFromWord } = require('./tierPalette');
+const { classificationFromWord } = require('./classification');
 
-const REGIONS = ['FDA', 'CE', 'NMPA', 'PMDA'];
+// TGA (Australia) added as a 5th region 2026-07-01 — the brochure carries it on
+// most products. RegulatoryClearance is region-generic, so this needs no schema
+// change: every product now gets 5 clearance rows.
+const REGIONS = ['FDA', 'CE', 'NMPA', 'PMDA', 'TGA'];
 
 // Blank / whitespace / nullish → null; otherwise the trimmed string.
 function blankToNull(v) {
@@ -45,6 +49,12 @@ function parseProductRow(r) {
     image: blankToNull(r.image),
     // Optional strategic tier (Tier 1/2/3). Absent/blank/unknown → null (untiered).
     tier: tierFromWord(r.tier),
+    // Brochure-derived dimensions (Slice 1.5); all optional.
+    classification: classificationFromWord(r.classification),
+    businessSegment: blankToNull(r.business_segment),
+    applicableDepartments: blankToNull(r.applicable_departments),
+    modelNumbers: blankToNull(r.model_numbers),
+    developmentStatus: blankToNull(r.development_status),
     status: 'ACTIVE',
   };
 

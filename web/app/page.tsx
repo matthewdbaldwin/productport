@@ -34,6 +34,11 @@ interface Product {
   regNotes: string;
   image: string | null;
   tier: ProductTier | null;
+  classification: 'CORE' | 'HIPO' | 'FLAGSHIP' | null;
+  businessSegment: string | null;
+  applicableDepartments: string | null; // pipe-delimited
+  modelNumbers: string | null;           // pipe-delimited
+  developmentStatus: string | null;
   clearances: Clearance[];
   trials: Trial[];
 }

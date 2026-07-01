@@ -29,6 +29,11 @@ function shapeProduct(p) {
     image: p.image || null,
     status: p.status,
     tier: p.tier || null, // strategic tier enum; null = untiered
+    classification: p.classification || null, // Core/Hi-po/Flagship; manual, separate from tier
+    businessSegment: p.businessSegment || null,
+    applicableDepartments: p.applicableDepartments || null, // pipe-delimited
+    modelNumbers: p.modelNumbers || null,                   // pipe-delimited
+    developmentStatus: p.developmentStatus || null,
     clearances: (p.clearances || [])
       .slice()
       .sort((a, b) => a.region.localeCompare(b.region))

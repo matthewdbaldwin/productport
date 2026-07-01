@@ -101,4 +101,30 @@ describe('shapeProduct — Prisma row → catalog contract', () => {
     const r = row(); delete r.tier;
     expect(shapeProduct(r).tier).toBeNull();
   });
+
+  test('passes brochure dimensions through (classification/businessSegment/departments/models/devStatus)', () => {
+    const shaped = shapeProduct(row({
+      classification: 'CORE',
+      businessSegment: 'Heart Failure Management & Electrophysiology',
+      applicableDepartments: 'Cath Lab|ICU',
+      modelNumbers: 'TSL0638|TSL1638',
+      developmentStatus: 'Under Development',
+    }));
+    expect(shaped.classification).toBe('CORE');
+    expect(shaped.businessSegment).toBe('Heart Failure Management & Electrophysiology');
+    expect(shaped.applicableDepartments).toBe('Cath Lab|ICU');
+    expect(shaped.modelNumbers).toBe('TSL0638|TSL1638');
+    expect(shaped.developmentStatus).toBe('Under Development');
+  });
+
+  test('brochure dimensions default to null when absent (pre-migration rows)', () => {
+    const r = row();
+    for (const k of ['classification', 'businessSegment', 'applicableDepartments', 'modelNumbers', 'developmentStatus']) delete r[k];
+    const shaped = shapeProduct(r);
+    expect(shaped.classification).toBeNull();
+    expect(shaped.businessSegment).toBeNull();
+    expect(shaped.applicableDepartments).toBeNull();
+    expect(shaped.modelNumbers).toBeNull();
+    expect(shaped.developmentStatus).toBeNull();
+  });
 });

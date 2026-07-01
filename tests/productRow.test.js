@@ -71,14 +71,14 @@ describe('parseProductRow — payload shape', () => {
     expect(data.category).toBe('Drug-Eluting Stent');
   });
 
-  test('maps the four region columns through the clearance enum', () => {
+  test('maps the region columns through the clearance enum (TGA blank → NONE)', () => {
     const { clearances } = parseProductRow(csvRow());
     const byRegion = Object.fromEntries(clearances.map((c) => [c.region, c.status]));
-    expect(byRegion).toEqual({ FDA: 'IN_PROGRESS', CE: 'APPROVED', NMPA: 'APPROVED', PMDA: 'NONE' });
+    expect(byRegion).toEqual({ FDA: 'IN_PROGRESS', CE: 'APPROVED', NMPA: 'APPROVED', PMDA: 'NONE', TGA: 'NONE' });
   });
 
-  test('always emits one clearance row per region (4 total)', () => {
-    expect(parseProductRow(csvRow()).clearances).toHaveLength(4);
+  test('always emits one clearance row per region (5 total: FDA/CE/NMPA/PMDA/TGA)', () => {
+    expect(parseProductRow(csvRow()).clearances).toHaveLength(5);
   });
 });
 
@@ -95,6 +95,43 @@ describe('parseProductRow — tier column', () => {
     // The column is optional — a CSV without it at all still parses.
     const noTierRow = csvRow(); delete noTierRow.tier;
     expect(parseProductRow(noTierRow).data.tier).toBeNull();
+  });
+});
+
+describe('parseProductRow — brochure dimensions (Slice 1.5)', () => {
+  test('maps business_segment, applicable_departments, model_numbers, development_status', () => {
+    const d = parseProductRow(csvRow({
+      business_segment: 'Heart Failure Management & Electrophysiology',
+      applicable_departments: 'Cath Lab|ICU',
+      model_numbers: 'TSL0638|TSL1638',
+      development_status: 'Under Development — est. cert Feb 2026',
+    })).data;
+    expect(d.businessSegment).toBe('Heart Failure Management & Electrophysiology');
+    expect(d.applicableDepartments).toBe('Cath Lab|ICU');
+    expect(d.modelNumbers).toBe('TSL0638|TSL1638');
+    expect(d.developmentStatus).toBe('Under Development — est. cert Feb 2026');
+  });
+
+  test('blank/missing brochure columns become null (all optional)', () => {
+    const d = parseProductRow(csvRow()).data; // csvRow has none of the new cols
+    expect(d.businessSegment).toBeNull();
+    expect(d.applicableDepartments).toBeNull();
+    expect(d.modelNumbers).toBeNull();
+    expect(d.developmentStatus).toBeNull();
+    expect(d.classification).toBeNull();
+  });
+
+  test('classification maps through classificationFromWord (Core → CORE, unknown → null)', () => {
+    expect(parseProductRow(csvRow({ classification: 'Core' })).data.classification).toBe('CORE');
+    expect(parseProductRow(csvRow({ classification: 'hi-po' })).data.classification).toBe('HIPO');
+    expect(parseProductRow(csvRow({ classification: 'platinum' })).data.classification).toBeNull();
+  });
+
+  test('emits a TGA clearance row (5 regions total: FDA/CE/NMPA/PMDA/TGA)', () => {
+    const { clearances } = parseProductRow(csvRow({ tga: 'cleared' }));
+    const regions = clearances.map((c) => c.region).sort();
+    expect(regions).toEqual(['CE', 'FDA', 'NMPA', 'PMDA', 'TGA']);
+    expect(clearances.find((c) => c.region === 'TGA').status).toBe('APPROVED');
   });
 });
 
