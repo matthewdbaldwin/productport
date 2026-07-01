@@ -78,4 +78,38 @@ router.post('/logout', requireAuth, async (req, res) => {
 // GET /api/auth/me — current user (from the verified token + JIT-provisioned row).
 router.get('/me', requireAuth, (req, res) => res.json(req.user));
 
+// GET /api/auth/role-catalog — public catalog of this satellite's roles.
+// SalesPort's People & Access aggregator pulls this to build the role picker.
+// viewer is the universal default (every employee has it); the others are the
+// explicit grants an admin assigns.
+router.get('/role-catalog', (_req, res) => {
+  res.json({
+    satellite: 'productport',
+    roles: [
+      { key: 'viewer',        label: 'Viewer',        description: 'Read-only product catalog. Every employee has this by default — no grant needed.' },
+      { key: 'product',       label: 'Product',       description: 'Product manager — edits catalog entries, regulatory + trial data.' },
+      { key: 'product_admin', label: 'Product Admin', description: 'Full ProductPort administrator. Manages the catalog + access; surfaces the tile in the app-switcher.' },
+    ],
+  });
+});
+
+// GET /api/auth/app-launcher — public list of sibling apps this deployment can
+// link to (only those whose *_WEB_URL env is set). Surfaced in the AppSwitcher.
+router.get('/app-launcher', (_req, res) => {
+  const HOST_APP = 'productport';
+  const defs = [
+    { id: 'salesport',  label: 'SalesPort',  tagline: 'CRM & sales',                  envVar: 'SALESPORT_WEB_URL'  },
+    { id: 'opsport',    label: 'OpsPort',    tagline: 'Operations & inventory',       envVar: 'OPSPORT_WEB_URL'    },
+    { id: 'reviewport', label: 'ReviewPort', tagline: 'Medical / legal / regulatory', envVar: 'REVIEWPORT_WEB_URL' },
+    { id: 'clinicport', label: 'ClinicPort', tagline: 'Clinical contacts',            envVar: 'CLINICPORT_WEB_URL' },
+    { id: 'execport',   label: 'ExecPort',   tagline: 'Exec analytics',               envVar: 'EXECPORT_WEB_URL'   },
+    { id: 'productport', label: 'ProductPort', tagline: 'Product catalog',            envVar: 'PRODUCTPORT_WEB_URL' },
+  ];
+  const apps = defs
+    .filter((d) => d.id !== HOST_APP)
+    .map((d) => ({ id: d.id, label: d.label, tagline: d.tagline, url: process.env[d.envVar] || null }))
+    .filter((a) => a.url);
+  res.json({ apps });
+});
+
 module.exports = router;
