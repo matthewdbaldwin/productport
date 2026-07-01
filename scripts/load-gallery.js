@@ -14,6 +14,8 @@
 //     "command":["node","scripts/load-gallery.js"],
 //     "environment":[{"name":"GALLERY_MANIFEST","value":"<base64>"}]}]}'
 'use strict';
+const fs = require('node:fs');
+const path = require('node:path');
 const db = require('../src/lib/db');
 const { toImageValue } = require('../src/lib/productImage');
 
@@ -26,9 +28,11 @@ function assertDev() {
 
 async function main() {
   assertDev();
+  // Manifest from the committed file by default; GALLERY_MANIFEST (base64) overrides.
   const raw = process.env.GALLERY_MANIFEST;
-  if (!raw) throw new Error('GALLERY_MANIFEST (base64 JSON) is required');
-  const manifest = JSON.parse(Buffer.from(raw, 'base64').toString('utf8'));
+  const manifest = raw
+    ? JSON.parse(Buffer.from(raw, 'base64').toString('utf8'))
+    : JSON.parse(fs.readFileSync(path.join(__dirname, 'gallery-manifest.json'), 'utf8'));
 
   let created = 0, skipped = 0, primaries = 0;
   const missing = [];
