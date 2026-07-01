@@ -101,4 +101,16 @@ function requireRole(...roles) {
   };
 }
 
-module.exports = { requireAuth, requireRole, COOKIE_NAME, AUDIENCE };
+// Catalog-write gate: product_admin / superuser role OR the platform is_superuser
+// flag (a platform superuser without an explicit productport grant resolves to
+// role=viewer, so role alone would wrongly block them). Used by the editor +
+// CSV import/export routes.
+function requireProductAdmin(req, res, next) {
+  const u = req.user;
+  if (u && (u.role === 'product_admin' || u.role === 'superuser' || u.isSuperuser)) {
+    return next();
+  }
+  return res.status(403).json({ error: 'Forbidden — ProductPort admin only' });
+}
+
+module.exports = { requireAuth, requireRole, requireProductAdmin, COOKIE_NAME, AUDIENCE };

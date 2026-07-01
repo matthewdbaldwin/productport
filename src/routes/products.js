@@ -12,8 +12,28 @@
 const express = require('express');
 const db = require('../lib/db');
 const { shapeProduct: shape } = require('../lib/shapeProduct');
+const { validateProductWrite } = require('../lib/productWrite');
+const { requireProductAdmin } = require('../middleware/auth');
 
 const router = express.Router();
+
+// Append-only edit trail. Never throws into the request path (a failed audit
+// write must not fail the mutation it records).
+async function audit(req, action, productId, meta) {
+  try {
+    await db.productAudit.create({
+      data: {
+        productId: productId ?? null,
+        userId: req.user?.id ?? null,
+        userEmail: req.user?.email ?? 'unknown',
+        action,
+        newValue: meta ? JSON.stringify(meta) : null,
+      },
+    });
+  } catch (err) {
+    req.log?.warn?.({ err: err.message, action, productId }, '[products] audit write failed');
+  }
+}
 
 const WITH_RELATIONS = { clearances: true, trials: true };
 
@@ -43,6 +63,56 @@ router.get('/:slug', async (req, res, next) => {
   } catch (err) {
     next(err);
   }
+});
+
+// ── Admin editor (product_admin / superuser) ──────────────────────────────
+// POST /api/products — create a product.
+router.post('/', requireProductAdmin, async (req, res, next) => {
+  try {
+    let data;
+    try { ({ data } = validateProductWrite(req.body || {})); }
+    catch (e) { return res.status(400).json({ error: e.message }); }
+
+    const existing = await db.product.findUnique({ where: { slug: data.slug } });
+    if (existing) return res.status(409).json({ error: `A product with slug "${data.slug}" already exists.` });
+
+    const created = await db.product.create({ data, include: WITH_RELATIONS });
+    await audit(req, 'created', created.id, { slug: created.slug, name: created.name });
+    res.status(201).json({ product: shape(created) });
+  } catch (err) { next(err); }
+});
+
+// PATCH /api/products/:slug — update (partial) a product.
+router.patch('/:slug', requireProductAdmin, async (req, res, next) => {
+  try {
+    const target = await db.product.findFirst({ where: { slug: req.params.slug, deletedAt: null } });
+    if (!target) return res.status(404).json({ error: 'Product not found' });
+
+    let data;
+    try { ({ data } = validateProductWrite(req.body || {}, { partial: true })); }
+    catch (e) { return res.status(400).json({ error: e.message }); }
+
+    // A slug change must not collide with another product.
+    if (data.slug && data.slug !== target.slug) {
+      const clash = await db.product.findUnique({ where: { slug: data.slug } });
+      if (clash) return res.status(409).json({ error: `A product with slug "${data.slug}" already exists.` });
+    }
+
+    const updated = await db.product.update({ where: { id: target.id }, data, include: WITH_RELATIONS });
+    await audit(req, 'updated', updated.id, { fields: Object.keys(data) });
+    res.json({ product: shape(updated) });
+  } catch (err) { next(err); }
+});
+
+// DELETE /api/products/:slug — soft-delete (sets deletedAt; recoverable).
+router.delete('/:slug', requireProductAdmin, async (req, res, next) => {
+  try {
+    const target = await db.product.findFirst({ where: { slug: req.params.slug, deletedAt: null } });
+    if (!target) return res.status(404).json({ error: 'Product not found' });
+    await db.product.update({ where: { id: target.id }, data: { deletedAt: new Date() } });
+    await audit(req, 'deleted', target.id, { slug: target.slug });
+    res.json({ ok: true });
+  } catch (err) { next(err); }
 });
 
 module.exports = router;

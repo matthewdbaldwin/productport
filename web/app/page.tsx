@@ -11,6 +11,8 @@ import { useRouter } from 'next/navigation';
 import { useAuth } from '@/contexts/AuthContext';
 import { api } from '@/lib/api';
 import { statusOf, orderedAreas, filterProducts } from '@/lib/catalogFilter';
+import { ProductEditModal } from './ProductEditModal';
+import type { ProductInput } from '@/lib/products';
 import s from './catalog.module.css';
 
 type ClearanceStatus = 'APPROVED' | 'IN_PROGRESS' | 'SUBMITTED' | 'NOT_APPROVED' | 'NONE';
@@ -33,6 +35,7 @@ interface Product {
   specs: string;
   regNotes: string;
   image: string | null;
+  status: 'ACTIVE' | 'DISCONTINUED' | 'DRAFT';
   tier: ProductTier | null;
   classification: 'CORE' | 'HIPO' | 'FLAGSHIP' | null;
   businessSegment: string | null;
@@ -110,7 +113,7 @@ function ProductImg({ p, thumb }: { p: Product; thumb?: boolean }) {
   );
 }
 
-function DetailModal({ p, onClose }: { p: Product; onClose: () => void }) {
+function DetailModal({ p, onClose, onEdit }: { p: Product; onClose: () => void; onEdit?: () => void }) {
   const [copied, setCopied] = useState(false);
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose(); };
@@ -142,6 +145,17 @@ function DetailModal({ p, onClose }: { p: Product; onClose: () => void }) {
     <div className={s.ov} onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}>
       <div className={s.modal} role="dialog" aria-modal="true" aria-labelledby="pp-modal-title">
         <button className={s.x} onClick={onClose} aria-label="Close">&times;</button>
+        {onEdit && (
+          <button
+            type="button"
+            className={s.ebtn}
+            data-testid="edit-product"
+            style={{ position: 'absolute', top: 16, right: 56, padding: '6px 14px', fontSize: 13 }}
+            onClick={onEdit}
+          >
+            Edit
+          </button>
+        )}
         <div className={s.mhead}>
           <div className={s.mimg}><ProductImg p={p} /></div>
           <div className={s.mbody}>
@@ -259,16 +273,19 @@ export default function CatalogPage() {
     () => (typeof window === 'undefined' ? null : new URLSearchParams(window.location.search).get('product')),
   );
 
+  const isAdmin = !!user && (user.role === 'product_admin' || user.role === 'superuser' || !!user.isSuperuser);
+  const [editState, setEditState] = useState<{ mode: 'create' | 'edit'; initial?: ProductInput & { slug: string } } | null>(null);
+
   useEffect(() => { if (!loading && !user) router.replace('/login'); }, [loading, user, router]);
 
-  useEffect(() => {
-    if (!user) return;
-    let alive = true;
-    api<{ products: Product[] }>('/api/products')
-      .then((d) => { if (alive) setProducts(d.products); })
-      .catch(() => { if (alive) setLoadError(true); });
-    return () => { alive = false; };
-  }, [user]);
+  const loadProducts = useCallback(
+    () => api<{ products: Product[] }>('/api/products')
+      .then((d) => setProducts(d.products))
+      .catch(() => setLoadError(true)),
+    [],
+  );
+
+  useEffect(() => { if (user) loadProducts(); }, [user, loadProducts]);
 
   // Canonical deep-link OUT — reflect the open product in the URL (so a refresh
   // or a copied link reopens it) and keep <link rel="canonical"> in sync. Uses
@@ -324,6 +341,11 @@ export default function CatalogPage() {
             <span>{products ? `${products.length} products` : 'Loading…'}</span>
           </span>
           <span className={s.conf}>For Internal Use Only</span>
+          {isAdmin && (
+            <button type="button" className={s.btn} data-testid="add-product" onClick={() => setEditState({ mode: 'create' })}>
+              + Add product
+            </button>
+          )}
           <a className={s.hublink} href="https://hub.microport.com">← Hub</a>
         </div>
       </div>
@@ -429,7 +451,40 @@ export default function CatalogPage() {
         Confidential · For internal use only
       </div>
 
-      {opened && <DetailModal p={opened} onClose={() => setOpenId(null)} />}
+      {opened && (
+        <DetailModal
+          p={opened}
+          onClose={() => setOpenId(null)}
+          onEdit={isAdmin ? () => setEditState({ mode: 'edit', initial: toInput(opened) }) : undefined}
+        />
+      )}
+
+      {editState && (
+        <ProductEditModal
+          mode={editState.mode}
+          initial={editState.initial}
+          onClose={() => setEditState(null)}
+          onSaved={async () => {
+            const wasEdit = editState.mode === 'edit';
+            setEditState(null);
+            if (wasEdit) setOpenId(null); // a rename/delete would leave a stale detail open
+            await loadProducts();
+          }}
+        />
+      )}
     </div>
   );
+}
+
+// Map a shaped catalog Product to the editor's input shape (id === slug).
+function toInput(p: Product): ProductInput & { slug: string } {
+  return {
+    slug: p.id, name: p.name, subsidiary: p.subsidiary, therapeuticArea: p.therapeuticArea,
+    category: p.category || null, type: p.type || null, tagline: p.tagline || null, overview: p.overview || null,
+    features: p.features || null, indication: p.indication || null, patientPopulation: p.patientPopulation || null,
+    specs: p.specs || null, regNotes: p.regNotes || null, image: p.image || null,
+    businessSegment: p.businessSegment || null, applicableDepartments: p.applicableDepartments || null,
+    modelNumbers: p.modelNumbers || null, developmentStatus: p.developmentStatus || null,
+    tier: p.tier, classification: p.classification, status: p.status,
+  };
 }

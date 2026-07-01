@@ -344,6 +344,22 @@
   border-radius: 5px;
 }
 
+/* ── Admin editor form (ProductEditModal) ────────────────────────────────── */
+.egrid { display: grid; grid-template-columns: 1fr 1fr; gap: 0 14px; }
+.efield { display: flex; flex-direction: column; gap: 3px; margin-bottom: 9px; font-size: 12px; font-weight: 600; }
+.efield > span { color: var(--blue); }
+.einput {
+  font: inherit; font-weight: 400; font-size: 13px;
+  padding: 7px 9px; border: 1px solid #d9dce1; border-radius: 6px;
+  width: 100%; box-sizing: border-box; background: #fff;
+}
+.einput:focus { outline: none; border-color: var(--blue); }
+.ebtn { background: var(--blue); color: #fff; border: none; padding: 9px 18px; border-radius: 6px; font-weight: 600; cursor: pointer; }
+.ebtn:disabled { opacity: 0.55; cursor: default; }
+.ebtnGhost { background: transparent; border: 1px solid #d9dce1; padding: 9px 16px; border-radius: 6px; cursor: pointer; }
+.ebtnDanger { background: var(--rd); color: #fff; border: none; padding: 8px 14px; border-radius: 6px; cursor: pointer; margin-left: 6px; }
+@media (max-width: 560px) { .egrid { grid-template-columns: 1fr; } }
+
 /* Strategic tier badge (gold/silver/bronze). Colors are set inline from
    TIER_META so the pill reads the same in every theme. */
 .tier {
