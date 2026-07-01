@@ -7,7 +7,7 @@
 'use strict';
 const { validateProductWrite } = require('../src/lib/productWrite');
 
-const good = (o = {}) => ({ slug: 'firehawk', name: 'Firehawk', subsidiary: 'MicroPort Cardiovascular', therapeuticArea: 'Coronary', ...o });
+const good = (o = {}) => ({ slug: 'firehawk', name: 'Firehawk', subsidiary: 'MicroPort Cardiovascular', therapeuticArea: 'Coronary and Structural Heart', ...o });
 
 describe('validateProductWrite — create (partial=false)', () => {
   test('accepts a minimal valid product and defaults status to ACTIVE', () => {
@@ -49,6 +49,22 @@ describe('validateProductWrite — enums', () => {
     expect(() => validateProductWrite(good({ tier: 'TIER9' }))).toThrow(/tier/i);
     expect(() => validateProductWrite(good({ classification: 'PLATINUM' }))).toThrow(/classification/i);
     expect(() => validateProductWrite(good({ status: 'LIVE' }))).toThrow(/status/i);
+  });
+});
+
+describe('validateProductWrite — therapeutic area (controlled 10)', () => {
+  test('accepts a canonical therapeutic area', () => {
+    const { data } = validateProductWrite(good({ therapeuticArea: 'Orthopedic Joint, Spine, and Trauma' }));
+    expect(data.therapeuticArea).toBe('Orthopedic Joint, Spine, and Trauma');
+  });
+
+  test('rejects a therapeutic area outside the canonical 10', () => {
+    expect(() => validateProductWrite(good({ therapeuticArea: 'Coronary' }))).toThrow(/therapeuticArea/i);
+    expect(() => validateProductWrite(good({ therapeuticArea: 'Dermatology' }))).toThrow(/therapeuticArea/i);
+  });
+
+  test('rejects a non-canonical therapeutic area on a partial update too', () => {
+    expect(() => validateProductWrite({ therapeuticArea: 'Coronary' }, { partial: true })).toThrow(/therapeuticArea/i);
   });
 });
 

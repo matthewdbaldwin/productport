@@ -7,12 +7,19 @@
 // companion catalogFilter.d.ts. The React page owns only the state + render.
 'use strict';
 
-// Therapeutic-area display order (mirrors the standalone catalog's AREAS list).
+// Therapeutic-area display order — the canonical 10 (2026-07-01). Mirrors
+// src/lib/therapeuticAreas.js + web/lib/products.ts THERAPEUTIC_AREAS.
 const AREA_ORDER = [
-  'Coronary', 'Structural Heart', 'Electrophysiology', 'Cardiac Rhythm Management',
-  'Neurovascular', 'Aortic & Peripheral', 'Extracorporeal Life Support',
-  'Surgical Robotics', 'Orthopedics', 'Endoscopy & Urology', 'Tumor Ablation',
-  'Endocrinology', 'Infusion & Vascular Access', 'Assisted Reproduction',
+  'Coronary and Structural Heart',
+  'Heart Failure and Electrophysiology',
+  'Aortic and Peripheral Vasculature',
+  'Robotic Surgery, AI, and Telesurgery',
+  'Neurovascular and Brain-Computer Interfaces',
+  'Orthopedic Joint, Spine, and Trauma',
+  'Urology, Oncology, and Gastroenterology',
+  'Emergency and Critical Care',
+  'Endocrinology and Reproductive Health',
+  'Regenerative Medicine and Medical Aesthetics',
 ];
 
 // "Present in a market" = a live clearance state, not absent/rejected.

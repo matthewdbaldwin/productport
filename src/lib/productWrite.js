@@ -14,6 +14,7 @@
 
 const { PRODUCT_TIERS } = require('./tierPalette');
 const { PRODUCT_CLASSIFICATIONS } = require('./classification');
+const { THERAPEUTIC_AREAS, isTherapeuticArea } = require('./therapeuticAreas');
 
 const STATUSES = ['ACTIVE', 'DISCONTINUED', 'DRAFT'];
 const SLUG_RE = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
@@ -59,6 +60,12 @@ function validateProductWrite(input, opts = {}) {
       throw new Error(`invalid slug "${val}" (lowercase letters, digits, hyphens only)`);
     }
     data[key] = val;
+  }
+
+  // Therapeutic area is a controlled vocabulary (the canonical 10). Validated
+  // when present (always on create; only if provided on partial update).
+  if (data.therapeuticArea && !isTherapeuticArea(data.therapeuticArea)) {
+    throw new Error(`invalid therapeuticArea "${data.therapeuticArea}" (expected one of: ${THERAPEUTIC_AREAS.join('; ')})`);
   }
 
   // Enums

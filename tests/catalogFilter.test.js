@@ -36,13 +36,15 @@ describe('statusOf', () => {
 describe('orderedAreas', () => {
   test('lists curated areas in catalog order, then unknown areas alphabetically', () => {
     const products = [
-      product({ id: '1', therapeuticArea: 'Orthopedics' }),
-      product({ id: '2', therapeuticArea: 'Coronary' }),
+      product({ id: '1', therapeuticArea: 'Orthopedic Joint, Spine, and Trauma' }),
+      product({ id: '2', therapeuticArea: 'Coronary and Structural Heart' }),
       product({ id: '3', therapeuticArea: 'Zebrafish Cardiology' }), // not in curated list
-      product({ id: '4', therapeuticArea: 'Neurovascular' }),
+      product({ id: '4', therapeuticArea: 'Aortic and Peripheral Vasculature' }),
     ];
+    // curated first (in AREA_ORDER), then unknown areas alphabetically
     expect(orderedAreas(products)).toEqual([
-      'Coronary', 'Neurovascular', 'Orthopedics', 'Zebrafish Cardiology',
+      'Coronary and Structural Heart', 'Aortic and Peripheral Vasculature',
+      'Orthopedic Joint, Spine, and Trauma', 'Zebrafish Cardiology',
     ]);
   });
   test('de-duplicates and returns [] for no products', () => {

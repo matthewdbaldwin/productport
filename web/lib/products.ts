@@ -6,6 +6,22 @@ export type ProductTier = 'TIER1' | 'TIER2' | 'TIER3';
 export type ProductClassification = 'CORE' | 'HIPO' | 'FLAGSHIP';
 export type ProductStatus = 'ACTIVE' | 'DISCONTINUED' | 'DRAFT';
 
+// The catalog's canonical 10 therapeutic areas. MIRROR of
+// src/lib/therapeuticAreas.js (server source of truth) — keep the two in sync.
+// The edit form renders this as a dropdown; the catalog filter orders by it.
+export const THERAPEUTIC_AREAS = [
+  'Coronary and Structural Heart',
+  'Heart Failure and Electrophysiology',
+  'Aortic and Peripheral Vasculature',
+  'Robotic Surgery, AI, and Telesurgery',
+  'Neurovascular and Brain-Computer Interfaces',
+  'Orthopedic Joint, Spine, and Trauma',
+  'Urology, Oncology, and Gastroenterology',
+  'Emergency and Critical Care',
+  'Endocrinology and Reproductive Health',
+  'Regenerative Medicine and Medical Aesthetics',
+] as const;
+
 // The editable field set — mirrors src/lib/productWrite.js. All optional except
 // on create, where slug/name/subsidiary/therapeuticArea are required (server-enforced).
 export interface ProductInput {

@@ -8,7 +8,7 @@
 import { useState } from 'react';
 import s from './catalog.module.css';
 import {
-  createProduct, updateProduct, deleteProduct,
+  createProduct, updateProduct, deleteProduct, THERAPEUTIC_AREAS,
   type ProductInput, type ProductTier, type ProductClassification, type ProductStatus,
 } from '@/lib/products';
 
@@ -98,7 +98,11 @@ export function ProductEditModal({ mode, initial, onClose, onSaved }: {
           {text('name', 'Name', true)}
           {text('slug', 'Slug (url key)', true)}
           {text('subsidiary', 'Subsidiary', true)}
-          {text('therapeuticArea', 'Therapeutic area', true)}
+          <label className={s.efield}><span>Therapeutic area *</span>
+            <select className={s.einput} value={f.therapeuticArea} onChange={set('therapeuticArea')}>
+              <option value="">— select —</option>{THERAPEUTIC_AREAS.map((a) => <option key={a} value={a}>{a}</option>)}
+            </select>
+          </label>
           {text('businessSegment', 'Business segment')}
           {text('category', 'Category')}
           {text('type', 'Type')}
