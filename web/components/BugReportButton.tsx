@@ -11,9 +11,11 @@ import { useEffect, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { useTranslations } from 'next-intl';
 import { api } from '@/lib/api';
+import { useAuth } from '@/contexts/AuthContext';
 
 export function BugReportButton() {
   const t = useTranslations('bug');
+  const { user } = useAuth();
   const [mounted, setMounted] = useState(false);
   const [open, setOpen] = useState(false);
   const [title, setTitle] = useState('');
@@ -22,7 +24,9 @@ export function BugReportButton() {
 
   // eslint-disable-next-line react-hooks/set-state-in-effect -- one-shot createPortal mount guard
   useEffect(() => setMounted(true), []);
-  if (!mounted) return null;
+  // Auth-gated: only signed-in users can file (mirrors the fleet). Without this
+  // the launcher showed on the logged-out /login page, where clicking 401s.
+  if (!user || !mounted) return null;
 
   async function submit() {
     await api('/api/bug-reports', {
