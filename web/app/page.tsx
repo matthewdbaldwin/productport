@@ -223,7 +223,12 @@ export default function CatalogPage() {
   const [mk, setMk] = useState<string | null>(null);
   const [cat, setCat] = useState<string>('');
   const [q, setQ] = useState('');
-  const [openId, setOpenId] = useState<string | null>(null);
+  // Initial open product comes from ?product=<slug> (canonical deep-link IN).
+  // Done in the state initializer, not an effect, so there's no setState-in-
+  // effect; the modal only renders once products load, so no hydration mismatch.
+  const [openId, setOpenId] = useState<string | null>(
+    () => (typeof window === 'undefined' ? null : new URLSearchParams(window.location.search).get('product')),
+  );
 
   useEffect(() => { if (!loading && !user) router.replace('/login'); }, [loading, user, router]);
 
@@ -235,15 +240,6 @@ export default function CatalogPage() {
       .catch(() => { if (alive) setLoadError(true); });
     return () => { alive = false; };
   }, [user]);
-
-  // Canonical deep-link IN — open the product named in ?product=<slug> on load.
-  // product.id === slug (see shapeProduct), so this is the same key the modal
-  // routes on. Read window.location directly rather than useSearchParams so the
-  // static /catalog route never trips the client-hook prerender bailout.
-  useEffect(() => {
-    const slug = new URLSearchParams(window.location.search).get('product');
-    if (slug) setOpenId(slug);
-  }, []);
 
   // Canonical deep-link OUT — reflect the open product in the URL (so a refresh
   // or a copied link reopens it) and keep <link rel="canonical"> in sync. Uses
