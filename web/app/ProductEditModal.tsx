@@ -9,11 +9,12 @@ import { useState } from 'react';
 import { useModalEsc, useFocusTrap } from '@matthewdbaldwin/microport-ui';
 import s from './catalog.module.css';
 import {
-  createProduct, updateProduct, deleteProduct, uploadProductImage, productImageSrc, THERAPEUTIC_AREAS,
-  type ProductInput, type ProductTier, type ProductClassification, type ProductStatus,
+  createProduct, updateProduct, deleteProduct, uploadProductImage, deleteProductImage, setPrimaryImage,
+  galleryImageSrc, THERAPEUTIC_AREAS,
+  type ProductInput, type ProductTier, type ProductClassification, type ProductStatus, type GalleryImage,
 } from '@/lib/products';
 
-type Initial = Partial<ProductInput> & { slug?: string };
+type Initial = Partial<ProductInput> & { slug?: string; images?: GalleryImage[] };
 
 const TIERS: ProductTier[] = ['TIER1', 'TIER2', 'TIER3'];
 const CLASSES: ProductClassification[] = ['CORE', 'HIPO', 'FLAGSHIP'];
@@ -38,24 +39,38 @@ export function ProductEditModal({ mode, initial, onClose, onSaved }: {
   const [err, setErr] = useState('');
   const [confirmDel, setConfirmDel] = useState(false);
   const [uploading, setUploading] = useState(false);
+  const [gallery, setGallery] = useState<GalleryImage[]>(i.images ?? []);
   useModalEsc(onClose);
   const trapRef = useFocusTrap<HTMLDivElement>();
 
-  // Image upload targets the existing product (POST /:slug/image), so it stamps
-  // + persists product.image server-side immediately. Reflect it in the form.
+  // All gallery mutations return the full product (with images) — reflect it and
+  // refresh the catalog (the primary drives the card thumbnail).
+  const applyProduct = (product: unknown) => {
+    setGallery((product as { images?: GalleryImage[] }).images ?? []);
+    setF((p) => ({ ...p, image: (product as { image?: string }).image ?? '' }));
+    onSaved();
+  };
+
   async function onPickImage(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
     e.target.value = ''; // allow re-picking the same file
     if (!file) return;
     setUploading(true); setErr('');
-    try {
-      const { product } = await uploadProductImage(i.slug as string, file);
-      const img = (product as { image?: string }).image ?? '';
-      setF((p) => ({ ...p, image: img }));
-      onSaved(); // refresh the catalog thumbnail
-    } catch (er) {
-      setErr(er instanceof Error ? er.message : 'Image upload failed');
-    } finally { setUploading(false); }
+    try { applyProduct((await uploadProductImage(i.slug as string, file)).product); }
+    catch (er) { setErr(er instanceof Error ? er.message : 'Image upload failed'); }
+    finally { setUploading(false); }
+  }
+
+  async function onSetPrimary(imageId: string) {
+    setErr('');
+    try { applyProduct((await setPrimaryImage(i.slug as string, imageId)).product); }
+    catch (er) { setErr(er instanceof Error ? er.message : 'Could not set primary'); }
+  }
+
+  async function onDeleteImage(imageId: string) {
+    setErr('');
+    try { applyProduct((await deleteProductImage(i.slug as string, imageId)).product); }
+    catch (er) { setErr(er instanceof Error ? er.message : 'Could not delete image'); }
   }
 
   const set = (k: string) => (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) =>
@@ -148,16 +163,24 @@ export function ProductEditModal({ mode, initial, onClose, onSaved }: {
 
         {mode === 'edit' && (
           <div className={s.efield} style={{ marginBottom: 12 }}>
-            <span>Product image</span>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginTop: 4 }}>
-              {productImageSrc(i.slug as string, f.image)
-                ? <img src={productImageSrc(i.slug as string, f.image) as string} alt="" style={{ width: 64, height: 64, objectFit: 'cover', borderRadius: 6, border: '1px solid var(--lgrey)' }} />
-                : <span style={{ width: 64, height: 64, display: 'grid', placeItems: 'center', borderRadius: 6, border: '1px dashed var(--lgrey)', color: 'var(--grey)', fontSize: 11 }}>none</span>}
-              <label className={s.ebtnGhost} style={{ cursor: 'pointer' }}>
-                {uploading ? 'Uploading…' : 'Upload image'}
+            <span>Product images <em style={{ color: 'var(--grey)', fontWeight: 400 }}>— gallery; the primary shows on the catalog card. JPEG/PNG/WebP, max 6 MB each.</em></span>
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 10, marginTop: 6, alignItems: 'flex-start' }}>
+              {gallery.map((img) => (
+                <div key={img.id} style={{ width: 96 }}>
+                  <div style={{ position: 'relative' }}>
+                    <img src={galleryImageSrc(i.slug as string, img.id)} alt="" style={{ width: 96, height: 96, objectFit: 'cover', borderRadius: 6, border: img.isPrimary ? '2px solid var(--blue)' : '1px solid var(--lgrey)' }} />
+                    {img.isPrimary && <span style={{ position: 'absolute', top: 3, left: 3, background: 'var(--blue)', color: '#fff', fontSize: 10, padding: '1px 5px', borderRadius: 4 }}>Primary</span>}
+                  </div>
+                  <div style={{ display: 'flex', gap: 6, marginTop: 3, fontSize: 11 }}>
+                    {!img.isPrimary && <button type="button" onClick={() => onSetPrimary(img.id)} style={{ background: 'none', border: 'none', color: 'var(--blue)', cursor: 'pointer', padding: 0 }}>Set primary</button>}
+                    <button type="button" onClick={() => onDeleteImage(img.id)} style={{ background: 'none', border: 'none', color: 'var(--rd)', cursor: 'pointer', padding: 0, marginLeft: 'auto' }}>Delete</button>
+                  </div>
+                </div>
+              ))}
+              <label className={s.ebtnGhost} style={{ cursor: 'pointer', width: 96, height: 96, display: 'grid', placeItems: 'center', textAlign: 'center', fontSize: 12 }}>
+                {uploading ? 'Uploading…' : '+ Add image'}
                 <input type="file" accept="image/jpeg,image/png,image/webp" onChange={onPickImage} disabled={uploading} style={{ display: 'none' }} />
               </label>
-              <em style={{ color: 'var(--grey)', fontWeight: 400, fontSize: 12 }}>JPEG / PNG / WebP, max 6 MB. Replaces immediately.</em>
             </div>
           </div>
         )}

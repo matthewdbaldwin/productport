@@ -75,12 +75,25 @@ export async function uploadProductImage(slug: string, file: File): Promise<{ pr
   return body as { product: unknown };
 }
 
-// The <img src> for a product image: uploaded (s3:) images resolve through the
-// API's presigned-redirect endpoint; legacy filenames stay on the static path.
+// The <img src> for a product's PRIMARY image (catalog card / detail hero):
+// uploaded (s3:) images resolve through the API's presigned-redirect endpoint;
+// legacy filenames stay on the static path.
 export const productImageSrc = (slug: string, image?: string | null): string | null => {
   if (!image) return null;
   return image.startsWith('s3:') ? `/api/products/${encodeURIComponent(slug)}/image` : `/products/${image}`;
 };
+
+export interface GalleryImage { id: string; isPrimary: boolean; sortOrder: number; }
+
+// <img src> for one gallery image (presigned redirect, scoped to the product).
+export const galleryImageSrc = (slug: string, imageId: string) =>
+  `/api/products/${encodeURIComponent(slug)}/image/${encodeURIComponent(imageId)}`;
+
+export const setPrimaryImage = (slug: string, imageId: string) =>
+  api<{ product: unknown }>(`products/${encodeURIComponent(slug)}/image/${encodeURIComponent(imageId)}/primary`, { method: 'POST' });
+
+export const deleteProductImage = (slug: string, imageId: string) =>
+  api<{ product: unknown }>(`products/${encodeURIComponent(slug)}/image/${encodeURIComponent(imageId)}`, { method: 'DELETE' });
 
 export interface ImportResult {
   total: number;

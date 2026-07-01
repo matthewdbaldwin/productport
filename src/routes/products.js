@@ -18,6 +18,7 @@ const { serializeProductRow, EXPORT_COLUMNS } = require('../lib/serializeProduct
 const { upsertProductRow } = require('../lib/productUpsert');
 const { putAsset, getDownloadUrl } = require('../lib/assetStorage');
 const { validateImageUpload, toImageValue, isS3Image, s3KeyOf } = require('../lib/productImage');
+const { primaryAfterDelete } = require('../lib/productGallery');
 const { requireProductAdmin } = require('../middleware/auth');
 const { parse: parseCsv } = require('csv-parse/sync');
 const multer = require('multer');
@@ -47,13 +48,17 @@ async function audit(req, action, productId, meta) {
 }
 
 const WITH_RELATIONS = { clearances: true, trials: true };
+// The catalog loads once and the detail/edit modals reuse the list product, so
+// the gallery must ride along. Gallery rows are tiny metadata ({id,isPrimary,
+// sortOrder}) — the actual images stay lazy (presigned per <img>).
+const WITH_IMAGES = { clearances: true, trials: true, images: true };
 
 // GET /api/products — the full active catalog, name-sorted.
 router.get('/', async (_req, res, next) => {
   try {
     const products = await db.product.findMany({
       where: { deletedAt: null, status: { not: 'DRAFT' } },
-      include: WITH_RELATIONS,
+      include: WITH_IMAGES,
       orderBy: { name: 'asc' },
     });
     res.json({ products: products.map(shape) });
@@ -92,7 +97,7 @@ router.get('/:slug', async (req, res, next) => {
   try {
     const product = await db.product.findFirst({
       where: { slug: req.params.slug, deletedAt: null },
-      include: WITH_RELATIONS,
+      include: WITH_IMAGES,
     });
     if (!product) return res.status(404).json({ error: 'Product not found' });
     res.json({ product: shape(product) });
@@ -183,8 +188,26 @@ router.get('/:slug/image', async (req, res, next) => {
   } catch (err) { next(err); }
 });
 
-// POST /api/products/:slug/image — admin image upload (multipart 'file').
-// Streams to S3 under products/<sha>.<ext>, stamps product.image = s3:<key>.
+// GET /api/products/:slug/image/:imageId — presigned redirect for one gallery
+// image (scoped to the product so an id can't be used to read another's key).
+router.get('/:slug/image/:imageId', async (req, res, next) => {
+  try {
+    const product = await db.product.findFirst({ where: { slug: req.params.slug, deletedAt: null }, select: { id: true } });
+    if (!product) return res.status(404).json({ error: 'Product not found' });
+    const img = await db.productImage.findFirst({ where: { id: req.params.imageId, productId: product.id }, select: { key: true } });
+    if (!img) return res.status(404).json({ error: 'Image not found' });
+    res.redirect(302, await getDownloadUrl(img.key));
+  } catch (err) { next(err); }
+});
+
+// Re-read a product with its gallery + return the shaped payload.
+async function reshapeWithGallery(res, productId) {
+  const fresh = await db.product.findUnique({ where: { id: productId }, include: WITH_IMAGES });
+  res.json({ product: shape(fresh) });
+}
+
+// POST /api/products/:slug/image — admin: upload + APPEND to the gallery.
+// First image becomes primary (and mirrors into Product.image the catalog reads).
 router.post('/:slug/image', requireProductAdmin, (req, res, next) => {
   uploadImage(req, res, (merrUpload) => {
     if (merrUpload) {
@@ -192,20 +215,63 @@ router.post('/:slug/image', requireProductAdmin, (req, res, next) => {
       return res.status(status).json({ error: merrUpload.code === 'LIMIT_FILE_SIZE' ? 'image too large (max 6 MB)' : merrUpload.message });
     }
     (async () => {
-      const target = await db.product.findFirst({ where: { slug: req.params.slug, deletedAt: null } });
+      const target = await db.product.findFirst({ where: { slug: req.params.slug, deletedAt: null }, include: { images: true } });
       if (!target) return res.status(404).json({ error: 'Product not found' });
       let meta;
       try { meta = validateImageUpload(req.file); }
       catch (e) { return res.status(e.status || 400).json({ error: e.message }); }
 
       const { key } = await putAsset(req.file.buffer, `img.${meta.ext}`, meta.mimeType, { prefix: 'products' });
-      const updated = await db.product.update({
-        where: { id: target.id }, data: { image: toImageValue(key) }, include: WITH_RELATIONS,
-      });
-      await audit(req, 'image', updated.id, { key });
-      res.json({ product: shape(updated) });
+      const isFirst = target.images.length === 0;
+      const nextOrder = target.images.reduce((m, i) => Math.max(m, i.sortOrder), -1) + 1;
+      await db.productImage.create({ data: { productId: target.id, key, sortOrder: nextOrder, isPrimary: isFirst } });
+      // The first image becomes the catalog-card hero (Product.image mirror).
+      if (isFirst) await db.product.update({ where: { id: target.id }, data: { image: toImageValue(key) } });
+      await audit(req, 'image-add', target.id, { key });
+      await reshapeWithGallery(res, target.id);
     })().catch(next);
   });
+});
+
+// POST /api/products/:slug/image/:imageId/primary — make a gallery image the hero.
+router.post('/:slug/image/:imageId/primary', requireProductAdmin, async (req, res, next) => {
+  try {
+    const product = await db.product.findFirst({ where: { slug: req.params.slug, deletedAt: null }, include: { images: true } });
+    if (!product) return res.status(404).json({ error: 'Product not found' });
+    const chosen = product.images.find((i) => i.id === req.params.imageId);
+    if (!chosen) return res.status(404).json({ error: 'Image not found' });
+    await db.productImage.updateMany({ where: { productId: product.id }, data: { isPrimary: false } });
+    await db.productImage.update({ where: { id: chosen.id }, data: { isPrimary: true } });
+    await db.product.update({ where: { id: product.id }, data: { image: toImageValue(chosen.key) } });
+    await audit(req, 'image-primary', product.id, { key: chosen.key });
+    await reshapeWithGallery(res, product.id);
+  } catch (err) { next(err); }
+});
+
+// DELETE /api/products/:slug/image/:imageId — remove a gallery image; if it was
+// the primary, promote the next remaining one (and re-mirror Product.image).
+router.delete('/:slug/image/:imageId', requireProductAdmin, async (req, res, next) => {
+  try {
+    const product = await db.product.findFirst({ where: { slug: req.params.slug, deletedAt: null }, include: { images: true } });
+    if (!product) return res.status(404).json({ error: 'Product not found' });
+    const victim = product.images.find((i) => i.id === req.params.imageId);
+    if (!victim) return res.status(404).json({ error: 'Image not found' });
+
+    await db.productImage.delete({ where: { id: victim.id } });
+    if (victim.isPrimary) {
+      const nextId = primaryAfterDelete(product.images, victim.id);
+      if (nextId) {
+        const promoted = product.images.find((i) => i.id === nextId);
+        await db.productImage.update({ where: { id: nextId }, data: { isPrimary: true } });
+        await db.product.update({ where: { id: product.id }, data: { image: toImageValue(promoted.key) } });
+      } else {
+        // No images left — clear the mirror (it was an s3: value from the gallery).
+        await db.product.update({ where: { id: product.id }, data: { image: null } });
+      }
+    }
+    await audit(req, 'image-delete', product.id, { key: victim.key });
+    await reshapeWithGallery(res, product.id);
+  } catch (err) { next(err); }
 });
 
 // DELETE /api/products/:slug — soft-delete (sets deletedAt; recoverable).

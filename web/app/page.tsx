@@ -14,7 +14,7 @@ import { api } from '@/lib/api';
 import { statusOf, orderedAreas, filterProducts } from '@/lib/catalogFilter';
 import { ProductEditModal } from './ProductEditModal';
 import { ImportCsvButton } from './ImportCsvButton';
-import type { ProductInput } from '@/lib/products';
+import { galleryImageSrc, type ProductInput, type GalleryImage } from '@/lib/products';
 import s from './catalog.module.css';
 
 type ClearanceStatus = 'APPROVED' | 'IN_PROGRESS' | 'SUBMITTED' | 'NOT_APPROVED' | 'NONE';
@@ -46,6 +46,7 @@ interface Product {
   developmentStatus: string | null;
   clearances: Clearance[];
   trials: Trial[];
+  images: GalleryImage[];
 }
 
 const REGIONS = ['CE', 'FDA', 'NMPA', 'PMDA'] as const;
@@ -124,8 +125,10 @@ function ProductImg({ p, thumb }: { p: Product; thumb?: boolean }) {
 
 function DetailModal({ p, onClose, onEdit }: { p: Product; onClose: () => void; onEdit?: () => void }) {
   const [copied, setCopied] = useState(false);
+  const [heroId, setHeroId] = useState<string | null>(null); // gallery thumb → swap the hero
   useModalEsc(onClose);
   const trapRef = useFocusTrap<HTMLDivElement>();
+  const heroSrc = heroId ? galleryImageSrc(p.id, heroId) : fullSrc(p);
   useEffect(() => {
     const prev = document.body.style.overflow;
     document.body.style.overflow = 'hidden';
@@ -166,7 +169,29 @@ function DetailModal({ p, onClose, onEdit }: { p: Product; onClose: () => void; 
           </button>
         )}
         <div className={s.mhead}>
-          <div className={s.mimg}><ProductImg p={p} /></div>
+          <div>
+            <div className={s.mimg}>
+              {heroSrc ? <img src={heroSrc} alt={p.name} /> : <ProductImg p={p} />}
+            </div>
+            {p.images.length > 1 && (
+              <div style={{ display: 'flex', gap: 6, marginTop: 8, flexWrap: 'wrap' }}>
+                {p.images.map((img) => {
+                  const active = heroId ? heroId === img.id : img.isPrimary;
+                  return (
+                    <button
+                      key={img.id}
+                      type="button"
+                      onClick={() => setHeroId(img.id)}
+                      aria-label={`View image${img.isPrimary ? ' (primary)' : ''}`}
+                      style={{ padding: 0, border: active ? '2px solid var(--blue)' : '1px solid var(--lgrey)', borderRadius: 6, cursor: 'pointer', background: 'none', lineHeight: 0 }}
+                    >
+                      <img src={galleryImageSrc(p.id, img.id)} alt="" style={{ width: 48, height: 48, objectFit: 'cover', borderRadius: 5 }} />
+                    </button>
+                  );
+                })}
+              </div>
+            )}
+          </div>
           <div className={s.mbody}>
             <div className={s.mft}>{p.therapeuticArea}{p.category ? ` · ${p.category}` : ''}<TierBadge tier={p.tier} /></div>
             <h1 id="pp-modal-title">{p.name}</h1>
@@ -283,7 +308,7 @@ export default function CatalogPage() {
   );
 
   const isAdmin = !!user && (user.role === 'product_admin' || user.role === 'superuser' || !!user.isSuperuser);
-  const [editState, setEditState] = useState<{ mode: 'create' | 'edit'; initial?: ProductInput & { slug: string } } | null>(null);
+  const [editState, setEditState] = useState<{ mode: 'create' | 'edit'; initial?: ProductInput & { slug: string; images?: GalleryImage[] } } | null>(null);
 
   useEffect(() => { if (!loading && !user) router.replace('/login'); }, [loading, user, router]);
 
@@ -492,7 +517,8 @@ export default function CatalogPage() {
 }
 
 // Map a shaped catalog Product to the editor's input shape (id === slug).
-function toInput(p: Product): ProductInput & { slug: string } {
+// Carries the gallery so the editor can manage it without a separate fetch.
+function toInput(p: Product): ProductInput & { slug: string; images?: GalleryImage[] } {
   return {
     slug: p.id, name: p.name, subsidiary: p.subsidiary, therapeuticArea: p.therapeuticArea,
     category: p.category || null, type: p.type || null, tagline: p.tagline || null, overview: p.overview || null,
@@ -500,6 +526,6 @@ function toInput(p: Product): ProductInput & { slug: string } {
     specs: p.specs || null, regNotes: p.regNotes || null, image: p.image || null,
     businessSegment: p.businessSegment || null, applicableDepartments: p.applicableDepartments || null,
     modelNumbers: p.modelNumbers || null, developmentStatus: p.developmentStatus || null,
-    tier: p.tier, classification: p.classification, status: p.status,
+    tier: p.tier, classification: p.classification, status: p.status, images: p.images,
   };
 }
