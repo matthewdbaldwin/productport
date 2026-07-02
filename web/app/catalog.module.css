@@ -302,6 +302,11 @@
   outline: none;
   border-color: var(--red);
 }
+/* Top-bar / low-repeat action buttons keep an UNCONDITIONAL 44px min-height.
+   Do NOT copy this onto .pill: the filter pills repeat in dense rows and
+   deliberately gate their 44px behind `@media (pointer: coarse)` so a mouse-
+   driven desktop stays compact. Blanket-applying always-on 44px to .pill would
+   re-introduce the bulk that split was written to remove. */
 .btn {
   padding: 8px 14px;
   border-radius: 9px;

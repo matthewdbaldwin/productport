@@ -7,7 +7,7 @@
 // the standalone MVP: load the whole (small) catalog once, then search / filter
 // / detail entirely in memory. Every authenticated employee is a viewer.
 import { useEffect, useMemo, useState, useCallback } from 'react';
-import { useModalEsc, useFocusTrap } from '@matthewdbaldwin/microport-ui';
+import { useModalEsc, useFocusTrap, Tooltip } from '@matthewdbaldwin/microport-ui';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/contexts/AuthContext';
 import { api } from '@/lib/api';
@@ -167,16 +167,18 @@ function DetailModal({ p, onClose, onEdit }: { p: Product; onClose: () => void; 
               <div style={{ display: 'flex', gap: 6, marginTop: 8, flexWrap: 'wrap' }}>
                 {p.images.map((img) => {
                   const active = heroId ? heroId === img.id : img.isPrimary;
+                  const label = `View image${img.isPrimary ? ' (primary)' : ''}`;
                   return (
-                    <button
-                      key={img.id}
-                      type="button"
-                      onClick={() => setHeroId(img.id)}
-                      aria-label={`View image${img.isPrimary ? ' (primary)' : ''}`}
-                      style={{ padding: 0, border: active ? '2px solid var(--blue)' : '1px solid var(--lgrey)', borderRadius: 6, cursor: 'pointer', background: 'none', lineHeight: 0 }}
-                    >
-                      <img src={galleryImageSrc(p.id, img.id)} alt="" style={{ width: 48, height: 48, objectFit: 'cover', borderRadius: 5 }} />
-                    </button>
+                    <Tooltip key={img.id} content={label}>
+                      <button
+                        type="button"
+                        onClick={() => setHeroId(img.id)}
+                        aria-label={label}
+                        style={{ padding: 0, border: active ? '2px solid var(--blue)' : '1px solid var(--lgrey)', borderRadius: 6, cursor: 'pointer', background: 'none', lineHeight: 0 }}
+                      >
+                        <img src={galleryImageSrc(p.id, img.id)} alt="" style={{ width: 48, height: 48, objectFit: 'cover', borderRadius: 5 }} />
+                      </button>
+                    </Tooltip>
                   );
                 })}
               </div>
@@ -195,7 +197,7 @@ function DetailModal({ p, onClose, onEdit }: { p: Product; onClose: () => void; 
                 onClick={copyLink}
                 aria-label="Copy a shareable link to this product"
                 style={{
-                  cursor: 'pointer', minHeight: 40,
+                  cursor: 'pointer', minHeight: 44,
                   fontSize: 12, padding: '4px 10px', borderRadius: 6,
                   border: '1px solid var(--line, #d0d5dd)', background: 'transparent',
                   color: 'inherit',

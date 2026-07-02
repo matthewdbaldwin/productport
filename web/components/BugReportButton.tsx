@@ -126,9 +126,11 @@ function BugReportModal({ onClose }: { onClose: () => void }) {
             <h2 id="bug-modal-title" className="text-base font-semibold inline-flex items-center gap-2" style={{ color: 'var(--text)' }}>
               <span style={{ color: 'var(--red)' }}><Bug size={18} aria-hidden="true" /></span>{t('label')}
             </h2>
-            <button type="button" onClick={onClose} aria-label={t('close')} disabled={submitting}
-              className="inline-flex items-center justify-center rounded"
-              style={{ color: 'var(--muted)', fontSize: 22, lineHeight: 1, width: 44, height: 44 }}>&times;</button>
+            <Tooltip content={t('close')}>
+              <button type="button" onClick={onClose} aria-label={t('close')} disabled={submitting}
+                className="inline-flex items-center justify-center rounded"
+                style={{ color: 'var(--muted)', fontSize: 22, lineHeight: 1, width: 44, height: 44 }}>&times;</button>
+            </Tooltip>
           </div>
 
           {sent ? (
