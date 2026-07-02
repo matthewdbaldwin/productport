@@ -12,7 +12,17 @@
 'use strict';
 
 async function upsertProductRow(db, { slug, data, clearances }) {
-  const existing = await db.product.findUnique({ where: { slug }, select: { id: true } });
+  // Match INCLUDING soft-deleted rows. slug is @unique (not compound with
+  // deletedAt), so a soft-deleted product still owns its slug. A bare upsert here
+  // would silently overwrite that deleted row while leaving deletedAt set — an
+  // incoherent "mutated-but-still-deleted" state (and a surprise revive if it's
+  // ever un-deleted). Flag it instead so an admin restores it deliberately; the
+  // import runner catches this per-row and surfaces it in the error report.
+  // feedback_import_revive_softdeleted_pattern.
+  const existing = await db.product.findFirst({ where: { slug }, select: { id: true, deletedAt: true } });
+  if (existing && existing.deletedAt) {
+    throw new Error(`slug "${slug}" matches a deleted product — restore it before re-importing`);
+  }
   const product = await db.product.upsert({ where: { slug }, update: data, create: data });
   await db.regulatoryClearance.deleteMany({ where: { productId: product.id } });
   if (clearances.length) {
