@@ -136,7 +136,7 @@ layer(base);
 
 body {
   background: var(--bg);
-  color: var(--fg);
+  color: var(--text); /* --fg is not a token; the theme foreground is --text */
 }
 
 /* reduced-motion kill-switch MUST cap iteration-count or infinite animations strobe.
