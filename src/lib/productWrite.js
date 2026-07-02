@@ -33,11 +33,20 @@ function trimOrNull(v) {
   return s === '' ? null : s;
 }
 
+// Throw a validation Error tagged with the offending field so the route can
+// return 400 { error, details:[{field,message}] } and the editor can highlight
+// the exact input (feedback_validation_details_must_propagate).
+function fieldError(field, message) {
+  const e = new Error(message);
+  e.field = field;
+  return e;
+}
+
 function checkEnum(field, value, allowed) {
   if (value === null || value === undefined) return null;
   const v = String(value).trim();
   if (v === '') return null;
-  if (!allowed.includes(v)) throw new Error(`invalid ${field} "${v}" (expected one of: ${allowed.join(', ')})`);
+  if (!allowed.includes(v)) throw fieldError(field, `invalid ${field} "${v}" (expected one of: ${allowed.join(', ')})`);
   return v;
 }
 
@@ -54,10 +63,10 @@ function validateProductWrite(input, opts = {}) {
     if (partial && !has(key)) continue;              // untouched on update
     if (!partial && !has(key) && !required) { data[key] = null; continue; }
     const val = trimOrNull(input[key]);
-    if (required && !val) throw new Error(`missing ${key}`);
-    if (val && val.length > max) throw new Error(`${key} too long (max ${max})`);
+    if (required && !val) throw fieldError(key, `missing ${key}`);
+    if (val && val.length > max) throw fieldError(key, `${key} too long (max ${max})`);
     if (key === 'slug' && val && !SLUG_RE.test(val)) {
-      throw new Error(`invalid slug "${val}" (lowercase letters, digits, hyphens only)`);
+      throw fieldError('slug', `invalid slug "${val}" (lowercase letters, digits, hyphens only)`);
     }
     data[key] = val;
   }
@@ -65,7 +74,7 @@ function validateProductWrite(input, opts = {}) {
   // Therapeutic area is a controlled vocabulary (the canonical 10). Validated
   // when present (always on create; only if provided on partial update).
   if (data.therapeuticArea && !isTherapeuticArea(data.therapeuticArea)) {
-    throw new Error(`invalid therapeuticArea "${data.therapeuticArea}" (expected one of: ${THERAPEUTIC_AREAS.join('; ')})`);
+    throw fieldError('therapeuticArea', `invalid therapeuticArea "${data.therapeuticArea}" (expected one of: ${THERAPEUTIC_AREAS.join('; ')})`);
   }
 
   // Enums

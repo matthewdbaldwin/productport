@@ -25,6 +25,15 @@ const multer = require('multer');
 
 const router = express.Router();
 
+// Shape a validateProductWrite error into the 400 body. When the error is tagged
+// with the offending field (fieldError), also emit `details` so the editor can
+// highlight that input inline (feedback_validation_details_must_propagate).
+function writeError(e) {
+  return e && e.field
+    ? { error: e.message, details: [{ field: e.field, message: e.message }] }
+    : { error: e.message };
+}
+
 // In-memory single-file upload → streamed to S3 in the handler (never touches
 // the container disk). 6 MB hard cap at the multer layer too.
 const uploadImage = multer({ storage: multer.memoryStorage(), limits: { fileSize: 6 * 1024 * 1024 } }).single('file');
@@ -112,7 +121,7 @@ router.post('/', requireProductAdmin, async (req, res, next) => {
   try {
     let data;
     try { ({ data } = validateProductWrite(req.body || {})); }
-    catch (e) { return res.status(400).json({ error: e.message }); }
+    catch (e) { return res.status(400).json(writeError(e)); }
 
     const existing = await db.product.findUnique({ where: { slug: data.slug } });
     if (existing) return res.status(409).json({ error: `A product with slug "${data.slug}" already exists.` });
@@ -131,7 +140,7 @@ router.patch('/:slug', requireProductAdmin, async (req, res, next) => {
 
     let data;
     try { ({ data } = validateProductWrite(req.body || {}, { partial: true })); }
-    catch (e) { return res.status(400).json({ error: e.message }); }
+    catch (e) { return res.status(400).json(writeError(e)); }
 
     // A slug change must not collide with another product.
     if (data.slug && data.slug !== target.slug) {

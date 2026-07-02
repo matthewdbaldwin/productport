@@ -7,6 +7,7 @@
 
 import { useState } from 'react';
 import { useModalEsc, useFocusTrap } from '@matthewdbaldwin/microport-ui';
+import { ApiError } from '@/lib/api';
 import s from './catalog.module.css';
 import {
   createProduct, updateProduct, deleteProduct, uploadProductImage, deleteProductImage, setPrimaryImage,
@@ -19,6 +20,19 @@ type Initial = Partial<ProductInput> & { slug?: string; images?: GalleryImage[] 
 const TIERS: ProductTier[] = ['TIER1', 'TIER2', 'TIER3'];
 const CLASSES: ProductClassification[] = ['CORE', 'HIPO', 'FLAGSHIP'];
 const STATUSES: ProductStatus[] = ['ACTIVE', 'DISCONTINUED', 'DRAFT'];
+
+// Pull field-level errors out of a 422/400 ApiError.details ([{field,message}])
+// so the editor can highlight the exact input. feedback_validation_details_must_propagate.
+function fieldErrorsFrom(e: unknown): Record<string, string> {
+  if (e instanceof ApiError && Array.isArray(e.details)) {
+    const map: Record<string, string> = {};
+    for (const d of e.details as Array<{ field?: string; message?: string }>) {
+      if (d && d.field) map[d.field] = d.message || 'Invalid value';
+    }
+    return map;
+  }
+  return {};
+}
 
 export function ProductEditModal({ mode, initial, onClose, onSaved }: {
   mode: 'create' | 'edit';
@@ -37,9 +51,12 @@ export function ProductEditModal({ mode, initial, onClose, onSaved }: {
   });
   const [saving, setSaving] = useState(false);
   const [err, setErr] = useState('');
+  const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
   const [confirmDel, setConfirmDel] = useState(false);
   const [uploading, setUploading] = useState(false);
   const [gallery, setGallery] = useState<GalleryImage[]>(i.images ?? []);
+  const [imgBusy, setImgBusy] = useState<string | null>(null);      // image id with an in-flight mutation
+  const [confirmDelImg, setConfirmDelImg] = useState<string | null>(null); // image id pending delete confirm
   useModalEsc(onClose);
   const trapRef = useFocusTrap<HTMLDivElement>();
 
@@ -54,7 +71,7 @@ export function ProductEditModal({ mode, initial, onClose, onSaved }: {
   async function onPickImage(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
     e.target.value = ''; // allow re-picking the same file
-    if (!file) return;
+    if (!file || uploading) return;
     setUploading(true); setErr('');
     try { applyProduct((await uploadProductImage(i.slug as string, file)).product); }
     catch (er) { setErr(er instanceof Error ? er.message : 'Image upload failed'); }
@@ -62,15 +79,19 @@ export function ProductEditModal({ mode, initial, onClose, onSaved }: {
   }
 
   async function onSetPrimary(imageId: string) {
-    setErr('');
+    if (imgBusy) return;
+    setErr(''); setImgBusy(imageId);
     try { applyProduct((await setPrimaryImage(i.slug as string, imageId)).product); }
     catch (er) { setErr(er instanceof Error ? er.message : 'Could not set primary'); }
+    finally { setImgBusy(null); }
   }
 
   async function onDeleteImage(imageId: string) {
-    setErr('');
+    if (imgBusy) return;
+    setErr(''); setImgBusy(imageId);
     try { applyProduct((await deleteProductImage(i.slug as string, imageId)).product); }
     catch (er) { setErr(er instanceof Error ? er.message : 'Could not delete image'); }
+    finally { setImgBusy(null); setConfirmDelImg(null); }
   }
 
   const set = (k: string) => (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) =>
@@ -79,7 +100,7 @@ export function ProductEditModal({ mode, initial, onClose, onSaved }: {
   const nn = (v: string) => (v.trim() === '' ? null : v.trim());
 
   async function save() {
-    setSaving(true); setErr('');
+    setSaving(true); setErr(''); setFieldErrors({});
     const input: ProductInput = {
       slug: f.slug.trim(), name: f.name.trim(), subsidiary: f.subsidiary.trim(), therapeuticArea: f.therapeuticArea.trim(),
       category: nn(f.category), type: nn(f.type), businessSegment: nn(f.businessSegment), image: nn(f.image),
@@ -95,6 +116,7 @@ export function ProductEditModal({ mode, initial, onClose, onSaved }: {
       onSaved();
     } catch (e) {
       setErr(e instanceof Error ? e.message : 'Save failed');
+      setFieldErrors(fieldErrorsFrom(e));
       setSaving(false);
     }
   }
@@ -105,20 +127,31 @@ export function ProductEditModal({ mode, initial, onClose, onSaved }: {
     catch (e) { setErr(e instanceof Error ? e.message : 'Delete failed'); setSaving(false); }
   }
 
+  const invalidStyle = (k: string) => (fieldErrors[k] ? { borderColor: 'var(--rd)' } : undefined);
+  const fieldErr = (k: string) => fieldErrors[k]
+    ? <em style={{ color: 'var(--rd)', fontWeight: 400, fontSize: 11 }}>{fieldErrors[k]}</em>
+    : null;
+
   // Plain render helpers (NOT components) — called inline as {text(...)}. Defining
   // them as <Component/> here would give React a new type each render and remount
   // the input on every keystroke (focus loss). As function calls they just return
-  // elements, so the input identity is stable.
-  const text = (k: string, label: string, req?: boolean) => (
+  // elements, so the input identity is stable. `focus` autofocuses the first
+  // meaningful field (Name) on open, overriding useFocusTrap's default of focusing
+  // the close-X (first DOM node) — matches BugReportModal's pattern.
+  const text = (k: string, label: string, req?: boolean, focus?: boolean) => (
     <label key={k} className={s.efield}>
       <span>{label}{req && <b style={{ color: 'var(--rd)' }}> *</b>}</span>
-      <input className={s.einput} value={f[k]} onChange={set(k)} />
+      <input className={s.einput} value={f[k]} onChange={set(k)}
+        autoFocus={focus} aria-invalid={fieldErrors[k] ? true : undefined} style={invalidStyle(k)} />
+      {fieldErr(k)}
     </label>
   );
   const area = (k: string, label: string, hint?: string) => (
     <label key={k} className={s.efield}>
       <span>{label}{hint && <em style={{ color: 'var(--grey)', fontWeight: 400 }}> — {hint}</em>}</span>
-      <textarea className={s.einput} rows={2} value={f[k]} onChange={set(k)} />
+      <textarea className={s.einput} rows={2} value={f[k]} onChange={set(k)}
+        aria-invalid={fieldErrors[k] ? true : undefined} style={invalidStyle(k)} />
+      {fieldErr(k)}
     </label>
   );
 
@@ -131,32 +164,37 @@ export function ProductEditModal({ mode, initial, onClose, onSaved }: {
         {err && <p role="alert" style={{ background: 'var(--rdb)', color: 'var(--rd)', padding: '8px 12px', borderRadius: 6, fontSize: 13 }}>{err}</p>}
 
         <div className={s.egrid}>
-          {text('name', 'Name', true)}
+          {text('name', 'Name', true, true)}
           {text('slug', 'Slug (url key)', true)}
           {text('subsidiary', 'Subsidiary', true)}
-          <label className={s.efield}><span>Therapeutic area *</span>
-            <select className={s.einput} value={f.therapeuticArea} onChange={set('therapeuticArea')}>
+          <label className={s.efield}><span>Therapeutic area <b style={{ color: 'var(--rd)' }}>*</b></span>
+            <select className={s.einput} value={f.therapeuticArea} onChange={set('therapeuticArea')}
+              aria-invalid={fieldErrors.therapeuticArea ? true : undefined} style={invalidStyle('therapeuticArea')}>
               <option value="">— select —</option>{THERAPEUTIC_AREAS.map((a) => <option key={a} value={a}>{a}</option>)}
             </select>
+            {fieldErr('therapeuticArea')}
           </label>
           {text('businessSegment', 'Business segment')}
           {text('category', 'Category')}
           {text('type', 'Type')}
           {text('image', 'Image filename')}
           <label className={s.efield}><span>Tier</span>
-            <select className={s.einput} value={f.tier} onChange={set('tier')}>
+            <select className={s.einput} value={f.tier} onChange={set('tier')} style={invalidStyle('tier')}>
               <option value="">— none —</option>{TIERS.map((t) => <option key={t} value={t}>{t.replace('TIER', 'Tier ')}</option>)}
             </select>
+            {fieldErr('tier')}
           </label>
           <label className={s.efield}><span>Classification</span>
-            <select className={s.einput} value={f.classification} onChange={set('classification')}>
+            <select className={s.einput} value={f.classification} onChange={set('classification')} style={invalidStyle('classification')}>
               <option value="">— none —</option>{CLASSES.map((c) => <option key={c} value={c}>{c}</option>)}
             </select>
+            {fieldErr('classification')}
           </label>
           <label className={s.efield}><span>Status</span>
-            <select className={s.einput} value={f.status} onChange={set('status')}>
+            <select className={s.einput} value={f.status} onChange={set('status')} style={invalidStyle('status')}>
               {STATUSES.map((st) => <option key={st} value={st}>{st}</option>)}
             </select>
+            {fieldErr('status')}
           </label>
           {text('developmentStatus', 'Development status')}
         </div>
@@ -165,19 +203,37 @@ export function ProductEditModal({ mode, initial, onClose, onSaved }: {
           <div className={s.efield} style={{ marginBottom: 12 }}>
             <span>Product images <em style={{ color: 'var(--grey)', fontWeight: 400 }}>— gallery; the primary shows on the catalog card. JPEG/PNG/WebP, max 6 MB each.</em></span>
             <div style={{ display: 'flex', flexWrap: 'wrap', gap: 10, marginTop: 6, alignItems: 'flex-start' }}>
-              {gallery.map((img) => (
-                <div key={img.id} style={{ width: 96 }}>
-                  <div style={{ position: 'relative' }}>
-                    <img src={galleryImageSrc(i.slug as string, img.id)} alt="" style={{ width: 96, height: 96, objectFit: 'cover', borderRadius: 6, border: img.isPrimary ? '2px solid var(--blue)' : '1px solid var(--lgrey)' }} />
-                    {img.isPrimary && <span style={{ position: 'absolute', top: 3, left: 3, background: 'var(--blue)', color: '#fff', fontSize: 10, padding: '1px 5px', borderRadius: 4 }}>Primary</span>}
+              {gallery.map((img) => {
+                const busy = imgBusy === img.id;
+                const confirming = confirmDelImg === img.id;
+                return (
+                  <div key={img.id} style={{ width: 96, opacity: busy ? 0.55 : 1 }}>
+                    <div style={{ position: 'relative' }}>
+                      <img src={galleryImageSrc(i.slug as string, img.id)} alt="" style={{ width: 96, height: 96, objectFit: 'cover', borderRadius: 6, border: img.isPrimary ? '2px solid var(--blue)' : '1px solid var(--lgrey)' }} />
+                      {img.isPrimary && <span style={{ position: 'absolute', top: 3, left: 3, background: 'var(--blue)', color: '#fff', fontSize: 10, padding: '1px 5px', borderRadius: 4 }}>Primary</span>}
+                    </div>
+                    {/* Small labels, but a 44px-tall hit area (padding) per the tap-target standard. */}
+                    {confirming ? (
+                      <div style={{ display: 'flex', gap: 4, marginTop: 3, fontSize: 11, alignItems: 'center' }}>
+                        <span style={{ color: 'var(--rd)' }}>Delete?</span>
+                        <button type="button" onClick={() => onDeleteImage(img.id)} disabled={busy}
+                          style={{ background: 'none', border: 'none', color: 'var(--rd)', fontWeight: 600, cursor: 'pointer', padding: '11px 6px', minHeight: 44 }}>{busy ? '…' : 'Yes'}</button>
+                        <button type="button" onClick={() => setConfirmDelImg(null)} disabled={busy}
+                          style={{ background: 'none', border: 'none', color: 'var(--grey)', cursor: 'pointer', padding: '11px 6px', minHeight: 44 }}>No</button>
+                      </div>
+                    ) : (
+                      <div style={{ display: 'flex', gap: 6, marginTop: 3, fontSize: 11, alignItems: 'center', minHeight: 44 }}>
+                        {!img.isPrimary && <button type="button" onClick={() => onSetPrimary(img.id)} disabled={busy}
+                          style={{ background: 'none', border: 'none', color: 'var(--blue)', cursor: 'pointer', padding: '11px 4px', minHeight: 44 }}>{busy ? '…' : 'Set primary'}</button>}
+                        <button type="button" onClick={() => setConfirmDelImg(img.id)} disabled={busy} aria-label="Delete image"
+                          style={{ background: 'none', border: 'none', color: 'var(--rd)', cursor: 'pointer', padding: '11px 4px', minHeight: 44, marginLeft: 'auto' }}>Delete</button>
+                      </div>
+                    )}
                   </div>
-                  <div style={{ display: 'flex', gap: 6, marginTop: 3, fontSize: 11 }}>
-                    {!img.isPrimary && <button type="button" onClick={() => onSetPrimary(img.id)} style={{ background: 'none', border: 'none', color: 'var(--blue)', cursor: 'pointer', padding: 0 }}>Set primary</button>}
-                    <button type="button" onClick={() => onDeleteImage(img.id)} style={{ background: 'none', border: 'none', color: 'var(--rd)', cursor: 'pointer', padding: 0, marginLeft: 'auto' }}>Delete</button>
-                  </div>
-                </div>
-              ))}
-              <label className={s.ebtnGhost} style={{ cursor: 'pointer', width: 96, height: 96, display: 'grid', placeItems: 'center', textAlign: 'center', fontSize: 12 }}>
+                );
+              })}
+              <label className={s.ebtnGhost} aria-disabled={uploading}
+                style={{ cursor: uploading ? 'default' : 'pointer', pointerEvents: uploading ? 'none' : undefined, width: 96, height: 96, display: 'grid', placeItems: 'center', textAlign: 'center', fontSize: 12 }}>
                 {uploading ? 'Uploading…' : '+ Add image'}
                 <input type="file" accept="image/jpeg,image/png,image/webp" onChange={onPickImage} disabled={uploading} style={{ display: 'none' }} />
               </label>
@@ -195,22 +251,25 @@ export function ProductEditModal({ mode, initial, onClose, onSaved }: {
         {area('applicableDepartments', 'Applicable departments', 'pipe-separated')}
         {area('regNotes', 'Regulatory notes')}
 
-        <div style={{ display: 'flex', gap: 10, marginTop: 16, alignItems: 'center' }}>
-          <button className={s.ebtn} disabled={saving} onClick={save}>{saving ? 'Saving…' : mode === 'create' ? 'Create' : 'Save changes'}</button>
-          <button className={s.ebtnGhost} disabled={saving} onClick={onClose}>Cancel</button>
+        {/* Footer: wraps on narrow screens; destructive Delete is separated on the
+            left, primary Save is rightmost (not the far-right slot Delete used to
+            hold). Standardized toward BugReportModal's convention. */}
+        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 10, marginTop: 16, alignItems: 'center' }}>
           {mode === 'edit' && (
-            <span style={{ marginLeft: 'auto' }}>
-              {confirmDel ? (
-                <>
-                  <span style={{ fontSize: 13, marginRight: 8 }}>Delete this product?</span>
-                  <button className={s.ebtnDanger} disabled={saving} onClick={del}>Confirm delete</button>
-                  <button className={s.ebtnGhost} disabled={saving} onClick={() => setConfirmDel(false)}>No</button>
-                </>
-              ) : (
-                <button className={s.ebtnDanger} disabled={saving} onClick={() => setConfirmDel(true)}>Delete</button>
-              )}
-            </span>
+            confirmDel ? (
+              <span style={{ display: 'inline-flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+                <span style={{ fontSize: 13 }}>Delete this product?</span>
+                <button className={s.ebtnDanger} disabled={saving} onClick={del}>Confirm delete</button>
+                <button className={s.ebtnGhost} disabled={saving} onClick={() => setConfirmDel(false)}>No</button>
+              </span>
+            ) : (
+              <button className={s.ebtnDanger} disabled={saving} onClick={() => setConfirmDel(true)}>Delete</button>
+            )
           )}
+          <span style={{ display: 'inline-flex', gap: 10, marginLeft: 'auto', flexWrap: 'wrap' }}>
+            <button className={s.ebtnGhost} disabled={saving} onClick={onClose}>Cancel</button>
+            <button className={s.ebtn} disabled={saving} onClick={save}>{saving ? 'Saving…' : mode === 'create' ? 'Create' : 'Save changes'}</button>
+          </span>
         </div>
       </div>
     </div>

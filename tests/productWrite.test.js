@@ -52,6 +52,30 @@ describe('validateProductWrite — enums', () => {
   });
 });
 
+describe('validateProductWrite — errors carry the offending field', () => {
+  // The route turns these into 400 { error, details:[{field,message}] } so the
+  // editor can highlight the exact field (feedback_validation_details_must_propagate).
+  const fieldOf = (fn) => { try { fn(); } catch (e) { return e.field; } return undefined; };
+
+  test('missing required → field is the missing key', () => {
+    expect(fieldOf(() => validateProductWrite(good({ subsidiary: '' })))).toBe('subsidiary');
+    expect(fieldOf(() => validateProductWrite(good({ name: '  ' })))).toBe('name');
+  });
+  test('bad slug format → field is slug', () => {
+    expect(fieldOf(() => validateProductWrite(good({ slug: 'Fire Hawk!' })))).toBe('slug');
+  });
+  test('out-of-enum → field is the enum key', () => {
+    expect(fieldOf(() => validateProductWrite(good({ tier: 'TIER9' })))).toBe('tier');
+    expect(fieldOf(() => validateProductWrite(good({ status: 'LIVE' })))).toBe('status');
+  });
+  test('bad therapeutic area → field is therapeuticArea', () => {
+    expect(fieldOf(() => validateProductWrite(good({ therapeuticArea: 'Cardiology' })))).toBe('therapeuticArea');
+  });
+  test('too-long text → field is that key', () => {
+    expect(fieldOf(() => validateProductWrite(good({ tagline: 'x'.repeat(501) })))).toBe('tagline');
+  });
+});
+
 describe('validateProductWrite — therapeutic area (controlled 10)', () => {
   test('accepts a canonical therapeutic area', () => {
     const { data } = validateProductWrite(good({ therapeuticArea: 'Orthopedic Joint, Spine, and Trauma' }));

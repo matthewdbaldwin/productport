@@ -157,17 +157,6 @@ function DetailModal({ p, onClose, onEdit }: { p: Product; onClose: () => void; 
     <div className={s.ov} onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}>
       <div ref={trapRef} className={s.modal} role="dialog" aria-modal="true" aria-labelledby="pp-modal-title" style={{ maxHeight: '92vh', overflowY: 'auto' }}>
         <button className={s.x} onClick={onClose} aria-label="Close">&times;</button>
-        {onEdit && (
-          <button
-            type="button"
-            className={s.ebtn}
-            data-testid="edit-product"
-            style={{ position: 'absolute', top: 16, right: 56, padding: '6px 14px', fontSize: 13 }}
-            onClick={onEdit}
-          >
-            Edit
-          </button>
-        )}
         <div className={s.mhead}>
           <div>
             <div className={s.mimg}>
@@ -199,19 +188,27 @@ function DetailModal({ p, onClose, onEdit }: { p: Product; onClose: () => void; 
               {p.tagline}<br />{p.subsidiary}{p.type ? ` · ${p.type}` : ''}
             </div>
             <div className={s.chips}><MarketChips p={p} /></div>
-            <button
-              type="button"
-              onClick={copyLink}
-              aria-label="Copy a shareable link to this product"
-              style={{
-                marginTop: 10, alignSelf: 'flex-start', cursor: 'pointer',
-                fontSize: 12, padding: '4px 10px', borderRadius: 6,
-                border: '1px solid var(--line, #d0d5dd)', background: 'transparent',
-                color: 'inherit',
-              }}
-            >
-              {copied ? '✓ Link copied' : '🔗 Copy link'}
-            </button>
+            <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginTop: 10, alignItems: 'center' }}>
+              <button
+                type="button"
+                onClick={copyLink}
+                aria-label="Copy a shareable link to this product"
+                style={{
+                  cursor: 'pointer', minHeight: 40,
+                  fontSize: 12, padding: '4px 10px', borderRadius: 6,
+                  border: '1px solid var(--line, #d0d5dd)', background: 'transparent',
+                  color: 'inherit',
+                }}
+              >
+                {copied ? '✓ Link copied' : '🔗 Copy link'}
+              </button>
+              {onEdit && (
+                <button type="button" className={s.ebtn} data-testid="edit-product"
+                  style={{ fontSize: 13 }} onClick={onEdit}>
+                  Edit
+                </button>
+              )}
+            </div>
           </div>
         </div>
         <div className={s.body}>
@@ -262,25 +259,30 @@ function DetailModal({ p, onClose, onEdit }: { p: Product; onClose: () => void; 
           {p.trials.length > 0 && (
             <div className={s.sec}>
               <h2>Key clinical evidence</h2>
-              <table className={s.tbl}>
-                <thead>
-                  <tr>
-                    <th>Trial</th><th>Identifier</th>
-                    <th style={{ textAlign: 'center' }}>N</th><th>Design</th><th>Result</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {p.trials.map((t, i) => (
-                    <tr key={i}>
-                      <td style={{ fontWeight: 500, color: 'var(--blue)' }}>{t.trial}</td>
-                      <td style={{ color: 'var(--grey)', whiteSpace: 'nowrap' }}>{t.identifier}</td>
-                      <td style={{ textAlign: 'center' }}>{t.n}</td>
-                      <td>{t.design}</td>
-                      <td>{t.result}</td>
+              {/* Own horizontal-scroll context: the ancestor .modal is overflow:hidden,
+                  so without this a wide trials table clips its Design/Result cells with
+                  no way to reach them on a phone. */}
+              <div style={{ overflowX: 'auto' }}>
+                <table className={s.tbl} style={{ minWidth: 520 }}>
+                  <thead>
+                    <tr>
+                      <th>Trial</th><th>Identifier</th>
+                      <th style={{ textAlign: 'center' }}>N</th><th>Design</th><th>Result</th>
                     </tr>
-                  ))}
-                </tbody>
-              </table>
+                  </thead>
+                  <tbody>
+                    {p.trials.map((t, i) => (
+                      <tr key={i}>
+                        <td style={{ fontWeight: 500, color: 'var(--blue)' }}>{t.trial}</td>
+                        <td style={{ color: 'var(--grey)', whiteSpace: 'nowrap' }}>{t.identifier}</td>
+                        <td style={{ textAlign: 'center' }}>{t.n}</td>
+                        <td>{t.design}</td>
+                        <td>{t.result}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
             </div>
           )}
         </div>
