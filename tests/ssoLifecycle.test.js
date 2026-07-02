@@ -88,6 +88,14 @@ describe('POST /api/sso/lifecycle/event', () => {
     expect(res.status).toBe(200);
     expect(res.body.dropped).toBeDefined();
   });
+
+  test('well-formed event for an unknown user → 200 noop (no local row to touch)', async () => {
+    mockStore.user = null; // db.user.findUnique returns null
+    const app = makeApp();
+    const res = await post(app, '/api/sso/lifecycle/event', evt({ email: 'ghost@test.local' }));
+    expect(res.status).toBe(200);
+    expect(res.body.ok).toBe(true);
+  });
 });
 
 describe('POST /api/sso/lifecycle/state', () => {
@@ -98,5 +106,11 @@ describe('POST /api/sso/lifecycle/state', () => {
     const res = await post(app, '/api/sso/lifecycle/state', { email: 'gone@test.local' });
     expect(res.status).toBe(200);
     expect(res.body).toEqual({ exists: true, role: 'product_admin', status: 'active', deletedAt: null });
+  });
+
+  test('/state without email → 400', async () => {
+    const app = makeApp();
+    const res = await post(app, '/api/sso/lifecycle/state', {});
+    expect(res.status).toBe(400);
   });
 });

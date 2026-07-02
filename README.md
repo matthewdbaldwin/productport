@@ -55,8 +55,9 @@ Auth goes through SalesPort SSO — a local instance needs `SALESPORT_JWT_PUBLIC
 | `COOKIE_DOMAIN` | Session cookie domain (`.microport.com` in prod) |
 | `SALESPORT_API_URL` | SalesPort API base URL (SSO + audit) |
 | `SALESPORT_WEB_URL` | SalesPort hub web URL (SSO round-trip origin) |
-| `WEBHOOK_SECRET_SALESPORT_productport` | HMAC secret for inbound SalesPort → ProductPort lifecycle webhooks |
-| `WEBHOOK_SECRET_productport_SALESPORT` | HMAC secret for outbound ProductPort → SalesPort events (e.g. bug reports) |
+| `SALESPORT_LIFECYCLE_SECRET` | HMAC secret for inbound SalesPort → ProductPort SSO-lifecycle webhooks (`/api/sso/lifecycle`) |
+| `ALLOW_UNSIGNED_LIFECYCLE` | Dev-only: skip lifecycle HMAC when no secret is provisioned (guard fails closed otherwise) |
+| `WEBHOOK_SECRET_PRODUCTPORT_SALESPORT` | HMAC secret for outbound ProductPort → SalesPort events (e.g. bug reports) |
 | `WEB_ORIGIN` | Own public web origin (CORS + canonical links) |
 | `PORT` | API listen port (`4006` locally) |
 | `NODE_AUTH_TOKEN` | GitHub Packages PAT — required to install `@matthewdbaldwin/*` |
@@ -65,7 +66,7 @@ Auth goes through SalesPort SSO — a local instance needs `SALESPORT_JWT_PUBLIC
 
 ## SSO lifecycle
 
-ProductPort is SSO/JIT: on every login the auth middleware re-resolves the user's role from the SSO claim and upserts the local `User` row. The inbound webhook (`POST /api/webhooks/salesport`) validates events against `microport-contracts` `LifecycleEvent` and acts on the account flag — `disable` deactivates the user (so an offboarded account loses access before its token expires), `reactivate` re-enables it. Role `grant` / `revoke` need no state written here; they take effect on the next login.
+ProductPort is SSO/JIT: on every login the auth middleware re-resolves the user's role from the SSO claim and upserts the local `User` row. The inbound receiver (`POST /api/sso/lifecycle/event`, HMAC-verified via `createLifecycleGuard`) validates events against `microport-contracts` `LifecycleEvent` and acts on the account flag — `disable` deactivates the user (so an offboarded account loses access before its token expires), `reactivate` re-enables it. Role `grant` / `revoke` need no state written here; they take effect on the next login. A sibling `POST /api/sso/lifecycle/state` answers SalesPort's hourly reconciliation probe. Every event is logged to `UserLifecycleEvent` (audit + `X-Lifecycle-Event-Id` dedup).
 
 ## Ship discipline
 

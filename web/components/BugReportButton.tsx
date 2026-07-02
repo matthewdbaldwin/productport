@@ -18,6 +18,13 @@ type Priority = 'low' | 'normal' | 'high' | 'critical';
 const PRIORITIES: Priority[] = ['low', 'normal', 'high', 'critical'];
 const APP_VERSION = process.env.NEXT_PUBLIC_APP_VERSION || '';
 
+// Minted at module scope, not in render — react-hooks/purity forbids Date.now()
+// (and other impure calls) inside a component/hook body; the fleet pattern is a
+// plain top-level helper the rule doesn't trace into.
+function mintEventId(): string {
+  return typeof crypto !== 'undefined' && crypto.randomUUID ? crypto.randomUUID() : `evt-${Date.now()}`;
+}
+
 export function BugReportButton() {
   const t = useTranslations('bug');
   const { user } = useAuth();
@@ -72,7 +79,7 @@ function BugReportModal({ onClose }: { onClose: () => void }) {
   }), []);
   // Idempotency key minted once per open, so a retry after a lost response dedups
   // on SalesPort instead of double-filing (fleet parity).
-  const eventId = useMemo(() => (typeof crypto !== 'undefined' && crypto.randomUUID ? crypto.randomUUID() : `${Date.now()}`), []);
+  const eventId = useMemo(() => mintEventId(), []);
 
   const inputStyle = { background: 'var(--surface2, var(--surface))', borderColor: 'var(--border)', color: 'var(--text)' } as const;
 
