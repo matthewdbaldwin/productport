@@ -50,6 +50,7 @@ interface Product {
 }
 
 const REGIONS = ['CE', 'FDA', 'NMPA', 'PMDA'] as const;
+const APP_VERSION = process.env.NEXT_PUBLIC_APP_VERSION || '';
 
 const STATUS_META: Record<ClearanceStatus, { label: string; bg: string; fg: string }> = {
   APPROVED:     { label: 'Cleared',     bg: 'var(--okb)', fg: 'var(--ok)' },
@@ -364,7 +365,10 @@ export default function CatalogPage() {
       <div className={s.top}>
         <div className={s.tb}>
           <img className={s.logo} src="/products/logo.jpg" alt="MicroPort" />
-          <span className={s.pp}>ProductPort</span>
+          <span className={s.brand}>
+            <span className={s.pp}>ProductPort</span>
+            {APP_VERSION && <span className={s.ver}>v{APP_VERSION}</span>}
+          </span>
           <div className={s.sw}>
             <svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="7" /><path d="M21 21l-4-4" /></svg>
             <input

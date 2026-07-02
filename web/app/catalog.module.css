@@ -54,11 +54,23 @@
   width: auto;
   flex: none;
 }
+.brand {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  border-left: 1px solid var(--lgrey);
+  padding-left: 14px;
+  line-height: 1.15;
+}
 .pp {
   font-weight: 500;
   font-size: 14px;
-  border-left: 1px solid var(--lgrey);
-  padding-left: 14px;
+}
+.ver {
+  font-size: 10.5px;
+  font-weight: 500;
+  letter-spacing: 0.02em;
+  color: var(--grey);
 }
 .sw {
   flex: 1;
