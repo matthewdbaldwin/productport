@@ -195,6 +195,60 @@
   color: var(--grey);
   margin-right: 4px;
 }
+
+/* Subsidiary accordion — 27 subsidiaries grouped under their therapeutic area
+   (~10 collapsible sections) so they don't wall the filter rail. */
+.accWrap {
+  margin-bottom: 10px;
+}
+.acc {
+  display: flex;
+  flex-direction: column;
+  margin-top: 4px;
+  border: 1px solid var(--lgrey);
+  border-radius: 10px;
+  overflow: hidden;
+  background: #fff;
+}
+.accSec + .accSec {
+  border-top: 1px solid var(--lgrey);
+}
+.accHead {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  background: none;
+  border: none;
+  cursor: pointer;
+  font-family: inherit;
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--navy);
+  text-align: left;
+  padding: 6px 12px;
+  min-height: 44px; /* tap-target standard */
+}
+.accHead:hover {
+  color: var(--blue);
+  background: #f7f8fb;
+}
+.accChev {
+  display: inline-block;
+  color: var(--grey);
+  font-size: 11px;
+  transition: transform 0.15s;
+  flex: none;
+}
+.accChev[data-open] {
+  transform: rotate(90deg);
+}
+.accName {
+  flex: 1;
+}
+.accBody {
+  padding: 2px 12px 10px 30px;
+}
 .count {
   font-size: 12.5px;
   color: var(--grey);

@@ -338,8 +338,25 @@ export default function CatalogPage() {
   }, [openId]);
 
   const areas = useMemo(() => orderedAreas(products ?? []), [products]);
-  const subs = useMemo(() => [...new Set((products ?? []).map((p) => p.subsidiary))].sort(), [products]);
   const cats = useMemo(() => [...new Set((products ?? []).map((p) => p.category).filter(Boolean))].sort(), [products]);
+  // Subsidiaries grouped under their therapeutic area (a subsidiary spanning two
+  // TAs appears under both — expected). Drives the Subsidiary accordion so the 27
+  // subsidiaries browse as ~10 collapsible sections instead of one flat pill wall.
+  const subsByArea = useMemo(() => {
+    const m: Record<string, Set<string>> = {};
+    for (const p of products ?? []) {
+      (m[p.therapeuticArea] ??= new Set()).add(p.subsidiary);
+    }
+    const out: Record<string, string[]> = {};
+    for (const a of Object.keys(m)) out[a] = [...m[a]].sort();
+    return out;
+  }, [products]);
+  const [expandedAreas, setExpandedAreas] = useState<Set<string>>(new Set());
+  const toggleArea = (a: string) =>
+    setExpandedAreas((prev) => { const n = new Set(prev); n.has(a) ? n.delete(a) : n.add(a); return n; });
+  // A section renders open if the user expanded it, OR it's the selected TA, OR it
+  // holds the selected subsidiary (so the active pill is always visible).
+  const areaOpen = (a: string) => expandedAreas.has(a) || fr === a || (!!sub && (subsByArea[a] ?? []).includes(sub));
   const countBy = useCallback(
     (key: keyof Product, v: string) => (products ?? []).filter((p) => p[key] === v).length,
     [products],
@@ -414,20 +431,38 @@ export default function CatalogPage() {
                 ))}
               </span>
             </div>
-            <div className={s.bar}>
+            <div className={s.accWrap}>
               <span className={s.lbl}>Subsidiary</span>
-              <span className={s.pillrow}>
-                {subs.map((sb) => (
-                  <button
-                    key={sb}
-                    type="button"
-                    className={`${s.pill} ${sub === sb ? s.pillOn : ''}`}
-                    onClick={() => setSub(sub === sb ? null : sb)}
-                  >
-                    {sb.replace('MicroPort ', '')}<span className={s.pcount}>{countBy('subsidiary', sb)}</span>
-                  </button>
-                ))}
-              </span>
+              <div className={s.acc}>
+                {areas.map((a) => {
+                  const list = subsByArea[a] ?? [];
+                  if (!list.length) return null;
+                  const open = areaOpen(a);
+                  return (
+                    <div key={a} className={s.accSec}>
+                      <button type="button" className={s.accHead} aria-expanded={open} onClick={() => toggleArea(a)}>
+                        <span className={s.accChev} data-open={open || undefined} aria-hidden="true">▸</span>
+                        <span className={s.accName}>{a}</span>
+                        <span className={s.pcount}>{list.length}</span>
+                      </button>
+                      {open && (
+                        <span className={`${s.pillrow} ${s.accBody}`}>
+                          {list.map((sb) => (
+                            <button
+                              key={sb}
+                              type="button"
+                              className={`${s.pill} ${sub === sb ? s.pillOn : ''}`}
+                              onClick={() => setSub(sub === sb ? null : sb)}
+                            >
+                              {sb.replace('MicroPort ', '')}<span className={s.pcount}>{countBy('subsidiary', sb)}</span>
+                            </button>
+                          ))}
+                        </span>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
             </div>
             <div className={s.bar}>
               <span className={s.lbl}>Regulatory</span>
