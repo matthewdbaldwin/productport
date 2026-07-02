@@ -5,18 +5,17 @@ name: Deploy to AWS (prod)
 # Dockerfile) + productport-web (web/Dockerfile). Same OIDC role.
 
 on:
-  push:
-    branches: [main]
-    paths-ignore:
-      - 'docs/**'
-      - '*.md'
-      - 'LICENSE'
-      - '.gitignore'
-      - '.env.example'
+  # Gated on CI: deploy runs only AFTER the "CI" workflow completes on main, and
+  # the job-level `if` requires conclusion == 'success', so a red CI no longer
+  # ships to prod. feedback_deploy_does_not_gate_on_ci.
+  workflow_run:
+    workflows: ["CI"]
+    types: [completed]
+    branches: [main, master]
 
 concurrency:
-  group: deploy-prod-${{ github.ref }}
-  cancel-in-progress: true
+  group: deploy-prod-${{ github.event.workflow_run.head_branch }}
+  cancel-in-progress: false
 
 permissions:
   id-token: write
@@ -33,9 +32,15 @@ jobs:
   deploy:
     name: Build & Deploy (prod)
     runs-on: ubuntu-latest
+    # Deploy only when the triggering CI run passed AND was a push to main (not a
+    # PR build). A red CI produces conclusion != 'success' -> no deploy.
+    if: ${{ github.event.workflow_run.conclusion == 'success' && github.event.workflow_run.event == 'push' }}
     steps:
       - name: Checkout
         uses: actions/checkout@v7
+        with:
+          # Deploy the exact commit CI validated, not just the branch tip.
+          ref: ${{ github.event.workflow_run.head_sha }}
 
       - name: Configure AWS credentials (OIDC)
         uses: aws-actions/configure-aws-credentials@v6
