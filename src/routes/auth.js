@@ -87,7 +87,9 @@ router.get('/role-catalog', (_req, res) => {
     satellite: 'productport',
     roles: [
       { key: 'viewer',        label: 'Viewer',        description: 'Read-only product catalog. Every employee has this by default — no grant needed.' },
-      { key: 'product',       label: 'Product',       description: 'Product manager — edits catalog entries, regulatory + trial data.' },
+      // 'product' (mid-tier editor) is intentionally NOT advertised: no route guard
+      // enforces it yet, so granting it today is a no-op (viewer-equivalent). Re-add
+      // when the two-tier editor (requireProductEditor) ships. See the Role enum.
       { key: 'product_admin', label: 'Product Admin', description: 'Full ProductPort administrator. Manages the catalog + access; surfaces the tile in the app-switcher.' },
     ],
   });

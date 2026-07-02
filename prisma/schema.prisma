@@ -21,8 +21,11 @@ datasource db {
 // must agree or hires 403 / unknown_role at login.
 enum Role {
   viewer
-  product        // edit descriptive fields + trials + images
-  product_admin  // + regulatory-clearance matrix, taxonomy, lifecycle
+  product        // RESERVED, not yet enforced — no guard grants at this level, so a
+                 // `product` grant is viewer-equivalent today. De-advertised from the
+                 // role-catalog until a requireProductEditor gate lands (descriptive
+                 // fields + trials + images). Kept as a value to avoid an enum rebuild.
+  product_admin  // full editor: + regulatory-clearance matrix, taxonomy, lifecycle
   superuser
 }
 
