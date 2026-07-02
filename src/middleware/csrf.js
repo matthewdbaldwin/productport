@@ -1,6 +1,6 @@
 // CSRF guard — mutating /api requests must carry X-Requested-With: productport-web
-// (a header a cross-site form can't set). Signature-authed ingress (webhooks,
-// SSO lifecycle) bypass via BOOTSTRAP_PATHS — they verify their own HMAC.
+// (a header a cross-site form can't set). Signature-authed ingress (the SSO
+// lifecycle receiver) bypasses via BOOTSTRAP_PATHS — it verifies its own HMAC.
 // feedback_csrf_bootstrap_allowlist_drift. Fan this list out to all receivers in
 // the same commit when you add an ingress route.
 'use strict';
@@ -11,7 +11,6 @@ const EXPECTED = 'productport-web';
 // Paths (relative to the /api mount) that authenticate via signature or a
 // one-time code, not the session cookie/CSRF header.
 const BOOTSTRAP_PATHS = [
-  /^\/webhooks(\/|$)/,
   /^\/sso\/lifecycle(\/|$)/,
   // SSO code exchange — the 60s handoff code IS the credential; the browser
   // POST has no session cookie or CSRF token yet. Matches the mounted path

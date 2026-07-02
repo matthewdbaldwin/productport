@@ -208,6 +208,30 @@ model Session {
   @@map("sessions")
 }
 
+// Inbound SSO-lifecycle event audit + idempotency store (fleet parity with
+// opsport/etc.). Every event salesport delivers to /api/sso/lifecycle/event is
+// logged here regardless of whether a local User matched; senderEventId (the
+// salesport LifecycleOutbox.id from X-Lifecycle-Event-Id) is unique so a retry
+// dedups on a single findUnique. See src/routes/ssoLifecycle.js.
+model UserLifecycleEvent {
+  id            String    @id @default(cuid())
+  senderEventId String?   @unique
+  email         String
+  kind          String // grant | revoke | disable | reactivate
+  prevRole      String?
+  newRole       String?
+  actorEmail    String?
+  actorRole     String?
+  payload       Json
+  receivedAt    DateTime  @default(now())
+  processedAt   DateTime?
+  error         String?   @db.Text
+
+  @@index([email])
+  @@index([receivedAt])
+  @@map("user_lifecycle_events")
+}
+
 // Durable outbox for any outbound webhook from this platform (at-least-once).
 model WebhookOutbox {
   id            String    @id @default(cuid())

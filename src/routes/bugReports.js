@@ -48,9 +48,9 @@ router.post('/', requireAuth, async (req, res) => {
   };
 
   // Validate-on-send against the shared contract (warn-don't-block; the receiver
-  // is the hard gate). NOTE: BugReportCrossApp's sourceApp enum does not yet
-  // include 'productport', so this warns until the contract is republished —
-  // functionally fine (the receiver allowlists productport). See the pp bug-report tail.
+  // is the hard gate). BugReportCrossApp's sourceApp enum includes 'productport'
+  // as of contracts 0.5.6, so a well-formed payload parses clean; the warn path
+  // only fires on a genuine shape defect.
   const chk = BugReportCrossApp.safeParse(payload);
   if (!chk.success) {
     logger.warn({ issues: chk.error.issues }, '[bug-reports] payload not (yet) in BugReportCrossApp — sending anyway');
