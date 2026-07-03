@@ -1,31 +1,28 @@
 'use client';
 
 // Floating "Report a bug" — a discreet round red bug-icon launcher (mirrors the
-// fleet: clinicport/salesport) that opens a proper modal form. Every AUTHED user
-// can file; the form POSTs to /api/bug-reports, which signs + forwards to the
-// SalesPort central queue. Rendered into document.body via a portal so the fixed
-// launcher escapes the app shell's stacking/overflow (and Firefox paints it).
+// fleet: opsport/reviewport/clinicport/salesport) that opens a modal form. Every
+// AUTHED user can file; the form POSTs to /api/bug-reports, which signs + forwards
+// to the SalesPort central queue. Rendered into document.body via a portal so the
+// fixed launcher escapes the app shell's stacking/overflow (and Firefox paints it).
 // bug-report-fanout, feedback_helpbutton_inline_zindex.
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { useTranslations } from 'next-intl';
-import { Tooltip, useModalEsc } from '@matthewdbaldwin/microport-ui';
+import { Bug } from 'lucide-react';
+import { Tooltip, useModalEsc, useFocusTrap } from '@matthewdbaldwin/microport-ui';
 import { useAuth } from '@/contexts/AuthContext';
 import { api } from '@/lib/api';
 
 type Priority = 'low' | 'normal' | 'high' | 'critical';
 const PRIORITIES: Priority[] = ['low', 'normal', 'high', 'critical'];
+const APP_VERSION = process.env.NEXT_PUBLIC_APP_VERSION || '';
 
-// Inline bug glyph — avoids a lucide-react dependency for one icon.
-function BugIcon({ size = 16 }: { size?: number }) {
-  return (
-    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor"
-      strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-      <path d="m8 2 1.88 1.88M14.12 3.88 16 2M9 7.13v-1a3.003 3.003 0 1 1 6 0v1" />
-      <path d="M12 20c-3.3 0-6-2.7-6-6v-3a4 4 0 0 1 4-4h4a4 4 0 0 1 4 4v3c0 3.3-2.7 6-6 6Z" />
-      <path d="M12 20v-9M6.53 9C4.6 8.8 3 7.1 3 5M6 13H2M3 21c0-2.1 1.7-3.9 3.8-4M20.97 5c0 2.1-1.6 3.8-3.5 4M4 3l16 16M22 13h-4M17.2 17c2.1.1 3.8 1.9 3.8 4" />
-    </svg>
-  );
+// Minted at module scope, not in render — react-hooks/purity forbids Date.now()
+// (and other impure calls) inside a component/hook body; the fleet pattern is a
+// plain top-level helper the rule doesn't trace into.
+function mintEventId(): string {
+  return typeof crypto !== 'undefined' && crypto.randomUUID ? crypto.randomUUID() : `evt-${Date.now()}`;
 }
 
 export function BugReportButton() {
@@ -48,10 +45,10 @@ export function BugReportButton() {
           onClick={() => setOpen(true)}
           aria-label={t('label')}
           data-bug-report-launcher="true"
-          className="fixed bottom-20 right-4 md:bottom-4 z-40 inline-flex items-center justify-center p-2.5 rounded-full shadow-lg transition-transform hover:scale-105"
-          style={{ background: 'var(--danger, #dc2626)', color: 'var(--danger-fg, #fff)' }}
+          className="fixed bottom-20 right-4 md:bottom-4 z-40 inline-flex items-center justify-center p-1.5 rounded-full shadow-lg transition-transform hover:scale-105"
+          style={{ background: 'var(--red)', color: 'var(--accent-fg)' }}
         >
-          <BugIcon size={18} />
+          <Bug size={16} aria-hidden="true" />
         </button>
       </Tooltip>
       {open && <BugReportModal onClose={() => setOpen(false)} />}
@@ -70,13 +67,27 @@ function BugReportModal({ onClose }: { onClose: () => void }) {
   const [error, setError] = useState('');
 
   useModalEsc(onClose, !submitting);
+  const trapRef = useFocusTrap<HTMLDivElement>();
 
-  const inputStyle = { background: 'var(--surface2, var(--surface))', borderColor: 'var(--border)', color: 'var(--fg)' } as const;
+  // Auto-captured context, computed once. Shown read-only to the reporter (fleet
+  // transparency parity) and sent with the report.
+  const ctx = useMemo(() => ({
+    pageUrl: typeof window !== 'undefined' ? window.location.href : '',
+    viewportSize: typeof window !== 'undefined' ? `${window.innerWidth}x${window.innerHeight}` : '',
+    browserAgent: typeof navigator !== 'undefined' ? navigator.userAgent : '',
+    appVersion: APP_VERSION,
+  }), []);
+  // Idempotency key minted once per open, so a retry after a lost response dedups
+  // on SalesPort instead of double-filing (fleet parity).
+  const eventId = useMemo(() => mintEventId(), []);
+
+  const inputStyle = { background: 'var(--surface2, var(--surface))', borderColor: 'var(--border)', color: 'var(--text)' } as const;
 
   async function submit(e: React.FormEvent) {
     e.preventDefault();
     setError('');
     if (!title.trim()) { setError(t('errorTitle')); return; }
+    if (!detail.trim()) { setError(t('errorDetail')); return; }
     setSubmitting(true);
     try {
       await api('/api/bug-reports', {
@@ -84,10 +95,12 @@ function BugReportModal({ onClose }: { onClose: () => void }) {
         body: JSON.stringify({
           title: title.trim(),
           description: detail.trim(),
-          pageUrl: window.location.href,
-          browserAgent: navigator.userAgent,
-          viewportSize: `${window.innerWidth}x${window.innerHeight}`,
           priority,
+          pageUrl: ctx.pageUrl,
+          browserAgent: ctx.browserAgent,
+          viewportSize: ctx.viewportSize,
+          appVersion: ctx.appVersion,
+          eventId,
         }),
       });
       setSent(true);
@@ -104,23 +117,27 @@ function BugReportModal({ onClose }: { onClose: () => void }) {
       <div className="fixed inset-0 z-50" style={{ background: 'rgba(0,0,0,0.5)' }} onClick={submitting ? undefined : onClose} />
       <div className="fixed inset-0 z-50 flex items-center justify-center p-4 pointer-events-none">
         <div
-          className="w-full max-w-md rounded-xl shadow-xl border pointer-events-auto"
+          ref={trapRef}
+          className="w-full max-w-lg rounded-xl shadow-xl border pointer-events-auto"
           style={{ background: 'var(--surface)', borderColor: 'var(--border)' }}
           role="dialog" aria-modal="true" aria-labelledby="bug-modal-title"
         >
           <div className="flex items-center justify-between px-5 py-3.5 border-b" style={{ borderColor: 'var(--border)' }}>
-            <h2 id="bug-modal-title" className="text-base font-semibold inline-flex items-center gap-2" style={{ color: 'var(--fg)' }}>
-              <span style={{ color: 'var(--danger, #dc2626)' }}><BugIcon size={18} /></span>{t('label')}
+            <h2 id="bug-modal-title" className="text-base font-semibold inline-flex items-center gap-2" style={{ color: 'var(--text)' }}>
+              <span style={{ color: 'var(--red)' }}><Bug size={18} aria-hidden="true" /></span>{t('label')}
             </h2>
-            <button type="button" onClick={onClose} aria-label={t('close')} className="btn-close" disabled={submitting}
-              style={{ color: 'var(--muted)', fontSize: 22, lineHeight: 1 }}>&times;</button>
+            <Tooltip content={t('close')}>
+              <button type="button" onClick={onClose} aria-label={t('close')} disabled={submitting}
+                className="inline-flex items-center justify-center rounded"
+                style={{ color: 'var(--muted)', fontSize: 22, lineHeight: 1, width: 44, height: 44 }}>&times;</button>
+            </Tooltip>
           </div>
 
           {sent ? (
-            <p className="px-5 py-6 text-sm" style={{ color: 'var(--fg)' }}>{t('thanks')}</p>
+            <p className="px-5 py-6 text-sm" style={{ color: 'var(--text)' }}>{t('thanks')}</p>
           ) : (
             <form onSubmit={submit} className="p-5 space-y-3">
-              {error && <p role="alert" className="text-sm" style={{ color: 'var(--danger, #dc2626)' }}>{error}</p>}
+              {error && <p role="alert" className="text-sm" style={{ color: 'var(--red)' }}>{error}</p>}
               <div className="space-y-1">
                 <label htmlFor="bug-title" className="text-xs font-medium" style={{ color: 'var(--muted)' }}>{t('titleLabel')}</label>
                 <input id="bug-title" className="w-full rounded border px-2.5 py-2 text-sm" style={inputStyle}
@@ -140,11 +157,21 @@ function BugReportModal({ onClose }: { onClose: () => void }) {
                   {PRIORITIES.map((p) => <option key={p} value={p}>{t(`priority_${p}`)}</option>)}
                 </select>
               </div>
+              {/* Read-only preview of what's attached — fleet transparency parity. */}
+              <details className="text-xs" style={{ color: 'var(--muted)' }}>
+                <summary className="cursor-pointer">{t('capturedContext')}</summary>
+                <dl className="mt-1.5 space-y-0.5">
+                  <div><span className="font-medium">{t('ctxPage')}:</span> {ctx.pageUrl}</div>
+                  <div><span className="font-medium">{t('ctxViewport')}:</span> {ctx.viewportSize}</div>
+                  {ctx.appVersion && <div><span className="font-medium">{t('ctxAppVersion')}:</span> {ctx.appVersion}</div>}
+                  <div className="truncate"><span className="font-medium">{t('ctxBrowser')}:</span> {ctx.browserAgent}</div>
+                </dl>
+              </details>
               <div className="flex justify-end gap-2 pt-1">
                 <button type="button" className="rounded px-3 py-2 text-sm min-h-11" style={{ color: 'var(--muted)' }} onClick={onClose} disabled={submitting}>
                   {t('cancel')}
                 </button>
-                <button type="submit" className="btn-primary rounded px-4 py-2 text-sm min-h-11" disabled={submitting || !title.trim()}>
+                <button type="submit" className="btn-primary rounded px-4 py-2 text-sm min-h-11" disabled={submitting || !title.trim() || !detail.trim()}>
                   {submitting ? t('sending') : t('send')}
                 </button>
               </div>

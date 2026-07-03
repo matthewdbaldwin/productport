@@ -93,4 +93,38 @@ describe('shapeProduct — Prisma row → catalog contract', () => {
     shapeProduct(r);
     expect(r.clearances.map((c) => c.region)).toEqual(before);
   });
+
+  test('passes the tier enum through (and null when untiered / absent)', () => {
+    expect(shapeProduct(row({ tier: 'TIER1' })).tier).toBe('TIER1');
+    expect(shapeProduct(row({ tier: null })).tier).toBeNull();
+    // A row from before the tier column existed (undefined) → null, not undefined.
+    const r = row(); delete r.tier;
+    expect(shapeProduct(r).tier).toBeNull();
+  });
+
+  test('passes brochure dimensions through (classification/businessSegment/departments/models/devStatus)', () => {
+    const shaped = shapeProduct(row({
+      classification: 'CORE',
+      businessSegment: 'Heart Failure Management & Electrophysiology',
+      applicableDepartments: 'Cath Lab|ICU',
+      modelNumbers: 'TSL0638|TSL1638',
+      developmentStatus: 'Under Development',
+    }));
+    expect(shaped.classification).toBe('CORE');
+    expect(shaped.businessSegment).toBe('Heart Failure Management & Electrophysiology');
+    expect(shaped.applicableDepartments).toBe('Cath Lab|ICU');
+    expect(shaped.modelNumbers).toBe('TSL0638|TSL1638');
+    expect(shaped.developmentStatus).toBe('Under Development');
+  });
+
+  test('brochure dimensions default to null when absent (pre-migration rows)', () => {
+    const r = row();
+    for (const k of ['classification', 'businessSegment', 'applicableDepartments', 'modelNumbers', 'developmentStatus']) delete r[k];
+    const shaped = shapeProduct(r);
+    expect(shaped.classification).toBeNull();
+    expect(shaped.businessSegment).toBeNull();
+    expect(shaped.applicableDepartments).toBeNull();
+    expect(shaped.modelNumbers).toBeNull();
+    expect(shaped.developmentStatus).toBeNull();
+  });
 });

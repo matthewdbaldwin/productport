@@ -7,13 +7,18 @@
 // the standalone MVP: load the whole (small) catalog once, then search / filter
 // / detail entirely in memory. Every authenticated employee is a viewer.
 import { useEffect, useMemo, useState, useCallback } from 'react';
+import { useModalEsc, useFocusTrap, Tooltip } from '@matthewdbaldwin/microport-ui';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/contexts/AuthContext';
 import { api } from '@/lib/api';
 import { statusOf, orderedAreas, filterProducts } from '@/lib/catalogFilter';
+import { ProductEditModal } from './ProductEditModal';
+import { ImportCsvButton } from './ImportCsvButton';
+import { galleryImageSrc, type ProductInput, type GalleryImage } from '@/lib/products';
 import s from './catalog.module.css';
 
 type ClearanceStatus = 'APPROVED' | 'IN_PROGRESS' | 'SUBMITTED' | 'NOT_APPROVED' | 'NONE';
+type ProductTier = 'TIER1' | 'TIER2' | 'TIER3';
 
 interface Clearance { region: string; status: ClearanceStatus; notes: string | null }
 interface Trial { trial: string; identifier: string; n: string; design: string; result: string }
@@ -32,11 +37,20 @@ interface Product {
   specs: string;
   regNotes: string;
   image: string | null;
+  status: 'ACTIVE' | 'DISCONTINUED' | 'DRAFT';
+  tier: ProductTier | null;
+  classification: 'CORE' | 'HIPO' | 'FLAGSHIP' | null;
+  businessSegment: string | null;
+  applicableDepartments: string | null; // pipe-delimited
+  modelNumbers: string | null;           // pipe-delimited
+  developmentStatus: string | null;
   clearances: Clearance[];
   trials: Trial[];
+  images: GalleryImage[];
 }
 
-const REGIONS = ['CE', 'FDA', 'NMPA', 'PMDA'] as const;
+const REGIONS = ['CE', 'FDA', 'NMPA', 'PMDA', 'TGA'] as const;
+const APP_VERSION = process.env.NEXT_PUBLIC_APP_VERSION || '';
 
 const STATUS_META: Record<ClearanceStatus, { label: string; bg: string; fg: string }> = {
   APPROVED:     { label: 'Cleared',     bg: 'var(--okb)', fg: 'var(--ok)' },
@@ -48,13 +62,42 @@ const STATUS_META: Record<ClearanceStatus, { label: string; bg: string; fg: stri
 
 // Grid cards use a lightweight ~240px WebP thumbnail (products/thumbs/, generated
 // by web/scripts/optimize-images.mjs); the detail modal uses the full original.
-const thumbSrc = (p: Product) => (p.image ? `/products/thumbs/${p.image.replace(/\.(jpe?g|png)$/i, '.webp')}` : null);
-const fullSrc = (p: Product) => (p.image ? `/products/${p.image}` : null);
+// Uploaded (s3:) images resolve through the API's presigned redirect (no static
+// thumb variant — the full image is served for both); legacy filenames keep the
+// optimized /products/thumbs/*.webp + /products/<file> static paths.
+const thumbSrc = (p: Product) => (!p.image ? null
+  : p.image.startsWith('s3:') ? `/api/products/${encodeURIComponent(p.id)}/image`
+  : `/products/thumbs/${p.image.replace(/\.(jpe?g|png)$/i, '.webp')}`);
+const fullSrc = (p: Product) => (!p.image ? null
+  : p.image.startsWith('s3:') ? `/api/products/${encodeURIComponent(p.id)}/image`
+  : `/products/${p.image}`);
 const splitList = (v: string) => (v || '').split('|').map((x) => x.trim()).filter(Boolean);
 
 function Chip({ label, status }: { label: string; status: ClearanceStatus }) {
   const m = STATUS_META[status];
   return <span className={s.chip} style={{ background: m.bg, color: m.fg }}>{label}</span>;
+}
+
+// Gold / Silver / Bronze medal palette — mirrors src/lib/tierPalette.js TIER_META.
+// Fixed hex (not theme tokens): a tier must read the same in every theme.
+const TIER_META: Record<ProductTier, { label: string; bg: string; fg: string }> = {
+  TIER1: { label: 'Tier 1', bg: '#E8B923', fg: '#3D2E00' },
+  TIER2: { label: 'Tier 2', bg: '#B8BEC7', fg: '#26292E' },
+  TIER3: { label: 'Tier 3', bg: '#C77B3B', fg: '#2E1600' },
+};
+
+function TierBadge({ tier }: { tier: ProductTier | null }) {
+  if (!tier) return null;
+  const m = TIER_META[tier];
+  return (
+    <span
+      className={s.tier}
+      style={{ background: m.bg, color: m.fg }}
+      data-testid={`tier-badge-${tier}`}
+    >
+      {m.label}
+    </span>
+  );
 }
 
 // Card market chips: approved → solid, in-progress / submitted → "• " suffix.
@@ -81,15 +124,17 @@ function ProductImg({ p, thumb }: { p: Product; thumb?: boolean }) {
   );
 }
 
-function DetailModal({ p, onClose }: { p: Product; onClose: () => void }) {
+function DetailModal({ p, onClose, onEdit }: { p: Product; onClose: () => void; onEdit?: () => void }) {
   const [copied, setCopied] = useState(false);
+  const [heroId, setHeroId] = useState<string | null>(null); // gallery thumb → swap the hero
+  useModalEsc(onClose);
+  const trapRef = useFocusTrap<HTMLDivElement>();
+  const heroSrc = heroId ? galleryImageSrc(p.id, heroId) : fullSrc(p);
   useEffect(() => {
-    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose(); };
-    document.addEventListener('keydown', onKey);
     const prev = document.body.style.overflow;
     document.body.style.overflow = 'hidden';
-    return () => { document.removeEventListener('keydown', onKey); document.body.style.overflow = prev; };
-  }, [onClose]);
+    return () => { document.body.style.overflow = prev; };
+  }, []);
 
   // Canonical, shareable URL for this product — the link hub.microport.com (and
   // anyone else) uses to deep-link straight to it. product.id === slug.
@@ -111,30 +156,62 @@ function DetailModal({ p, onClose }: { p: Product; onClose: () => void }) {
 
   return (
     <div className={s.ov} onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}>
-      <div className={s.modal} role="dialog" aria-modal="true" aria-labelledby="pp-modal-title">
+      <div ref={trapRef} className={s.modal} role="dialog" aria-modal="true" aria-labelledby="pp-modal-title" style={{ maxHeight: '92vh', overflowY: 'auto' }}>
         <button className={s.x} onClick={onClose} aria-label="Close">&times;</button>
         <div className={s.mhead}>
-          <div className={s.mimg}><ProductImg p={p} /></div>
+          <div>
+            <div className={s.mimg}>
+              {heroSrc ? <img src={heroSrc} alt={p.name} /> : <ProductImg p={p} />}
+            </div>
+            {p.images.length > 1 && (
+              <div style={{ display: 'flex', gap: 6, marginTop: 8, flexWrap: 'wrap' }}>
+                {p.images.map((img) => {
+                  const active = heroId ? heroId === img.id : img.isPrimary;
+                  const label = `View image${img.isPrimary ? ' (primary)' : ''}`;
+                  return (
+                    <Tooltip key={img.id} content={label}>
+                      <button
+                        type="button"
+                        onClick={() => setHeroId(img.id)}
+                        aria-label={label}
+                        style={{ padding: 0, border: active ? '2px solid var(--blue)' : '1px solid var(--lgrey)', borderRadius: 6, cursor: 'pointer', background: 'none', lineHeight: 0 }}
+                      >
+                        <img src={galleryImageSrc(p.id, img.id)} alt="" style={{ width: 48, height: 48, objectFit: 'cover', borderRadius: 5 }} />
+                      </button>
+                    </Tooltip>
+                  );
+                })}
+              </div>
+            )}
+          </div>
           <div className={s.mbody}>
-            <div className={s.mft}>{p.therapeuticArea}{p.category ? ` · ${p.category}` : ''}</div>
+            <div className={s.mft}>{p.therapeuticArea}{p.category ? ` · ${p.category}` : ''}<TierBadge tier={p.tier} /></div>
             <h1 id="pp-modal-title">{p.name}</h1>
             <div className={s.msub}>
               {p.tagline}<br />{p.subsidiary}{p.type ? ` · ${p.type}` : ''}
             </div>
             <div className={s.chips}><MarketChips p={p} /></div>
-            <button
-              type="button"
-              onClick={copyLink}
-              aria-label="Copy a shareable link to this product"
-              style={{
-                marginTop: 10, alignSelf: 'flex-start', cursor: 'pointer',
-                fontSize: 12, padding: '4px 10px', borderRadius: 6,
-                border: '1px solid var(--line, #d0d5dd)', background: 'transparent',
-                color: 'inherit',
-              }}
-            >
-              {copied ? '✓ Link copied' : '🔗 Copy link'}
-            </button>
+            <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginTop: 10, alignItems: 'center' }}>
+              <button
+                type="button"
+                onClick={copyLink}
+                aria-label="Copy a shareable link to this product"
+                style={{
+                  cursor: 'pointer', minHeight: 44,
+                  fontSize: 12, padding: '4px 10px', borderRadius: 6,
+                  border: '1px solid var(--line, #d0d5dd)', background: 'transparent',
+                  color: 'inherit',
+                }}
+              >
+                {copied ? '✓ Link copied' : '🔗 Copy link'}
+              </button>
+              {onEdit && (
+                <button type="button" className={s.ebtn} data-testid="edit-product"
+                  style={{ fontSize: 13 }} onClick={onEdit}>
+                  Edit
+                </button>
+              )}
+            </div>
           </div>
         </div>
         <div className={s.body}>
@@ -185,25 +262,30 @@ function DetailModal({ p, onClose }: { p: Product; onClose: () => void }) {
           {p.trials.length > 0 && (
             <div className={s.sec}>
               <h2>Key clinical evidence</h2>
-              <table className={s.tbl}>
-                <thead>
-                  <tr>
-                    <th>Trial</th><th>Identifier</th>
-                    <th style={{ textAlign: 'center' }}>N</th><th>Design</th><th>Result</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {p.trials.map((t, i) => (
-                    <tr key={i}>
-                      <td style={{ fontWeight: 500, color: 'var(--blue)' }}>{t.trial}</td>
-                      <td style={{ color: 'var(--grey)', whiteSpace: 'nowrap' }}>{t.identifier}</td>
-                      <td style={{ textAlign: 'center' }}>{t.n}</td>
-                      <td>{t.design}</td>
-                      <td>{t.result}</td>
+              {/* Own horizontal-scroll context: the ancestor .modal is overflow:hidden,
+                  so without this a wide trials table clips its Design/Result cells with
+                  no way to reach them on a phone. */}
+              <div style={{ overflowX: 'auto' }}>
+                <table className={s.tbl} style={{ minWidth: 520 }}>
+                  <thead>
+                    <tr>
+                      <th>Trial</th><th>Identifier</th>
+                      <th style={{ textAlign: 'center' }}>N</th><th>Design</th><th>Result</th>
                     </tr>
-                  ))}
-                </tbody>
-              </table>
+                  </thead>
+                  <tbody>
+                    {p.trials.map((t, i) => (
+                      <tr key={i}>
+                        <td style={{ fontWeight: 500, color: 'var(--blue)' }}>{t.trial}</td>
+                        <td style={{ color: 'var(--grey)', whiteSpace: 'nowrap' }}>{t.identifier}</td>
+                        <td style={{ textAlign: 'center' }}>{t.n}</td>
+                        <td>{t.design}</td>
+                        <td>{t.result}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
             </div>
           )}
         </div>
@@ -230,16 +312,19 @@ export default function CatalogPage() {
     () => (typeof window === 'undefined' ? null : new URLSearchParams(window.location.search).get('product')),
   );
 
+  const isAdmin = !!user && (user.role === 'product_admin' || user.role === 'superuser' || !!user.isSuperuser);
+  const [editState, setEditState] = useState<{ mode: 'create' | 'edit'; initial?: ProductInput & { slug: string; images?: GalleryImage[] } } | null>(null);
+
   useEffect(() => { if (!loading && !user) router.replace('/login'); }, [loading, user, router]);
 
-  useEffect(() => {
-    if (!user) return;
-    let alive = true;
-    api<{ products: Product[] }>('/api/products')
-      .then((d) => { if (alive) setProducts(d.products); })
-      .catch(() => { if (alive) setLoadError(true); });
-    return () => { alive = false; };
-  }, [user]);
+  const loadProducts = useCallback(
+    () => api<{ products: Product[] }>('/api/products')
+      .then((d) => setProducts(d.products))
+      .catch(() => setLoadError(true)),
+    [],
+  );
+
+  useEffect(() => { if (user) loadProducts(); }, [user, loadProducts]);
 
   // Canonical deep-link OUT — reflect the open product in the URL (so a refresh
   // or a copied link reopens it) and keep <link rel="canonical"> in sync. Uses
@@ -256,8 +341,11 @@ export default function CatalogPage() {
   }, [openId]);
 
   const areas = useMemo(() => orderedAreas(products ?? []), [products]);
-  const subs = useMemo(() => [...new Set((products ?? []).map((p) => p.subsidiary))].sort(), [products]);
   const cats = useMemo(() => [...new Set((products ?? []).map((p) => p.category).filter(Boolean))].sort(), [products]);
+  const subs = useMemo(() => [...new Set((products ?? []).map((p) => p.subsidiary))].sort(), [products]);
+  // Single collapsible "Subsidiary" section so the 27 subsidiaries don't wall the
+  // filter rail. Collapsed by default; the header shows the active pick when set.
+  const [subsOpen, setSubsOpen] = useState(false);
   const countBy = useCallback(
     (key: keyof Product, v: string) => (products ?? []).filter((p) => p[key] === v).length,
     [products],
@@ -279,7 +367,10 @@ export default function CatalogPage() {
       <div className={s.top}>
         <div className={s.tb}>
           <img className={s.logo} src="/products/logo.jpg" alt="MicroPort" />
-          <span className={s.pp}>ProductPort</span>
+          <span className={s.brand}>
+            <span className={s.pp}>ProductPort</span>
+            {APP_VERSION && <span className={s.ver}>v{APP_VERSION}</span>}
+          </span>
           <div className={s.sw}>
             <svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="7" /><path d="M21 21l-4-4" /></svg>
             <input
@@ -295,6 +386,17 @@ export default function CatalogPage() {
             <span>{products ? `${products.length} products` : 'Loading…'}</span>
           </span>
           <span className={s.conf}>For Internal Use Only</span>
+          {isAdmin && (
+            <button type="button" className={s.btn} data-testid="add-product" onClick={() => setEditState({ mode: 'create' })}>
+              + Add product
+            </button>
+          )}
+          {isAdmin && <ImportCsvButton onDone={loadProducts} />}
+          {isAdmin && (
+            <a className={s.btn} href="/api/products/export.csv" data-testid="export-csv" style={{ textDecoration: 'none' }}>
+              Export CSV
+            </a>
+          )}
           <a className={s.hublink} href="https://hub.microport.com">← Hub</a>
         </div>
       </div>
@@ -321,20 +423,31 @@ export default function CatalogPage() {
                 ))}
               </span>
             </div>
-            <div className={s.bar}>
+            <div className={s.accWrap}>
               <span className={s.lbl}>Subsidiary</span>
-              <span className={s.pillrow}>
-                {subs.map((sb) => (
-                  <button
-                    key={sb}
-                    type="button"
-                    className={`${s.pill} ${sub === sb ? s.pillOn : ''}`}
-                    onClick={() => setSub(sub === sb ? null : sb)}
-                  >
-                    {sb.replace('MicroPort ', '')}<span className={s.pcount}>{countBy('subsidiary', sb)}</span>
+              <div className={s.acc}>
+                <div className={s.accSec}>
+                  <button type="button" className={s.accHead} aria-expanded={subsOpen} onClick={() => setSubsOpen((o) => !o)}>
+                    <span className={s.accChev} data-open={subsOpen || undefined} aria-hidden="true">▸</span>
+                    <span className={s.accName}>{sub ? sub.replace('MicroPort ', '') : 'All subsidiaries'}</span>
+                    <span className={s.pcount}>{subs.length}</span>
                   </button>
-                ))}
-              </span>
+                  {subsOpen && (
+                    <span className={`${s.pillrow} ${s.accBody}`}>
+                      {subs.map((sb) => (
+                        <button
+                          key={sb}
+                          type="button"
+                          className={`${s.pill} ${sub === sb ? s.pillOn : ''}`}
+                          onClick={() => setSub(sub === sb ? null : sb)}
+                        >
+                          {sb.replace('MicroPort ', '')}<span className={s.pcount}>{countBy('subsidiary', sb)}</span>
+                        </button>
+                      ))}
+                    </span>
+                  )}
+                </div>
+              </div>
             </div>
             <div className={s.bar}>
               <span className={s.lbl}>Regulatory</span>
@@ -382,7 +495,7 @@ export default function CatalogPage() {
                 >
                   <div className={s.cimg}><ProductImg p={p} thumb /></div>
                   <div className={s.cb}>
-                    <div className={s.ftag}>{p.therapeuticArea}</div>
+                    <div className={s.ftag}>{p.therapeuticArea}<TierBadge tier={p.tier} /></div>
                     <div className={s.cn}>{p.name}</div>
                     <div className={s.ct}>{p.tagline}</div>
                     <div className={s.cs}>{p.subsidiary}{p.category ? ` · ${p.category}` : ''}</div>
@@ -400,7 +513,41 @@ export default function CatalogPage() {
         Confidential · For internal use only
       </div>
 
-      {opened && <DetailModal p={opened} onClose={() => setOpenId(null)} />}
+      {opened && (
+        <DetailModal
+          p={opened}
+          onClose={() => setOpenId(null)}
+          onEdit={isAdmin ? () => setEditState({ mode: 'edit', initial: toInput(opened) }) : undefined}
+        />
+      )}
+
+      {editState && (
+        <ProductEditModal
+          mode={editState.mode}
+          initial={editState.initial}
+          onClose={() => setEditState(null)}
+          onSaved={async () => {
+            const wasEdit = editState.mode === 'edit';
+            setEditState(null);
+            if (wasEdit) setOpenId(null); // a rename/delete would leave a stale detail open
+            await loadProducts();
+          }}
+        />
+      )}
     </div>
   );
+}
+
+// Map a shaped catalog Product to the editor's input shape (id === slug).
+// Carries the gallery so the editor can manage it without a separate fetch.
+function toInput(p: Product): ProductInput & { slug: string; images?: GalleryImage[] } {
+  return {
+    slug: p.id, name: p.name, subsidiary: p.subsidiary, therapeuticArea: p.therapeuticArea,
+    category: p.category || null, type: p.type || null, tagline: p.tagline || null, overview: p.overview || null,
+    features: p.features || null, indication: p.indication || null, patientPopulation: p.patientPopulation || null,
+    specs: p.specs || null, regNotes: p.regNotes || null, image: p.image || null,
+    businessSegment: p.businessSegment || null, applicableDepartments: p.applicableDepartments || null,
+    modelNumbers: p.modelNumbers || null, developmentStatus: p.developmentStatus || null,
+    tier: p.tier, classification: p.classification, status: p.status, images: p.images,
+  };
 }

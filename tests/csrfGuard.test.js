@@ -30,8 +30,9 @@ describe('csrfGuard', () => {
     expect(res.statusCode).toBe(200);
   });
 
-  test('webhooks ingress still bypasses', () => {
-    expect(run(mkReq({ method: 'POST', baseUrl: '/api/webhooks', path: '/salesport' })).nexted).toBe(true);
+  test('SSO lifecycle ingress bypasses (verifies its own HMAC)', () => {
+    expect(run(mkReq({ method: 'POST', baseUrl: '/api/sso/lifecycle', path: '/event' })).nexted).toBe(true);
+    expect(run(mkReq({ method: 'POST', baseUrl: '/api/sso/lifecycle', path: '/state' })).nexted).toBe(true);
   });
 
   test('an ordinary mutating /api call without the header is rejected 403', () => {

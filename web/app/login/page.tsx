@@ -63,7 +63,7 @@ function LoginInner() {
     return (
       <main className="min-h-screen min-h-dvh flex items-center justify-center p-8">
         <div className="w-full max-w-sm space-y-4 text-center">
-          <h1 className="text-2xl font-semibold" style={{ color: 'var(--fg)' }}>ProductPort</h1>
+          <h1 className="text-2xl font-semibold" style={{ color: 'var(--text)' }}>ProductPort</h1>
           <p className="text-sm" style={{ color: 'var(--muted)' }}>{msg}</p>
           <button
             type="button"
@@ -80,7 +80,7 @@ function LoginInner() {
   return (
     <main className="min-h-screen min-h-dvh flex items-center justify-center p-8">
       <div className="w-full max-w-sm space-y-6 text-center">
-        <h1 className="text-2xl font-semibold" style={{ color: 'var(--fg)' }}>ProductPort</h1>
+        <h1 className="text-2xl font-semibold" style={{ color: 'var(--text)' }}>ProductPort</h1>
         <p className="text-sm" style={{ color: 'var(--muted)' }}>{t('redirecting')}</p>
         <a href={SSO_HREF} className="btn-primary block w-full justify-center py-2.5 min-h-11">
           {t('signInWithSalesPort')}

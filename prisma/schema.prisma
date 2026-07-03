@@ -21,8 +21,11 @@ datasource db {
 // must agree or hires 403 / unknown_role at login.
 enum Role {
   viewer
-  product        // edit descriptive fields + trials + images
-  product_admin  // + regulatory-clearance matrix, taxonomy, lifecycle
+  product        // RESERVED, not yet enforced — no guard grants at this level, so a
+                 // `product` grant is viewer-equivalent today. De-advertised from the
+                 // role-catalog until a requireProductEditor gate lands (descriptive
+                 // fields + trials + images). Kept as a value to avoid an enum rebuild.
+  product_admin  // full editor: + regulatory-clearance matrix, taxonomy, lifecycle
   superuser
 }
 
@@ -53,6 +56,23 @@ enum ProductStatus {
   DRAFT
 }
 
+// Strategic product tier (single per product; null = untiered). Rendered as a
+// gold/silver/bronze badge — see src/lib/tierPalette.js.
+enum ProductTier {
+  TIER1
+  TIER2
+  TIER3
+}
+
+// Business classification from the GloMatrix brochure (Core / Hi-po / Flagship).
+// Separate from `tier`; manually assigned (the brochure defines but never tags
+// these per-product). See src/lib/classification.js.
+enum ProductClassification {
+  CORE
+  HIPO
+  FLAGSHIP
+}
+
 enum ClearanceStatus {
   APPROVED       // "cleared"
   IN_PROGRESS    // "in progress"
@@ -81,6 +101,12 @@ model Product {
   image            String?                 // primary image filename (served from web/public/products)
   mdmCode          String?       @unique    // mesh join key (P2) — minted by SalesPort
   status           ProductStatus @default(ACTIVE)
+  tier             ProductTier?              // strategic tier (gold/silver/bronze badge); null = untiered
+  classification   ProductClassification?    // Core/Hi-po/Flagship (brochure); manual, separate from tier
+  businessSegment  String?                   // 12-way GloMatrix taxonomy above therapeuticArea
+  applicableDepartments String? @db.Text     // pipe-delimited (e.g. "Cardiology|ICU|Thoracic Surgery")
+  modelNumbers     String?       @db.Text     // pipe-delimited SKU/model list (first-class; was buried in specs)
+  developmentStatus String?                   // lifecycle free-text ("Under Development — est. cert Feb 2026"); null = marketed
   createdAt        DateTime      @default(now())
   updatedAt        DateTime      @updatedAt
   deletedAt        DateTime?
@@ -88,11 +114,15 @@ model Product {
   clearances       RegulatoryClearance[]
   trials           Trial[]
   audits           ProductAudit[]
+  images           ProductImage[]
 
   @@index([therapeuticArea])
   @@index([subsidiary])
   @@index([category])
   @@index([status])
+  @@index([tier])
+  @@index([classification])
+  @@index([businessSegment])
   @@map("products")
 }
 
@@ -111,6 +141,24 @@ model RegulatoryClearance {
   @@unique([productId, region])
   @@index([region, status])
   @@map("regulatory_clearances")
+}
+
+// Product image gallery (2026-07-01). Many images per product; one flagged
+// primary (mirrored into Product.image as the catalog-card hero). Legacy
+// products keep their filename in Product.image with zero rows here — the
+// gallery just shows that one image. S3 keys only (uploads); served via the
+// per-image presigned-redirect route.
+model ProductImage {
+  id        String   @id @default(cuid())
+  productId String
+  product   Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
+  key       String   // S3 object key (products/<sha>.<ext>)
+  sortOrder Int      @default(0)
+  isPrimary Boolean  @default(false)
+  createdAt DateTime @default(now())
+
+  @@index([productId])
+  @@map("product_images")
 }
 
 model Trial {
@@ -161,6 +209,30 @@ model Session {
 
   @@index([userId])
   @@map("sessions")
+}
+
+// Inbound SSO-lifecycle event audit + idempotency store (fleet parity with
+// opsport/etc.). Every event salesport delivers to /api/sso/lifecycle/event is
+// logged here regardless of whether a local User matched; senderEventId (the
+// salesport LifecycleOutbox.id from X-Lifecycle-Event-Id) is unique so a retry
+// dedups on a single findUnique. See src/routes/ssoLifecycle.js.
+model UserLifecycleEvent {
+  id            String    @id @default(cuid())
+  senderEventId String?   @unique
+  email         String
+  kind          String // grant | revoke | disable | reactivate
+  prevRole      String?
+  newRole       String?
+  actorEmail    String?
+  actorRole     String?
+  payload       Json
+  receivedAt    DateTime  @default(now())
+  processedAt   DateTime?
+  error         String?   @db.Text
+
+  @@index([email])
+  @@index([receivedAt])
+  @@map("user_lifecycle_events")
 }
 
 // Durable outbox for any outbound webhook from this platform (at-least-once).

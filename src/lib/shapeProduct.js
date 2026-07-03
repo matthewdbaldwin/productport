@@ -6,6 +6,7 @@
 // a null leaking through to the UI) becomes a RED test instead of silent data
 // loss. Pure; tested in tests/shapeProduct.test.js.
 'use strict';
+const { galleryView } = require('./productGallery');
 
 // Camel-case + flatten a Prisma product (with `clearances` + `trials`
 // relations included) into the catalog contract: clearances sorted by region,
@@ -27,7 +28,17 @@ function shapeProduct(p) {
     specs: p.specs || '',
     regNotes: p.regNotes || '',
     image: p.image || null,
+    // Gallery (ordered id/isPrimary/sortOrder) when the relation is loaded — the
+    // web builds per-image src via /api/products/:slug/image/:id. Absent on the
+    // list endpoint (only the detail loads images), so default to [].
+    images: p.images ? galleryView(p.images) : [],
     status: p.status,
+    tier: p.tier || null, // strategic tier enum; null = untiered
+    classification: p.classification || null, // Core/Hi-po/Flagship; manual, separate from tier
+    businessSegment: p.businessSegment || null,
+    applicableDepartments: p.applicableDepartments || null, // pipe-delimited
+    modelNumbers: p.modelNumbers || null,                   // pipe-delimited
+    developmentStatus: p.developmentStatus || null,
     clearances: (p.clearances || [])
       .slice()
       .sort((a, b) => a.region.localeCompare(b.region))

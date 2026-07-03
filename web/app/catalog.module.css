@@ -54,11 +54,23 @@
   width: auto;
   flex: none;
 }
+.brand {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  border-left: 1px solid var(--lgrey);
+  padding-left: 14px;
+  line-height: 1.15;
+}
 .pp {
   font-weight: 500;
   font-size: 14px;
-  border-left: 1px solid var(--lgrey);
-  padding-left: 14px;
+}
+.ver {
+  font-size: 10.5px;
+  font-weight: 500;
+  letter-spacing: 0.02em;
+  color: var(--grey);
 }
 .sw {
   flex: 1;
@@ -154,27 +166,30 @@
 .bar {
   display: flex;
   flex-wrap: wrap;
-  gap: 8px;
-  align-items: center;
+  gap: 8px 12px;
+  align-items: flex-start;
   margin-bottom: 10px;
 }
 .pillrow {
   display: flex;
   flex-wrap: wrap;
   gap: 8px;
+  min-width: 0; /* shrink beside the fixed label gutter instead of wrapping below it */
 }
 .pill {
   font-size: 12.5px;
   font-weight: 500;
-  padding: 6px 13px;
-  border-radius: 20px;
+  padding: 5px 12px;
+  border-radius: 18px;
   border: 1px solid var(--lgrey);
   background: #fff;
   color: var(--navy);
   cursor: pointer;
   user-select: none;
   font-family: inherit;
-  min-height: 32px;
+  display: inline-flex;
+  align-items: center;
+  transition: border-color 0.12s, color 0.12s, transform 0.12s;
 }
 .pillOn {
   background: var(--blue);
@@ -184,6 +199,17 @@
 .pill:not(.pillOn):hover {
   border-color: var(--red);
   color: var(--red);
+  transform: translateY(-1px);
+}
+/* The 44px tap-target standard (feedback_tap_target_standard) applies on TOUCH;
+   on a mouse-driven desktop the wrapping pill rows are tightened for density.
+   Restoring min-height only under coarse pointers keeps phones compliant without
+   the mobile-ux-audit hover-only / undersized-target flags. */
+@media (pointer: coarse) {
+  .pill {
+    min-height: 44px;
+    padding: 7px 13px;
+  }
 }
 .lbl {
   font-size: 11px;
@@ -191,7 +217,70 @@
   letter-spacing: 0.05em;
   text-transform: uppercase;
   color: var(--grey);
-  margin-right: 4px;
+  width: 132px;
+  flex: none;
+  padding-top: 9px;
+  white-space: nowrap; /* "Therapeutic area" reads on one line, level with the others */
+}
+
+/* Subsidiary filter — one collapsible accordion (all subsidiaries lumped) so the
+   long list doesn't wall the filter rail. Sits in the same label-gutter grid as
+   the pill rows, its box filling the controls column. */
+.accWrap {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 12px;
+  align-items: flex-start;
+  margin-bottom: 10px;
+}
+.acc {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-width: 0;
+  border: 1px solid var(--lgrey);
+  border-radius: 10px;
+  overflow: hidden;
+  background: #fff;
+}
+.accSec + .accSec {
+  border-top: 1px solid var(--lgrey);
+}
+.accHead {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  background: none;
+  border: none;
+  cursor: pointer;
+  font-family: inherit;
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--navy);
+  text-align: left;
+  padding: 6px 12px;
+  min-height: 44px; /* tap-target standard */
+}
+.accHead:hover {
+  color: var(--blue);
+  background: #f7f8fb;
+}
+.accChev {
+  display: inline-block;
+  color: var(--grey);
+  font-size: 11px;
+  transition: transform 0.15s;
+  flex: none;
+}
+.accChev[data-open] {
+  transform: rotate(90deg);
+}
+.accName {
+  flex: 1;
+}
+.accBody {
+  padding: 2px 12px 10px 30px;
 }
 .count {
   font-size: 12.5px;
@@ -199,7 +288,7 @@
   margin: 8px 2px 14px;
 }
 .sel {
-  height: 36px;
+  min-height: 44px; /* tap-target standard */
   border: 1px solid var(--lgrey);
   border-radius: 9px;
   padding: 0 10px;
@@ -213,6 +302,11 @@
   outline: none;
   border-color: var(--red);
 }
+/* Top-bar / low-repeat action buttons keep an UNCONDITIONAL 44px min-height.
+   Do NOT copy this onto .pill: the filter pills repeat in dense rows and
+   deliberately gate their 44px behind `@media (pointer: coarse)` so a mouse-
+   driven desktop stays compact. Blanket-applying always-on 44px to .pill would
+   re-introduce the bulk that split was written to remove. */
 .btn {
   padding: 8px 14px;
   border-radius: 9px;
@@ -222,7 +316,9 @@
   font-size: 13px;
   font-weight: 500;
   cursor: pointer;
-  min-height: 36px;
+  display: inline-flex;
+  align-items: center;
+  min-height: 44px; /* tap-target standard */
 }
 .clearbtn {
   margin-left: auto;
@@ -244,6 +340,23 @@
   font-weight: 400;
   font-size: 11px;
   margin-left: 4px;
+}
+
+/* On phones the fixed 132px label gutter would eat ~a third of the row, so stack
+   the label above its controls (both full-width) instead of the desktop
+   label | controls columns. */
+@media (max-width: 640px) {
+  .bar,
+  .accWrap {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 4px;
+  }
+  .lbl {
+    width: auto;
+    padding-top: 0;
+    white-space: normal;
+  }
 }
 
 /* ── Card grid ───────────────────────────────────────────────────────────── */
@@ -342,6 +455,38 @@
   font-weight: 600;
   padding: 2px 8px;
   border-radius: 5px;
+}
+
+/* ── Admin editor form (ProductEditModal) ────────────────────────────────── */
+.egrid { display: grid; grid-template-columns: 1fr 1fr; gap: 0 14px; }
+.efield { display: flex; flex-direction: column; gap: 3px; margin-bottom: 9px; font-size: 12px; font-weight: 600; }
+.efield > span { color: var(--blue); }
+.einput {
+  font: inherit; font-weight: 400; font-size: 13px;
+  padding: 7px 9px; border: 1px solid #d9dce1; border-radius: 6px;
+  width: 100%; box-sizing: border-box; background: #fff;
+}
+.einput:focus { outline: none; border-color: var(--blue); }
+/* Editor action buttons — inline-flex + 44px min so they meet the tap-target
+   standard (feedback_tap_target_standard) on touch. */
+.ebtn { background: var(--blue); color: #fff; border: none; padding: 9px 18px; border-radius: 6px; font-weight: 600; cursor: pointer; display: inline-flex; align-items: center; justify-content: center; min-height: 44px; }
+.ebtn:disabled { opacity: 0.55; cursor: default; }
+.ebtnGhost { background: transparent; border: 1px solid #d9dce1; padding: 9px 16px; border-radius: 6px; cursor: pointer; display: inline-flex; align-items: center; justify-content: center; min-height: 44px; }
+.ebtnDanger { background: var(--rd); color: #fff; border: none; padding: 8px 14px; border-radius: 6px; cursor: pointer; display: inline-flex; align-items: center; justify-content: center; min-height: 44px; }
+@media (max-width: 560px) { .egrid { grid-template-columns: 1fr; } }
+
+/* Strategic tier badge (gold/silver/bronze). Colors are set inline from
+   TIER_META so the pill reads the same in every theme. */
+.tier {
+  display: inline-block;
+  margin-left: 6px;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.03em;
+  padding: 1px 7px;
+  border-radius: 999px;
+  vertical-align: middle;
+  text-transform: none;
 }
 
 /* ── Detail modal ────────────────────────────────────────────────────────── */

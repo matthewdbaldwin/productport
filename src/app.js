@@ -52,7 +52,9 @@ app.use('/api', csrfGuard);
 // ── Unauthenticated, signature-authed ingress FIRST ──────────────────────────
 // Mounted BEFORE the bare-/api requireAuth routers so requireAuth doesn't 401
 // the webhook before its own HMAC check runs. feedback_express_mount_prefix_path_check.
-app.use('/api/webhooks', require('./routes/webhooks'));
+// Inbound SSO-lifecycle events from salesport (grant/revoke/disable/reactivate)
+// + the hourly /state reconciliation probe. Fleet-canonical path + HMAC.
+app.use('/api/sso/lifecycle', require('./routes/ssoLifecycle'));
 
 // ── Auth (login/SSO callback/logout) — its own internal gating ───────────────
 app.use('/api/auth', require('./routes/auth'));
