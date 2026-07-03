@@ -45,6 +45,13 @@ const health = (_req, res) => res.json({ ok: true, service: 'productport-api', v
 app.get('/health', health);
 app.get('/api/health', health);
 
+// Fleet-canonical rate limits (apple 2026-07-03: pp was the only satellite
+// with NONE). Global cap on /api; tight cap on the SSO exchange — pp is
+// pure-SSO, so the exchange is its only auth-attempt surface.
+const { apiLimiter, authLimiter } = require('./middleware/limiters');
+app.use('/api', apiLimiter);
+app.post('/api/auth/sso/exchange', authLimiter);
+
 // CSRF guard on /api, with BOOTSTRAP_PATHS bypassing signature-authed ingress
 // (webhooks/lifecycle verify their own HMAC). feedback_csrf_bootstrap_allowlist_drift.
 app.use('/api', csrfGuard);
