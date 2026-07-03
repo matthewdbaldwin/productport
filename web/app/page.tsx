@@ -49,7 +49,7 @@ interface Product {
   images: GalleryImage[];
 }
 
-const REGIONS = ['CE', 'FDA', 'NMPA', 'PMDA'] as const;
+const REGIONS = ['CE', 'FDA', 'NMPA', 'PMDA', 'TGA'] as const;
 const APP_VERSION = process.env.NEXT_PUBLIC_APP_VERSION || '';
 
 const STATUS_META: Record<ClearanceStatus, { label: string; bg: string; fg: string }> = {
