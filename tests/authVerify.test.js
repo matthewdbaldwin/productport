@@ -74,3 +74,20 @@ describe('requireAuth — SSO verifier wiring', () => {
     expect(res.statusCode).toBe(401);
   });
 });
+
+test('SSO locale persists into the JIT upsert (apple 2026-07-03 — was never written)', async () => {
+  const db = require('../src/lib/db');
+  const token = sign({ sub: 3, email: 'fr@test.local', app_roles: { productport: 'viewer' }, locale: 'fr-FR' }, 'productport');
+  await run(token);
+  const arg = db.user.upsert.mock.calls.at(-1)[0];
+  expect(arg.update.locale).toBe('fr-FR');
+  expect(arg.create.locale).toBe('fr-FR');
+});
+
+test('a token without a locale leaves the stored locale untouched', async () => {
+  const db = require('../src/lib/db');
+  const token = sign({ sub: 4, email: 'nl@test.local', app_roles: { productport: 'viewer' } }, 'productport');
+  await run(token);
+  const arg = db.user.upsert.mock.calls.at(-1)[0];
+  expect(arg.update.locale).toBeUndefined();   // no clobber back to default
+});

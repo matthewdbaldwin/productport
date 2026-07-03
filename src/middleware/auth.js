@@ -69,11 +69,13 @@ async function requireAuth(req, res, next) {
     // (universal-app hub change is the paired PRD item).
     const role = resolveRole(payload.app_roles, mapContractRole);
 
-    // JIT-provision against this platform's own User table.
+    // JIT-provision against this platform's own User table. locale rides the
+    // SSO claim (sp is source of truth); absent → leave the stored value alone
+    // (apple 2026-07-03 — locale was never persisted at all before this).
     const user = await db.user.upsert({
       where:  { email: payload.email },
-      update: { name: payload.name || undefined, role },
-      create: { email: payload.email, name: payload.name || null, role },
+      update: { name: payload.name || undefined, role, locale: payload.locale || undefined },
+      create: { email: payload.email, name: payload.name || null, role, locale: payload.locale || undefined },
     });
     if (!user.active) return res.status(401).json({ error: 'Account not found or disabled' });
 
