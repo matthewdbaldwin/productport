@@ -15,7 +15,7 @@ jest.mock('../src/lib/db', () => ({
 }));
 
 const { publicKey, privateKey } = crypto.generateKeyPairSync('rsa', { modulusLength: 2048 });
-const ISSUER = 'https://dev.salesport.site';
+const ISSUER = 'https://sales-dev.microport.com';
 
 process.env.SALESPORT_JWT_PUBLIC_KEY = Buffer.from(publicKey.export({ type: 'spki', format: 'pem' })).toString('base64');
 process.env.SALESPORT_JWT_ISSUER = ISSUER;
