@@ -25,6 +25,10 @@ const router = express.Router();
 const WEB          = process.env.WEB_ORIGIN || '';
 const SALESPORT_WEB = process.env.SALESPORT_WEB_URL || process.env.SALESPORT_API_URL || '';
 const SALESPORT_API = process.env.SALESPORT_API_URL || '';
+// Login funnels through the hub/portal host (PORTAL_WEB_URL), falling back to
+// the CRM host if the split var isn't set yet. The SalesPort-CRM launcher tile
+// keeps using SALESPORT_WEB_URL separately.
+const PORTAL_WEB = process.env.PORTAL_WEB_URL || SALESPORT_WEB;
 
 function setSessionCookie(res, token) {
   res.cookie(COOKIE_NAME, token, {
@@ -37,10 +41,10 @@ function setSessionCookie(res, token) {
 
 // GET /api/auth/sso/start — browser entry point; redirect to SalesPort login.
 router.get('/sso/start', (req, res) => {
-  if (!SALESPORT_WEB) return res.status(503).json({ error: 'SSO not configured on this instance.' });
+  if (!PORTAL_WEB) return res.status(503).json({ error: 'SSO not configured on this instance.' });
   const web = WEB || `${req.protocol}://${req.get('host')}`;
   const returnTo = encodeURIComponent(`${web}/auth/callback`);
-  res.redirect(`${SALESPORT_WEB}/login?sso=productport&returnTo=${returnTo}`);
+  res.redirect(`${PORTAL_WEB}/login?sso=productport&returnTo=${returnTo}`);
 });
 
 // POST /api/auth/sso/exchange — relay the one-time code to SalesPort's handoff
