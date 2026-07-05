@@ -115,7 +115,12 @@ router.get('/app-launcher', (_req, res) => {
     .filter((d) => d.id !== HOST_APP)
     .map((d) => ({ id: d.id, label: d.label, tagline: d.tagline, url: process.env[d.envVar] || null }))
     .filter((a) => a.url);
-  res.json({ apps });
+  // The "Company portal" target in the app switcher lives on the hub host, not
+  // the SalesPort CRM host. Echo PORTAL_WEB_URL so the switcher stops deriving
+  // it from the SalesPort tile (→ CRM/portal). Null when unset → the switcher
+  // keeps its legacy CRM-derived fallback.
+  const portalUrl = (process.env.PORTAL_WEB_URL || '').split(',')[0].trim() || null;
+  res.json({ apps, portalUrl });
 });
 
 module.exports = router;
