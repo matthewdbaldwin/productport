@@ -11,7 +11,7 @@ const logger = require('../lib/logger');
 const { createVerifier } = require('@matthewdbaldwin/microport-auth');
 // contracts exports `mapRole`; alias to mapContractRole to match the fleet.
 const { SsoClaims, mapRole: mapContractRole } = require('@matthewdbaldwin/microport-contracts');
-const { resolveRole } = require('../lib/resolveRole');
+const { resolveRole, preserveLocalElevation } = require('../lib/resolveRole');
 
 const COOKIE_NAME = 'productport_token';
 const AUDIENCE    = ['productport', 'microport-apps'];
@@ -72,9 +72,17 @@ async function requireAuth(req, res, next) {
     // JIT-provision against this platform's own User table. locale rides the
     // SSO claim (sp is source of truth); absent → leave the stored value alone
     // (apple 2026-07-03 — locale was never persisted at all before this).
+    // Pre-read the existing role: superuser is a LOCAL elevation SSO never
+    // carries, and this sync runs on EVERY request — without the guard a
+    // promoted superuser is demoted back to viewer on their next call.
+    const existing = await db.user.findUnique({
+      where:  { email: payload.email },
+      select: { role: true },
+    });
+    const nextRole = preserveLocalElevation(existing?.role, role);
     const user = await db.user.upsert({
       where:  { email: payload.email },
-      update: { name: payload.name || undefined, role, locale: payload.locale || undefined },
+      update: { name: payload.name || undefined, role: nextRole, locale: payload.locale || undefined },
       create: { email: payload.email, name: payload.name || null, role, locale: payload.locale || undefined },
     });
     if (!user.active) return res.status(401).json({ error: 'Account not found or disabled' });

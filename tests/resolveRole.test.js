@@ -49,3 +49,28 @@ describe('resolveRole — ProductPort universal viewer default', () => {
     }
   });
 });
+
+// superuser is a LOCAL elevation in ProductPort (in the Role enum, deliberately
+// absent from ssoGrantable in microport-contracts — "local-elevated, not
+// SSO-granted"). requireAuth re-resolves the role from SSO claims on EVERY
+// request and JIT-syncs it, so without a guard a manually-promoted superuser
+// is demoted back to viewer on their very next API call. Same bug class fixed
+// in ReviewPort 2026-07-06.
+const { preserveLocalElevation } = require('../src/lib/resolveRole');
+
+describe('preserveLocalElevation — JIT sync must not demote a local superuser', () => {
+  test('existing superuser + any resolved role → stays superuser', () => {
+    expect(preserveLocalElevation('superuser', 'viewer')).toBe('superuser');
+    expect(preserveLocalElevation('superuser', 'product_admin')).toBe('superuser');
+  });
+
+  test('existing non-superuser → follows the resolved role', () => {
+    expect(preserveLocalElevation('viewer', 'product_admin')).toBe('product_admin');
+    expect(preserveLocalElevation('product', 'viewer')).toBe('viewer');
+  });
+
+  test('no existing user (create path) → resolved role', () => {
+    expect(preserveLocalElevation(null, 'viewer')).toBe('viewer');
+    expect(preserveLocalElevation(undefined, 'product')).toBe('product');
+  });
+});
