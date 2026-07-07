@@ -61,10 +61,18 @@ jobs:
       - name: Build and push productport-web:latest
         env:
           NODE_AUTH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          # Sentry: DSN baked into the browser bundle, AUTH_TOKEN authorises
+          # source-map upload during the build. Both are pulled from GH
+          # secrets; neither is carried into the runtime task definition
+          # (runtime SENTRY_DSN is baked into the image at build time).
+          NEXT_PUBLIC_SENTRY_DSN: ${{ secrets.NEXT_PUBLIC_SENTRY_DSN }}
+          SENTRY_AUTH_TOKEN:      ${{ secrets.SENTRY_AUTH_TOKEN }}
         run: |
           docker build \
             --build-arg API_URL=http://localhost:4006 \
             --build-arg NODE_AUTH_TOKEN=$NODE_AUTH_TOKEN \
+            --build-arg NEXT_PUBLIC_SENTRY_DSN=$NEXT_PUBLIC_SENTRY_DSN \
+            --build-arg SENTRY_AUTH_TOKEN=$SENTRY_AUTH_TOKEN \
             -t $ECR_REGISTRY/productport-web:latest ./web
           docker push $ECR_REGISTRY/productport-web:latest
 
