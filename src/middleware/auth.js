@@ -24,10 +24,18 @@ const AUDIENCE    = ['productport', 'microport-apps'];
 const SALESPORT_PUBLIC_KEY = process.env.SALESPORT_JWT_PUBLIC_KEY
   ? Buffer.from(process.env.SALESPORT_JWT_PUBLIC_KEY, 'base64').toString('utf8')
   : undefined;
+// Dual-key (HubPort extraction Slice 1): an OPTIONAL second verification key.
+// Unset today → byte-identical single-key behavior (the lib filters blank keys).
+// Fills with the HubPort public key at Slice 3 so this app accepts HubPort-signed
+// tokens during the issuer flip, without a synchronized all-fleet redeploy.
+const SALESPORT_PUBLIC_KEY_B = process.env.SALESPORT_JWT_PUBLIC_KEY_B
+  ? Buffer.from(process.env.SALESPORT_JWT_PUBLIC_KEY_B, 'base64').toString('utf8')
+  : '';
 
 const verify = createVerifier({
   publicKey:    SALESPORT_PUBLIC_KEY,
   issuer:       process.env.SALESPORT_JWT_ISSUER,
+  additionalKeys: [{ publicKey: SALESPORT_PUBLIC_KEY_B }], // HubPort Slice 1 — empty until Slice 3
   claimsSchema: SsoClaims,
   // bake clean, then 'enforce'. Break-glass: SSO_CLAIMS_MODE=warn (or off).
   claimsMode:   process.env.SSO_CLAIMS_MODE || 'enforce',
