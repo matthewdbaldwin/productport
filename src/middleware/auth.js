@@ -36,6 +36,10 @@ const verify = createVerifier({
   publicKey:    SALESPORT_PUBLIC_KEY,
   issuer:       process.env.SALESPORT_JWT_ISSUER,
   additionalKeys: [{ publicKey: SALESPORT_PUBLIC_KEY_B }], // HubPort Slice 1 — empty until Slice 3
+  // HubPort IdP lift Track B — rotation-friendly JWKS key path (inert until
+  // HUBPORT_JWKS_URL is set; strictly additive — the static keys stay the
+  // fallback, so a JWKS outage can never fail auth closed).
+  jwks:         process.env.HUBPORT_JWKS_URL ? { url: process.env.HUBPORT_JWKS_URL, logger } : undefined,
   claimsSchema: SsoClaims,
   // bake clean, then 'enforce'. Break-glass: SSO_CLAIMS_MODE=warn (or off).
   claimsMode:   process.env.SSO_CLAIMS_MODE || 'enforce',

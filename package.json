@@ -16,7 +16,7 @@
   "dependencies": {
     "@aws-sdk/client-s3": "^3.1078.0",
     "@aws-sdk/s3-request-presigner": "^3.1078.0",
-    "@matthewdbaldwin/microport-auth": "^0.13.0",
+    "@matthewdbaldwin/microport-auth": "^0.15.0",
     "@matthewdbaldwin/microport-contracts": "^0.6.0",
     "@prisma/adapter-pg": "^7.8.0",
     "@prisma/client": "^7.8.0",
