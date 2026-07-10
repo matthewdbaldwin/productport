@@ -29,6 +29,12 @@ const SALESPORT_API = process.env.SALESPORT_API_URL || '';
 // the CRM host if the split var isn't set yet. The SalesPort-CRM launcher tile
 // keeps using SALESPORT_WEB_URL separately.
 const PORTAL_WEB = process.env.PORTAL_WEB_URL || SALESPORT_WEB;
+// Handoff-code EXCHANGE target — the IdP backend that minted the code. Split out
+// from SALESPORT_API_URL (which also feeds CSP connectSrc + the bug-report relay)
+// so the SSO exchange can be repointed at HubPort during the Slice-4h IdP flip
+// WITHOUT disturbing those other consumers. Defaults to SALESPORT_API_URL while
+// SalesPort is still the IdP; at flip time set IDP_API_URL alongside PORTAL_WEB_URL.
+const IDP_API = process.env.IDP_API_URL || SALESPORT_API;
 
 function setSessionCookie(res, token) {
   res.cookie(COOKIE_NAME, token, {
@@ -53,13 +59,16 @@ router.get('/sso/start', (req, res) => {
 // so the web frontend can stash the token + apply theme during the transition.
 router.post('/sso/exchange', async (req, res, next) => {
   try {
-    if (!SALESPORT_API) return res.status(503).json({ error: 'SSO not configured on this instance.' });
+    if (!IDP_API) return res.status(503).json({ error: 'SSO not configured on this instance.' });
     const { code } = req.body || {};
 
-    const upstream = await fetch(`${SALESPORT_API.replace(/\/$/, '')}/api/auth/handoff/exchange`, {
+    const upstream = await fetch(`${IDP_API.replace(/\/$/, '')}/api/auth/handoff/exchange`, {
       method:  'POST',
       headers: { 'Content-Type': 'application/json' },
       body:    JSON.stringify({ code }),
+      // Bound the IdP call — this is the login critical path; a hung hub must
+      // fail the exchange fast (→ error handler), never hang the request.
+      signal:  AbortSignal.timeout(10_000),
     });
     const payload = await upstream.json().catch(() => ({}));
 

@@ -1,6 +1,7 @@
 // next.config.js — MUST be .js, never .ts. A next.config.ts builds fine locally
 // and breaks the production build. feedback_next_config_ts_prod.
 const createNextIntlPlugin = require('next-intl/plugin');
+const { withSentryConfig } = require('@sentry/nextjs');
 const { version } = require('./package.json');
 const withNextIntl = createNextIntlPlugin('./i18n.ts');
 
@@ -18,4 +19,17 @@ const nextConfig = {
   },
 };
 
-module.exports = withNextIntl(nextConfig);
+// Wrap with Sentry for source-map upload (SENTRY_AUTH_TOKEN at build time) and
+// the /monitoring tunnel that routes Sentry traffic through the Next.js server
+// to bypass ad-blockers. Mirrors the fleet (opsport/salesport) wiring.
+module.exports = withSentryConfig(withNextIntl(nextConfig), {
+  org:               process.env.SENTRY_ORG     || 'microport-c0',
+  project:           process.env.SENTRY_PROJECT || 'productport-web',
+  authToken:         process.env.SENTRY_AUTH_TOKEN,
+  silent:            !process.env.CI,
+  widenClientFileUpload: true,
+  tunnelRoute:       '/monitoring',
+  webpack: {
+    treeshake: { removeDebugLogging: true },
+  },
+});

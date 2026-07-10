@@ -10,7 +10,12 @@ const jwt = require('jsonwebtoken');
 
 // Mock the DB before requiring the middleware — requireAuth JIT-upserts a user.
 jest.mock('../src/lib/db', () => ({
-  user: { upsert: jest.fn().mockResolvedValue({ id: 1, email: 'admin@test.local', name: null, role: 'viewer', active: true }) },
+  user: {
+    upsert: jest.fn().mockResolvedValue({ id: 1, email: 'admin@test.local', name: null, role: 'viewer', active: true }),
+    // requireAuth pre-reads the existing role (superuser-preservation guard);
+    // null = no existing user, the create path.
+    findUnique: jest.fn().mockResolvedValue(null),
+  },
   session: { findUnique: jest.fn() },
 }));
 
@@ -90,4 +95,17 @@ test('a token without a locale leaves the stored locale untouched', async () => 
   await run(token);
   const arg = db.user.upsert.mock.calls.at(-1)[0];
   expect(arg.update.locale).toBeUndefined();   // no clobber back to default
+});
+
+// superuser is a LOCAL elevation (absent from ssoGrantable in contracts).
+// requireAuth re-syncs the role on EVERY request, so without the guard a
+// promoted superuser was demoted back to viewer on their next API call.
+test('an existing local superuser is not demoted by the per-request JIT sync', async () => {
+  const db = require('../src/lib/db');
+  db.user.findUnique.mockResolvedValueOnce({ role: 'superuser' });
+  const token = sign({ sub: 5, email: 'su@test.local', app_roles: { productport: 'viewer' } }, 'productport');
+  await run(token);
+  const arg = db.user.upsert.mock.calls.at(-1)[0];
+  expect(arg.update.role).toBe('superuser');   // preserved, not the resolved 'viewer'
+  expect(arg.create.role).toBe('viewer');      // create path (no existing user) unaffected
 });

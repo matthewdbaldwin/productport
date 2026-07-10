@@ -29,4 +29,14 @@ function resolveRole(appRoles, mapFn) {
   return DEFAULT_ROLE;
 }
 
-module.exports = { resolveRole, DEFAULT_ROLE };
+// superuser is a LOCAL elevation (in the Role enum, deliberately absent from
+// ssoGrantable in microport-contracts — "local-elevated, not SSO-granted").
+// SSO claims never carry it, so the per-request JIT sync must never write the
+// resolved role over an existing superuser — doing so silently demotes a
+// deliberately-promoted user on their very next API call. Same guard as
+// ReviewPort's syncReviewportUser (fixed 2026-07-06).
+function preserveLocalElevation(existingRole, resolvedRole) {
+  return existingRole === 'superuser' ? 'superuser' : resolvedRole;
+}
+
+module.exports = { resolveRole, preserveLocalElevation, DEFAULT_ROLE };

@@ -11,7 +11,7 @@ const logger = require('../lib/logger');
 const { createVerifier } = require('@matthewdbaldwin/microport-auth');
 // contracts exports `mapRole`; alias to mapContractRole to match the fleet.
 const { SsoClaims, mapRole: mapContractRole } = require('@matthewdbaldwin/microport-contracts');
-const { resolveRole } = require('../lib/resolveRole');
+const { resolveRole, preserveLocalElevation } = require('../lib/resolveRole');
 
 const COOKIE_NAME = 'productport_token';
 const AUDIENCE    = ['productport', 'microport-apps'];
@@ -24,10 +24,22 @@ const AUDIENCE    = ['productport', 'microport-apps'];
 const SALESPORT_PUBLIC_KEY = process.env.SALESPORT_JWT_PUBLIC_KEY
   ? Buffer.from(process.env.SALESPORT_JWT_PUBLIC_KEY, 'base64').toString('utf8')
   : undefined;
+// Dual-key (HubPort extraction Slice 1): an OPTIONAL second verification key.
+// Unset today → byte-identical single-key behavior (the lib filters blank keys).
+// Fills with the HubPort public key at Slice 3 so this app accepts HubPort-signed
+// tokens during the issuer flip, without a synchronized all-fleet redeploy.
+const SALESPORT_PUBLIC_KEY_B = process.env.SALESPORT_JWT_PUBLIC_KEY_B
+  ? Buffer.from(process.env.SALESPORT_JWT_PUBLIC_KEY_B, 'base64').toString('utf8')
+  : '';
 
 const verify = createVerifier({
   publicKey:    SALESPORT_PUBLIC_KEY,
   issuer:       process.env.SALESPORT_JWT_ISSUER,
+  additionalKeys: [{ publicKey: SALESPORT_PUBLIC_KEY_B }], // HubPort Slice 1 — empty until Slice 3
+  // HubPort IdP lift Track B — rotation-friendly JWKS key path (inert until
+  // HUBPORT_JWKS_URL is set; strictly additive — the static keys stay the
+  // fallback, so a JWKS outage can never fail auth closed).
+  jwks:         process.env.HUBPORT_JWKS_URL ? { url: process.env.HUBPORT_JWKS_URL, logger } : undefined,
   claimsSchema: SsoClaims,
   // bake clean, then 'enforce'. Break-glass: SSO_CLAIMS_MODE=warn (or off).
   claimsMode:   process.env.SSO_CLAIMS_MODE || 'enforce',
@@ -72,9 +84,17 @@ async function requireAuth(req, res, next) {
     // JIT-provision against this platform's own User table. locale rides the
     // SSO claim (sp is source of truth); absent → leave the stored value alone
     // (apple 2026-07-03 — locale was never persisted at all before this).
+    // Pre-read the existing role: superuser is a LOCAL elevation SSO never
+    // carries, and this sync runs on EVERY request — without the guard a
+    // promoted superuser is demoted back to viewer on their next call.
+    const existing = await db.user.findUnique({
+      where:  { email: payload.email },
+      select: { role: true },
+    });
+    const nextRole = preserveLocalElevation(existing?.role, role);
     const user = await db.user.upsert({
       where:  { email: payload.email },
-      update: { name: payload.name || undefined, role, locale: payload.locale || undefined },
+      update: { name: payload.name || undefined, role: nextRole, locale: payload.locale || undefined },
       create: { email: payload.email, name: payload.name || null, role, locale: payload.locale || undefined },
     });
     if (!user.active) return res.status(401).json({ error: 'Account not found or disabled' });
