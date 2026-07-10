@@ -66,6 +66,9 @@ router.post('/sso/exchange', async (req, res, next) => {
       method:  'POST',
       headers: { 'Content-Type': 'application/json' },
       body:    JSON.stringify({ code }),
+      // Bound the IdP call — this is the login critical path; a hung hub must
+      // fail the exchange fast (→ error handler), never hang the request.
+      signal:  AbortSignal.timeout(10_000),
     });
     const payload = await upstream.json().catch(() => ({}));
 
