@@ -21,8 +21,11 @@ const str = (v) => (typeof v === 'string' ? v.trim() : '');
 // ANY authenticated user can file (anyone files; the superuser triages centrally
 // on SalesPort). ProductPort is universal, so every employee reaches this.
 router.post('/', requireAuth, async (req, res) => {
-  const base   = process.env.SALESPORT_API_URL;
-  const secret = process.env.WEBHOOK_SECRET_PRODUCTPORT_SALESPORT;
+  // Env-indirected for a clean sp->hub cutover flip: both default to the
+  // SalesPort channel so prod/dev are UNCHANGED until the flip sets
+  // BUGREPORT_FORWARD_URL=<hub> + BUGREPORT_FORWARD_SECRET=WEBHOOK_SECRET_PRODUCTPORT_HUBPORT.
+  const base   = process.env.BUGREPORT_FORWARD_URL || process.env.SALESPORT_API_URL;
+  const secret = process.env.BUGREPORT_FORWARD_SECRET || process.env.WEBHOOK_SECRET_PRODUCTPORT_SALESPORT;
   if (!base) return res.status(503).json({ error: 'SalesPort integration not configured.' });
 
   const title = str(req.body?.title);
