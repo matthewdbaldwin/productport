@@ -34,8 +34,15 @@
     "sending": "提交中…",
     "close": "关闭",
     "thanks": "问题报告已提交。",
+    "screenshotLabel": "截图（可选）",
+    "screenshotHint": "附加图片，或使用 Ctrl/Cmd+V 粘贴。",
+    "screenshotChoose": "选择截图",
+    "screenshotReplace": "更换截图",
+    "screenshotRemove": "移除截图",
+    "screenshotPreviewAlt": "截图预览",
     "errorTitle": "请填写标题。",
     "errorDetail": "请填写描述。",
+    "errorScreenshotTooLarge": "截图不得超过 2 MB。",
     "errorSend": "提交失败，请重试。"
   }
 }

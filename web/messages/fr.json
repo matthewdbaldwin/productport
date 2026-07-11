@@ -34,8 +34,15 @@
     "sending": "Envoi…",
     "close": "Fermer",
     "thanks": "Rapport de bug envoyé.",
+    "screenshotLabel": "Capture d'écran (facultatif)",
+    "screenshotHint": "Joignez une image ou collez-en une avec Ctrl/Cmd+V.",
+    "screenshotChoose": "Choisir une capture",
+    "screenshotReplace": "Remplacer la capture",
+    "screenshotRemove": "Retirer la capture",
+    "screenshotPreviewAlt": "Aperçu de la capture",
     "errorTitle": "Le titre est requis.",
     "errorDetail": "La description est requise.",
+    "errorScreenshotTooLarge": "La capture doit faire 2 Mo ou moins.",
     "errorSend": "Échec de l'envoi. Veuillez réessayer."
   }
 }

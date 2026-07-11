@@ -34,8 +34,15 @@
     "sending": "Submitting…",
     "close": "Close",
     "thanks": "Bug report submitted.",
+    "screenshotLabel": "Screenshot (optional)",
+    "screenshotHint": "Attach an image, or paste one with Ctrl/Cmd+V.",
+    "screenshotChoose": "Choose screenshot",
+    "screenshotReplace": "Replace screenshot",
+    "screenshotRemove": "Remove screenshot",
+    "screenshotPreviewAlt": "Screenshot preview",
     "errorTitle": "A title is required.",
     "errorDetail": "A description is required.",
+    "errorScreenshotTooLarge": "Screenshot must be 2 MB or smaller.",
     "errorSend": "Could not send your report. Please try again."
   }
 }
