@@ -6,10 +6,10 @@
 // to the SalesPort central queue. Rendered into document.body via a portal so the
 // fixed launcher escapes the app shell's stacking/overflow (and Firefox paints it).
 // bug-report-fanout, feedback_helpbutton_inline_zindex.
-import { useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { useTranslations } from 'next-intl';
-import { Bug } from 'lucide-react';
+import { Bug, Upload, X } from 'lucide-react';
 import { Tooltip, useModalEsc, useFocusTrap } from '@matthewdbaldwin/microport-ui';
 import { useAuth } from '@/contexts/AuthContext';
 import { api } from '@/lib/api';
@@ -45,10 +45,15 @@ export function BugReportButton() {
           onClick={() => setOpen(true)}
           aria-label={t('label')}
           data-bug-report-launcher="true"
-          className="fixed bottom-20 right-4 md:bottom-4 z-40 inline-flex items-center justify-center p-1.5 rounded-full shadow-lg transition-transform hover:scale-105"
-          style={{ background: 'var(--red)', color: 'var(--accent-fg)' }}
+          className="group fixed bottom-20 right-4 md:bottom-4 z-40 inline-flex items-center justify-center min-w-11 min-h-11"
+          style={{ color: 'var(--accent-fg)' }}
         >
-          <Bug size={16} aria-hidden="true" />
+          <span
+            className="inline-flex items-center justify-center w-9 h-9 rounded-full shadow-lg transition-transform group-hover:scale-105"
+            style={{ background: 'var(--red)' }}
+          >
+            <Bug size={18} aria-hidden="true" />
+          </span>
         </button>
       </Tooltip>
       {open && <BugReportModal onClose={() => setOpen(false)} />}
@@ -62,12 +67,49 @@ function BugReportModal({ onClose }: { onClose: () => void }) {
   const [title, setTitle] = useState('');
   const [detail, setDetail] = useState('');
   const [priority, setPriority] = useState<Priority>('normal');
+  const [screenshot, setScreenshot] = useState<File | null>(null);
+  const [preview, setPreview] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [sent, setSent] = useState(false);
   const [error, setError] = useState('');
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   useModalEsc(onClose, !submitting);
   const trapRef = useFocusTrap<HTMLDivElement>();
+
+  // Accept an image (file-picker or clipboard paste); reject > 2 MB — the API
+  // enforces the same ceiling, so fail fast client-side. A revocable object-URL
+  // drives the preview.
+  const acceptScreenshot = useCallback((file: File): boolean => {
+    if (file.size > 2 * 1024 * 1024) { setError(t('errorScreenshotTooLarge')); return false; }
+    setScreenshot(file);
+    setPreview(URL.createObjectURL(file));
+    setError('');
+    return true;
+  }, [t]);
+
+  // Ctrl/Cmd+V grabs an image from the clipboard while the modal is open.
+  useEffect(() => {
+    function onPaste(e: ClipboardEvent) {
+      if (!e.clipboardData) return;
+      for (const item of e.clipboardData.items) {
+        if (item.type.startsWith('image/')) {
+          const file = item.getAsFile();
+          if (file) { acceptScreenshot(file); e.preventDefault(); return; }
+        }
+      }
+    }
+    document.addEventListener('paste', onPaste);
+    return () => document.removeEventListener('paste', onPaste);
+  }, [acceptScreenshot]);
+
+  // Release the object-URL when the preview changes / the modal unmounts.
+  useEffect(() => () => { if (preview) URL.revokeObjectURL(preview); }, [preview]);
+
+  function handleFileChange(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    if (file) acceptScreenshot(file);
+  }
 
   // Auto-captured context, computed once. Shown read-only to the reporter (fleet
   // transparency parity) and sent with the report.
@@ -90,19 +132,43 @@ function BugReportModal({ onClose }: { onClose: () => void }) {
     if (!detail.trim()) { setError(t('errorDetail')); return; }
     setSubmitting(true);
     try {
-      await api('/api/bug-reports', {
-        method: 'POST',
-        body: JSON.stringify({
-          title: title.trim(),
-          description: detail.trim(),
-          priority,
-          pageUrl: ctx.pageUrl,
-          browserAgent: ctx.browserAgent,
-          viewportSize: ctx.viewportSize,
-          appVersion: ctx.appVersion,
-          eventId,
-        }),
-      });
+      if (screenshot) {
+        // Multipart path — the api() helper forces a JSON Content-Type, which
+        // breaks the multipart boundary, so raw fetch with the CSRF header +
+        // cookies (NO Content-Type; the browser sets the multipart boundary).
+        const form = new FormData();
+        form.append('title', title.trim());
+        form.append('description', detail.trim());
+        form.append('priority', priority);
+        form.append('pageUrl', ctx.pageUrl);
+        if (ctx.browserAgent) form.append('browserAgent', ctx.browserAgent);
+        if (ctx.viewportSize) form.append('viewportSize', ctx.viewportSize);
+        if (ctx.appVersion) form.append('appVersion', ctx.appVersion);
+        form.append('eventId', eventId);
+        form.append('screenshot', screenshot);
+        const res = await fetch('/api/bug-reports', {
+          method: 'POST',
+          credentials: 'include',
+          headers: { 'X-Requested-With': 'productport-web' },
+          body: form,
+        });
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      } else {
+        // No screenshot — the existing JSON path is unchanged.
+        await api('/api/bug-reports', {
+          method: 'POST',
+          body: JSON.stringify({
+            title: title.trim(),
+            description: detail.trim(),
+            priority,
+            pageUrl: ctx.pageUrl,
+            browserAgent: ctx.browserAgent,
+            viewportSize: ctx.viewportSize,
+            appVersion: ctx.appVersion,
+            eventId,
+          }),
+        });
+      }
       setSent(true);
       setTimeout(onClose, 1400);
     } catch {
@@ -156,6 +222,27 @@ function BugReportModal({ onClose }: { onClose: () => void }) {
                   value={priority} onChange={(e) => setPriority(e.target.value as Priority)}>
                   {PRIORITIES.map((p) => <option key={p} value={p}>{t(`priority_${p}`)}</option>)}
                 </select>
+              </div>
+              <div className="space-y-1">
+                <label className="text-xs font-medium" style={{ color: 'var(--muted)' }}>{t('screenshotLabel')}</label>
+                <p className="text-xs" style={{ color: 'var(--muted)' }}>{t('screenshotHint')}</p>
+                <input ref={fileInputRef} type="file" accept="image/*" onChange={handleFileChange} className="hidden" />
+                <button type="button" onClick={() => fileInputRef.current?.click()}
+                  className="inline-flex items-center gap-2 rounded border px-3 py-2 text-sm min-h-11" style={inputStyle}>
+                  <Upload size={14} aria-hidden="true" />
+                  {screenshot ? t('screenshotReplace') : t('screenshotChoose')}
+                </button>
+                {preview && (
+                  <div className="mt-2 relative inline-block">
+                    <img src={preview} alt={t('screenshotPreviewAlt')} className="max-h-48 rounded border" style={{ borderColor: 'var(--border)' }} />
+                    <button type="button" aria-label={t('screenshotRemove')}
+                      onClick={() => { setScreenshot(null); setPreview(null); if (fileInputRef.current) fileInputRef.current.value = ''; }}
+                      className="absolute top-1 right-1 inline-flex items-center justify-center rounded-full border w-7 h-7"
+                      style={{ background: 'var(--surface)', borderColor: 'var(--border)', color: 'var(--text)' }}>
+                      <X size={14} aria-hidden="true" />
+                    </button>
+                  </div>
+                )}
               </div>
               {/* Read-only preview of what's attached — fleet transparency parity. */}
               <details className="text-xs" style={{ color: 'var(--muted)' }}>
