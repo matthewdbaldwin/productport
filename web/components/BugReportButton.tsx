@@ -45,10 +45,15 @@ export function BugReportButton() {
           onClick={() => setOpen(true)}
           aria-label={t('label')}
           data-bug-report-launcher="true"
-          className="fixed bottom-20 right-4 md:bottom-4 z-40 inline-flex items-center justify-center p-1.5 rounded-full shadow-lg transition-transform hover:scale-105"
-          style={{ background: 'var(--red)', color: 'var(--accent-fg)' }}
+          className="group fixed bottom-20 right-4 md:bottom-4 z-40 inline-flex items-center justify-center min-w-11 min-h-11"
+          style={{ color: 'var(--accent-fg)' }}
         >
-          <Bug size={16} aria-hidden="true" />
+          <span
+            className="inline-flex items-center justify-center w-9 h-9 rounded-full shadow-lg transition-transform group-hover:scale-105"
+            style={{ background: 'var(--red)' }}
+          >
+            <Bug size={18} aria-hidden="true" />
+          </span>
         </button>
       </Tooltip>
       {open && <BugReportModal onClose={() => setOpen(false)} />}
