@@ -153,6 +153,36 @@ describe('parseProductRow — brochure dimensions (Slice 1.5)', () => {
   });
 });
 
+describe('parseProductRow — clearance cert numbers + qualifier (WS2)', () => {
+  test('reads <region>_cert and <region>_qualifier into the clearance row', () => {
+    const { clearances } = parseProductRow(csvRow({
+      ce: 'cleared', ce_cert: 'CE12345|CE99', ce_qualifier: 'CMD-only',
+      nmpa: 'cleared', nmpa_cert: 'NMPA-777',
+    }));
+    const ce = clearances.find((c) => c.region === 'CE');
+    const nmpa = clearances.find((c) => c.region === 'NMPA');
+    expect(ce.certificateNumbers).toBe('CE12345|CE99');
+    expect(ce.qualifier).toBe('CMD-only');
+    expect(nmpa.certificateNumbers).toBe('NMPA-777');
+    expect(nmpa.qualifier).toBeNull();
+  });
+
+  test('blank cert/qualifier columns become null; notes stays null on import', () => {
+    const fda = parseProductRow(csvRow()).clearances.find((c) => c.region === 'FDA');
+    expect(fda.certificateNumbers).toBeNull();
+    expect(fda.qualifier).toBeNull();
+    expect(fda.notes).toBeNull();
+  });
+
+  test('rejects an unknown qualifier with a precise error', () => {
+    expect(() => parseProductRow(csvRow({ ce_qualifier: 'bogus' }))).toThrow(/ce_qualifier.*expected one of/i);
+  });
+
+  test('rejects an over-long cert cell (length cap)', () => {
+    expect(() => parseProductRow(csvRow({ fda_cert: 'x'.repeat(1001) }))).toThrow(/fda_cert too long/i);
+  });
+});
+
 describe('parseTrialRow', () => {
   test('defaults a blank trial name to a placeholder and nulls blank optionals', () => {
     const t = parseTrialRow({ trial: '', identifier: 'NCT9', n: '', design: 'RCT', result: '' }, 3);

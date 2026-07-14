@@ -8,6 +8,7 @@
 // tests/productRow.test.js.
 'use strict';
 const { clearanceStatus } = require('./clearanceStatus');
+const { isQualifier, CLEARANCE_QUALIFIERS } = require('./clearanceQualifier');
 const { tierFromWord } = require('./tierPalette');
 const { classificationFromWord } = require('./classification');
 const { isTherapeuticArea, THERAPEUTIC_AREAS } = require('./therapeuticAreas');
@@ -17,6 +18,8 @@ const { SLUG_RE, STATUSES, FIELD_MAX } = require('./productWrite');
 // most products. RegulatoryClearance is region-generic, so this needs no schema
 // change: every product now gets 5 clearance rows.
 const REGIONS = ['FDA', 'CE', 'NMPA', 'PMDA', 'TGA'];
+
+const CERT_MAX = 1000; // pipe-delimited cert numbers — a handful per region
 
 // Blank / whitespace / nullish → null; otherwise the trimmed string.
 function blankToNull(v) {
@@ -83,12 +86,23 @@ function parseProductRow(r) {
     if (data[key] != null && String(data[key]).length > max) throw new Error(`${key} too long (max ${max})`);
   }
 
-  // One clearance row per region (all 5: FDA/CE/NMPA/PMDA/TGA), mapped through the enum.
-  const clearances = REGIONS.map((region) => ({
-    region,
-    status: clearanceStatus(r[region.toLowerCase()]),
-    notes: null,
-  }));
+  // One clearance row per region (all 5). status via the enum; certificateNumbers
+  // (pipe-delimited) + qualifier (validated caveat vocabulary) from the paired
+  // <region>_cert / <region>_qualifier columns. Blank → null; an unknown qualifier
+  // or an over-long cert cell throws a precise error (per-row isolation surfaces
+  // it in the import report). notes stays admin-only (null on import).
+  const clearances = REGIONS.map((region) => {
+    const key = region.toLowerCase();
+    const qualifier = blankToNull(r[`${key}_qualifier`]);
+    if (qualifier && !isQualifier(qualifier)) {
+      throw new Error(`invalid ${key}_qualifier "${qualifier}" (expected one of: ${CLEARANCE_QUALIFIERS.join(', ')})`);
+    }
+    const certificateNumbers = blankToNull(r[`${key}_cert`]);
+    if (certificateNumbers && certificateNumbers.length > CERT_MAX) {
+      throw new Error(`${key}_cert too long (max ${CERT_MAX})`);
+    }
+    return { region, status: clearanceStatus(r[key]), certificateNumbers, qualifier, notes: null };
+  });
 
   return { slug, data, clearances };
 }
