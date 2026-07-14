@@ -68,7 +68,9 @@ describe('shapeProduct — Prisma row → catalog contract', () => {
     const out = shapeProduct(row());
     expect(out.clearances.map((c) => c.region)).toEqual(['CE', 'FDA', 'NMPA']);
     const ce = out.clearances.find((c) => c.region === 'CE');
-    expect(ce).toEqual({ region: 'CE', status: 'APPROVED', notes: 'note' });
+    expect(ce).toEqual({
+      region: 'CE', status: 'APPROVED', certificateNumbers: null, qualifier: null, notes: 'note',
+    });
     const fda = out.clearances.find((c) => c.region === 'FDA');
     expect(fda.notes).toBeNull();
   });
@@ -126,5 +128,24 @@ describe('shapeProduct — Prisma row → catalog contract', () => {
     expect(shaped.applicableDepartments).toBeNull();
     expect(shaped.modelNumbers).toBeNull();
     expect(shaped.developmentStatus).toBeNull();
+  });
+});
+
+describe('shapeProduct — clearance cert# + qualifier (WS2)', () => {
+  test('carries certificateNumbers + qualifier through the contract', () => {
+    const shaped = shapeProduct({
+      slug: 'x', name: 'X', subsidiary: 'S', therapeuticArea: 'Emergency and Critical Care',
+      clearances: [
+        { region: 'CE', status: 'APPROVED', certificateNumbers: 'CE-1', qualifier: 'CMD-only', notes: 'n' },
+        { region: 'FDA', status: 'NONE', certificateNumbers: null, qualifier: null, notes: null },
+      ],
+      trials: [],
+    });
+    const ce = shaped.clearances.find((c) => c.region === 'CE');
+    const fda = shaped.clearances.find((c) => c.region === 'FDA');
+    expect(ce.certificateNumbers).toBe('CE-1');
+    expect(ce.qualifier).toBe('CMD-only');
+    expect(fda.certificateNumbers).toBeNull();
+    expect(fda.qualifier).toBeNull();
   });
 });

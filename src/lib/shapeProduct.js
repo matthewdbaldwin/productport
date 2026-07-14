@@ -42,7 +42,13 @@ function shapeProduct(p) {
     clearances: (p.clearances || [])
       .slice()
       .sort((a, b) => a.region.localeCompare(b.region))
-      .map((c) => ({ region: c.region, status: c.status, notes: c.notes || null })),
+      .map((c) => ({
+        region: c.region,
+        status: c.status,
+        certificateNumbers: c.certificateNumbers || null,
+        qualifier: c.qualifier || null,
+        notes: c.notes || null,
+      })),
     trials: (p.trials || [])
       .slice()
       .sort((a, b) => a.displayOrder - b.displayOrder)
