@@ -11,15 +11,39 @@ import { ApiError } from '@/lib/api';
 import s from './catalog.module.css';
 import {
   createProduct, updateProduct, deleteProduct, uploadProductImage, deleteProductImage, setPrimaryImage,
-  galleryImageSrc, THERAPEUTIC_AREAS,
+  galleryImageSrc, THERAPEUTIC_AREAS, updateClearances, CLEARANCE_QUALIFIERS,
   type ProductInput, type ProductTier, type ProductClassification, type ProductStatus, type GalleryImage,
+  type ClearanceRow, type ClearanceStatus,
 } from '@/lib/products';
 
-type Initial = Partial<ProductInput> & { slug?: string; images?: GalleryImage[] };
+type Initial = Partial<ProductInput> & { slug?: string; images?: GalleryImage[]; clearances?: ClearanceRow[] };
 
 const TIERS: ProductTier[] = ['TIER1', 'TIER2', 'TIER3'];
 const CLASSES: ProductClassification[] = ['CORE', 'HIPO', 'FLAGSHIP'];
 const STATUSES: ProductStatus[] = ['ACTIVE', 'DISCONTINUED', 'DRAFT'];
+const CLR_REGIONS = ['CE', 'FDA', 'NMPA', 'PMDA', 'TGA'] as const;
+const CLR_STATUSES: ClearanceStatus[] = ['NONE', 'IN_PROGRESS', 'SUBMITTED', 'APPROVED', 'NOT_APPROVED'];
+
+// The matrix is edited as plain strings (all inputs emit strings), so state is
+// this all-string row — never ClearanceRow. saveClearances() maps it back to
+// ClearanceRow (cast status, blank → null). This dodges the computed-key write
+// on a union-typed field (string ≠ the ClearanceStatus union under tsc).
+type EditRow = { region: string; status: string; certificateNumbers: string; qualifier: string; notes: string };
+
+// Seed a full 5-region matrix from a product's (possibly partial) clearance rows.
+function seedMatrix(rows?: ClearanceRow[]): EditRow[] {
+  const by = new Map((rows ?? []).map((r) => [r.region, r]));
+  return CLR_REGIONS.map((region) => {
+    const r = by.get(region);
+    return {
+      region,
+      status: r?.status ?? 'NONE',
+      certificateNumbers: r?.certificateNumbers ?? '',
+      qualifier: r?.qualifier ?? '',
+      notes: r?.notes ?? '',
+    };
+  });
+}
 
 // Pull field-level errors out of a 422/400 ApiError.details ([{field,message}])
 // so the editor can highlight the exact input. feedback_validation_details_must_propagate.
@@ -57,8 +81,37 @@ export function ProductEditModal({ mode, initial, onClose, onSaved }: {
   const [gallery, setGallery] = useState<GalleryImage[]>(i.images ?? []);
   const [imgBusy, setImgBusy] = useState<string | null>(null);      // image id with an in-flight mutation
   const [confirmDelImg, setConfirmDelImg] = useState<string | null>(null); // image id pending delete confirm
+  const [matrix, setMatrix] = useState<EditRow[]>(() => seedMatrix(i.clearances));
+  const [clrSaving, setClrSaving] = useState(false);
+  const [clrErr, setClrErr] = useState('');
+  const [clrSaved, setClrSaved] = useState(false);
   useModalEsc(onClose);
   const trapRef = useFocusTrap<HTMLDivElement>();
+
+  const setCell = (idx: number, key: keyof EditRow) =>
+    (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) =>
+      setMatrix((m) => m.map((row, j) => (j === idx ? { ...row, [key]: e.target.value } : row)));
+
+  async function saveClearances() {
+    setClrSaving(true); setClrErr(''); setClrSaved(false);
+    // Send blank cert/qualifier/notes as null; the server validator also trims.
+    const payload: ClearanceRow[] = matrix.map((r) => ({
+      region: r.region,
+      status: r.status as ClearanceStatus,
+      certificateNumbers: r.certificateNumbers.trim() || null,
+      qualifier: r.qualifier.trim() || null,
+      notes: r.notes.trim() || null,
+    }));
+    try {
+      await updateClearances(i.slug as string, payload);
+      setClrSaved(true);
+      onSaved();
+    } catch (e) {
+      setClrErr(e instanceof Error ? e.message : 'Could not save clearances');
+    } finally {
+      setClrSaving(false);
+    }
+  }
 
   // All gallery mutations return the full product (with images) — reflect it and
   // refresh the catalog (the primary drives the card thumbnail).
@@ -237,6 +290,56 @@ export function ProductEditModal({ mode, initial, onClose, onSaved }: {
                 {uploading ? 'Uploading…' : '+ Add image'}
                 <input type="file" accept="image/jpeg,image/png,image/webp" onChange={onPickImage} disabled={uploading} style={{ display: 'none' }} />
               </label>
+            </div>
+          </div>
+        )}
+
+        {mode === 'edit' && (
+          <div className={s.efield} style={{ marginBottom: 12 }}>
+            <span>Regulatory clearances <em style={{ color: 'var(--grey)', fontWeight: 400 }}>— status, certificate number(s) (pipe-separated), and any caveat, per region.</em></span>
+            <div style={{ overflowX: 'auto' }}>
+              <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13, marginTop: 6 }}>
+                <thead>
+                  <tr style={{ textAlign: 'left', color: 'var(--grey)' }}>
+                    <th style={{ padding: '4px 6px' }}>Region</th>
+                    <th style={{ padding: '4px 6px' }}>Status</th>
+                    <th style={{ padding: '4px 6px' }}>Certificate number(s)</th>
+                    <th style={{ padding: '4px 6px' }}>Qualifier</th>
+                    <th style={{ padding: '4px 6px' }}>Notes</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {matrix.map((row, idx) => (
+                    <tr key={row.region}>
+                      <td style={{ padding: '4px 6px', fontWeight: 600 }}>{row.region}</td>
+                      <td style={{ padding: '4px 6px' }}>
+                        <select className={s.einput} value={row.status} onChange={setCell(idx, 'status')}>
+                          {CLR_STATUSES.map((st) => <option key={st} value={st}>{st}</option>)}
+                        </select>
+                      </td>
+                      <td style={{ padding: '4px 6px' }}>
+                        <input className={s.einput} value={row.certificateNumbers ?? ''} onChange={setCell(idx, 'certificateNumbers')} placeholder="e.g. CE-100|CE-200" />
+                      </td>
+                      <td style={{ padding: '4px 6px' }}>
+                        <select className={s.einput} value={row.qualifier ?? ''} onChange={setCell(idx, 'qualifier')}>
+                          <option value="">— none —</option>
+                          {CLEARANCE_QUALIFIERS.map((q) => <option key={q} value={q}>{q}</option>)}
+                        </select>
+                      </td>
+                      <td style={{ padding: '4px 6px' }}>
+                        <input className={s.einput} value={row.notes ?? ''} onChange={setCell(idx, 'notes')} />
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+            {clrErr && <em style={{ color: 'var(--rd)', fontSize: 12 }}>{clrErr}</em>}
+            <div style={{ display: 'flex', gap: 10, alignItems: 'center', marginTop: 6 }}>
+              <button type="button" className={s.ebtnGhost} disabled={clrSaving} onClick={saveClearances}>
+                {clrSaving ? 'Saving…' : 'Save clearances'}
+              </button>
+              {clrSaved && <em style={{ color: 'var(--ok)', fontSize: 12 }}>Saved.</em>}
             </div>
           </div>
         )}

@@ -14,8 +14,11 @@ const product = {
   modelNumbers: 'M1|M2', developmentStatus: 'Under Development', status: 'DISCONTINUED',
 };
 const clearances = [
-  { region: 'FDA', status: 'IN_PROGRESS' }, { region: 'CE', status: 'APPROVED' },
-  { region: 'NMPA', status: 'APPROVED' }, { region: 'PMDA', status: 'NONE' }, { region: 'TGA', status: 'APPROVED' },
+  { region: 'FDA', status: 'IN_PROGRESS', certificateNumbers: null, qualifier: null },
+  { region: 'CE', status: 'APPROVED', certificateNumbers: 'CE-100|CE-200', qualifier: 'CMD-only' },
+  { region: 'NMPA', status: 'APPROVED', certificateNumbers: 'NMPA-9', qualifier: null },
+  { region: 'PMDA', status: 'NONE', certificateNumbers: null, qualifier: null },
+  { region: 'TGA', status: 'APPROVED', certificateNumbers: null, qualifier: 'agent' },
 ];
 
 describe('serializeProductRow', () => {
@@ -62,5 +65,26 @@ describe('serializeProductRow', () => {
     expect(EXPORT_COLUMNS[0]).toBe('id');
     expect(EXPORT_COLUMNS).toContain('tier');
     expect(EXPORT_COLUMNS).toContain('tga');
+  });
+
+  test('emits per-region cert + qualifier columns', () => {
+    const row = serializeProductRow(product, clearances);
+    expect(row.ce_cert).toBe('CE-100|CE-200');
+    expect(row.ce_qualifier).toBe('CMD-only');
+    expect(row.tga_qualifier).toBe('agent');
+    expect(row.fda_cert).toBe('');       // null → blank
+    expect(row.nmpa_qualifier).toBe(''); // null → blank
+    expect(EXPORT_COLUMNS).toContain('ce_cert');
+    expect(EXPORT_COLUMNS).toContain('tga_qualifier');
+  });
+
+  test('ROUND-TRIP preserves cert numbers + qualifier', () => {
+    const back = parseProductRow(serializeProductRow(product, clearances));
+    const byRegion = Object.fromEntries(back.clearances.map((c) => [c.region, c]));
+    expect(byRegion.CE.certificateNumbers).toBe('CE-100|CE-200');
+    expect(byRegion.CE.qualifier).toBe('CMD-only');
+    expect(byRegion.TGA.qualifier).toBe('agent');
+    expect(byRegion.FDA.certificateNumbers).toBeNull();
+    expect(byRegion.PMDA.qualifier).toBeNull();
   });
 });

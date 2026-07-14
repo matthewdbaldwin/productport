@@ -24,14 +24,22 @@ const EXPORT_COLUMNS = [
   'features', 'indication', 'patient_population', 'specs', 'reg_notes', 'image',
   'tier', 'classification', 'business_segment', 'applicable_departments', 'model_numbers', 'development_status',
   'status',
-  'fda', 'ce', 'nmpa', 'pmda', 'tga',
+  'fda', 'fda_cert', 'fda_qualifier',
+  'ce', 'ce_cert', 'ce_qualifier',
+  'nmpa', 'nmpa_cert', 'nmpa_qualifier',
+  'pmda', 'pmda_cert', 'pmda_qualifier',
+  'tga', 'tga_cert', 'tga_qualifier',
 ];
 
 const blank = (v) => (v == null ? '' : String(v));
 
 function serializeProductRow(p, clearances = []) {
-  const byRegion = {};
-  for (const c of clearances) byRegion[c.region] = WORD_FROM_STATUS[c.status] ?? '';
+  const word = {}, cert = {}, qual = {};
+  for (const c of clearances) {
+    word[c.region] = WORD_FROM_STATUS[c.status] ?? '';
+    cert[c.region] = blank(c.certificateNumbers);
+    qual[c.region] = blank(c.qualifier);
+  }
 
   return {
     id: blank(p.slug),
@@ -55,11 +63,11 @@ function serializeProductRow(p, clearances = []) {
     model_numbers: blank(p.modelNumbers),
     development_status: blank(p.developmentStatus),
     status: blank(p.status),                   // ACTIVE/DISCONTINUED/DRAFT — round-trips so re-import preserves it
-    fda: byRegion.FDA ?? '',
-    ce: byRegion.CE ?? '',
-    nmpa: byRegion.NMPA ?? '',
-    pmda: byRegion.PMDA ?? '',
-    tga: byRegion.TGA ?? '',
+    fda: word.FDA ?? '', fda_cert: cert.FDA ?? '', fda_qualifier: qual.FDA ?? '',
+    ce: word.CE ?? '', ce_cert: cert.CE ?? '', ce_qualifier: qual.CE ?? '',
+    nmpa: word.NMPA ?? '', nmpa_cert: cert.NMPA ?? '', nmpa_qualifier: qual.NMPA ?? '',
+    pmda: word.PMDA ?? '', pmda_cert: cert.PMDA ?? '', pmda_qualifier: qual.PMDA ?? '',
+    tga: word.TGA ?? '', tga_cert: cert.TGA ?? '', tga_qualifier: qual.TGA ?? '',
   };
 }
 
