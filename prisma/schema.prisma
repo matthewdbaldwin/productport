@@ -135,7 +135,9 @@ model RegulatoryClearance {
   product    Product         @relation(fields: [productId], references: [id], onDelete: Cascade)
   region     String          // FDA | CE | NMPA | PMDA | …
   status     ClearanceStatus @default(NONE)
-  notes      String?
+  notes              String?
+  certificateNumbers String?   // pipe-delimited registration certificate numbers (WS2)
+  qualifier          String?   // validity caveat; app-validated vocabulary (src/lib/clearanceQualifier.js); null = none
   updatedAt  DateTime        @updatedAt
 
   @@unique([productId, region])
