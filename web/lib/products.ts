@@ -110,3 +110,25 @@ export const importProductsCsv = (csvText: string) =>
     headers: { 'Content-Type': 'text/csv' },
     body: csvText,
   });
+
+export type ClearanceStatus = 'APPROVED' | 'IN_PROGRESS' | 'SUBMITTED' | 'NOT_APPROVED' | 'NONE';
+
+// MIRROR of src/lib/clearanceQualifier.js — keep in sync. The editor renders this
+// as a dropdown (blank = no caveat).
+export const CLEARANCE_QUALIFIERS = ['CMD-only', 'CE-invalid', 'agent', 'pending', 'recently-approved'] as const;
+
+export interface ClearanceRow {
+  region: string;
+  status: ClearanceStatus;
+  certificateNumbers: string | null;
+  qualifier: string | null;
+  notes: string | null;
+}
+
+// Replace a product's whole clearance matrix (server deletes + recreates the
+// region rows from this payload). Admin-only.
+export const updateClearances = (slug: string, clearances: ClearanceRow[]) =>
+  api<{ product: unknown }>(`products/${encodeURIComponent(slug)}/clearances`, {
+    method: 'PUT',
+    body: JSON.stringify({ clearances }),
+  });

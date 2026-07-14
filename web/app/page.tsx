@@ -20,7 +20,7 @@ import s from './catalog.module.css';
 type ClearanceStatus = 'APPROVED' | 'IN_PROGRESS' | 'SUBMITTED' | 'NOT_APPROVED' | 'NONE';
 type ProductTier = 'TIER1' | 'TIER2' | 'TIER3';
 
-interface Clearance { region: string; status: ClearanceStatus; notes: string | null }
+interface Clearance { region: string; status: ClearanceStatus; certificateNumbers: string | null; qualifier: string | null; notes: string | null }
 interface Trial { trial: string; identifier: string; n: string; design: string; result: string }
 interface Product {
   id: string;
@@ -313,7 +313,7 @@ export default function CatalogPage() {
   );
 
   const isAdmin = !!user && (user.role === 'product_admin' || user.role === 'superuser' || !!user.isSuperuser);
-  const [editState, setEditState] = useState<{ mode: 'create' | 'edit'; initial?: ProductInput & { slug: string; images?: GalleryImage[] } } | null>(null);
+  const [editState, setEditState] = useState<{ mode: 'create' | 'edit'; initial?: ProductInput & { slug: string; images?: GalleryImage[]; clearances?: Clearance[] } } | null>(null);
 
   useEffect(() => { if (!loading && !user) router.replace('/login'); }, [loading, user, router]);
 
@@ -540,7 +540,7 @@ export default function CatalogPage() {
 
 // Map a shaped catalog Product to the editor's input shape (id === slug).
 // Carries the gallery so the editor can manage it without a separate fetch.
-function toInput(p: Product): ProductInput & { slug: string; images?: GalleryImage[] } {
+function toInput(p: Product): ProductInput & { slug: string; images?: GalleryImage[]; clearances?: Clearance[] } {
   return {
     slug: p.id, name: p.name, subsidiary: p.subsidiary, therapeuticArea: p.therapeuticArea,
     category: p.category || null, type: p.type || null, tagline: p.tagline || null, overview: p.overview || null,
@@ -549,5 +549,6 @@ function toInput(p: Product): ProductInput & { slug: string; images?: GalleryIma
     businessSegment: p.businessSegment || null, applicableDepartments: p.applicableDepartments || null,
     modelNumbers: p.modelNumbers || null, developmentStatus: p.developmentStatus || null,
     tier: p.tier, classification: p.classification, status: p.status, images: p.images,
+    clearances: p.clearances,
   };
 }
