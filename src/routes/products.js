@@ -13,6 +13,7 @@ const express = require('express');
 const db = require('../lib/db');
 const { shapeProduct: shape } = require('../lib/shapeProduct');
 const { validateProductWrite } = require('../lib/productWrite');
+const { validateClearanceMatrix } = require('../lib/clearanceWrite');
 const { importProducts } = require('../lib/importProducts');
 const { serializeProductRow, EXPORT_COLUMNS } = require('../lib/serializeProductRow');
 const { upsertProductRow } = require('../lib/productUpsert');
@@ -151,6 +152,28 @@ router.patch('/:slug', requireProductAdmin, async (req, res, next) => {
     const updated = await db.product.update({ where: { id: target.id }, data, include: WITH_RELATIONS });
     await audit(req, 'updated', updated.id, { fields: Object.keys(data) });
     res.json({ product: shape(updated) });
+  } catch (err) { next(err); }
+});
+
+// PUT /api/products/:slug/clearances — replace a product's regulatory-clearance
+// matrix (status + cert# + qualifier + notes per region). Admin-only. The whole
+// matrix is replaced (delete + recreate), matching the CSV import's per-product
+// clearance semantics. Logged as clearance.updated.
+router.put('/:slug/clearances', requireProductAdmin, async (req, res, next) => {
+  try {
+    const target = await db.product.findFirst({ where: { slug: req.params.slug, deletedAt: null }, select: { id: true } });
+    if (!target) return res.status(404).json({ error: 'Product not found' });
+
+    let rows;
+    try { ({ rows } = validateClearanceMatrix(req.body || {})); }
+    catch (e) { return res.status(400).json(writeError(e)); }
+
+    await db.regulatoryClearance.deleteMany({ where: { productId: target.id } });
+    if (rows.length) {
+      await db.regulatoryClearance.createMany({ data: rows.map((r) => ({ ...r, productId: target.id })) });
+    }
+    await audit(req, 'clearance.updated', target.id, { regions: rows.map((r) => r.region) });
+    await reshapeWithGallery(res, target.id);
   } catch (err) { next(err); }
 });
 
