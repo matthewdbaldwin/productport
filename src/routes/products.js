@@ -16,7 +16,8 @@ const { validateProductWrite } = require('../lib/productWrite');
 const { validateClearanceMatrix } = require('../lib/clearanceWrite');
 const { importProducts } = require('../lib/importProducts');
 const { serializeProductRow, EXPORT_COLUMNS } = require('../lib/serializeProductRow');
-const { upsertProductRow } = require('../lib/productUpsert');
+const { upsertProductRow, previewProductRow } = require('../lib/productUpsert');
+const { verifyImportHeader } = require('../lib/verifyImportHeader');
 const { putAsset, getDownloadUrl } = require('../lib/assetStorage');
 const { validateImageUpload, toImageValue, isS3Image, s3KeyOf } = require('../lib/productImage');
 const { primaryAfterDelete } = require('../lib/productGallery');
@@ -194,15 +195,44 @@ router.post(
       const csv = typeof req.body === 'string' ? req.body : '';
       if (!csv.trim()) return res.status(400).json({ error: 'Empty CSV body — POST the file contents as text/csv.' });
 
+      // Format gate FIRST — the import is a full upsert + clearance-matrix
+      // replace, so a header missing any canonical column would silently null
+      // that data on every row (e.g. re-importing an old export erases the cert
+      // numbers / model numbers / TGA rows). Reject rather than clobber.
+      let header;
+      try { header = parseCsv(csv, { to_line: 1, bom: true, trim: false })[0] || []; }
+      catch (e) { return res.status(400).json({ error: `CSV parse failed: ${e.message}` }); }
+      const verdict = verifyImportHeader(header);
+      if (!verdict.ok) {
+        return res.status(400).json({
+          error: `Old-format or incompatible CSV: missing column(s) ${verdict.missing.join(', ')}. `
+            + `The bulk import replaces every column, so a partial header would erase data — `
+            + `re-export the current catalog (Export CSV) and edit that file.`,
+          missing: verdict.missing,
+          unknown: verdict.unknown,
+        });
+      }
+
+      // Trim the header → column keys (values stay untrimmed) so parseProductRow
+      // reads `r.fda_cert` etc. even when a header cell carries stray whitespace.
+      // MUST match verifyImportHeader's own trim, or a padded-but-canonical header
+      // would clear the gate yet parse to undefined → the very clobber we reject.
       let rows;
-      try { rows = parseCsv(csv, { columns: true, bom: true, skip_empty_lines: true, trim: false }); }
+      try { rows = parseCsv(csv, { columns: (h) => h.map((c) => String(c).trim()), bom: true, skip_empty_lines: true, trim: false }); }
       catch (e) { return res.status(400).json({ error: `CSV parse failed: ${e.message}` }); }
 
-      const result = await importProducts(rows, upsertRowToDb);
-      await audit(req, 'import', null, {
-        total: result.total, created: result.created, updated: result.updated, errorCount: result.errors.length,
-      });
-      res.json(result);
+      // Dry-run preview (?dryRun=1): validate + tally created/updated/errors with
+      // the same rules as the real run, but write nothing and don't audit — an
+      // admin can preflight a file before committing it.
+      const dryRun = req.query.dryRun === '1' || req.query.dryRun === 'true';
+      const runRow = dryRun ? (row) => previewProductRow(db, row) : upsertRowToDb;
+      const result = await importProducts(rows, runRow);
+      if (!dryRun) {
+        await audit(req, 'import', null, {
+          total: result.total, created: result.created, updated: result.updated, errorCount: result.errors.length,
+        });
+      }
+      res.json({ ...result, dryRun, unknownColumns: verdict.unknown });
     } catch (err) { next(err); }
   },
 );
