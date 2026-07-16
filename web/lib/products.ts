@@ -100,12 +100,16 @@ export interface ImportResult {
   created: number;
   updated: number;
   errors: { row: number; slug: string; error: string }[];
+  dryRun?: boolean;
+  unknownColumns?: string[];
 }
 
 // Bulk upsert-on-slug from a CSV. POSTs the raw file text (no multipart); the
-// server parses + reconciles. 2xx even with per-row errors (in `errors`).
-export const importProductsCsv = (csvText: string) =>
-  api<ImportResult>('products/import', {
+// server parses + reconciles. The server rejects (400, ApiError) an old/
+// incompatible header before it can clobber; 2xx even with per-row errors (in
+// `errors`). `dryRun` runs the same validation + tally but writes nothing.
+export const importProductsCsv = (csvText: string, opts: { dryRun?: boolean } = {}) =>
+  api<ImportResult>(`products/import${opts.dryRun ? '?dryRun=1' : ''}`, {
     method: 'POST',
     headers: { 'Content-Type': 'text/csv' },
     body: csvText,

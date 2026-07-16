@@ -4,6 +4,12 @@
 // file as text and POSTs it to /api/products/import (upsert-on-slug). Shows a
 // created/updated/errors summary; if any rows failed, offers a downloadable
 // error report so the admin can fix + re-upload.
+//
+// "Verify (dry run)" runs the same server-side validation + tally WITHOUT
+// writing — so an admin can preflight a file before committing it. Either action
+// is rejected (400) by the server if the CSV header is old/incompatible (missing
+// a canonical column), because the import replaces every column and a partial
+// header would erase data; the rejection message names the missing columns.
 
 import { useRef, useState } from 'react';
 import s from './catalog.module.css';
@@ -11,6 +17,9 @@ import { importProductsCsv, type ImportResult } from '@/lib/products';
 
 export function ImportCsvButton({ onDone }: { onDone: () => void | Promise<void> }) {
   const ref = useRef<HTMLInputElement>(null);
+  // Carries the chosen mode (verify vs import) across the file-picker round-trip:
+  // the <input> onChange fires after the dialog closes, so we can't close over it.
+  const dryRef = useRef(false);
   const [busy, setBusy] = useState(false);
   const [result, setResult] = useState<ImportResult | null>(null);
   const [err, setErr] = useState('');
@@ -19,17 +28,23 @@ export function ImportCsvButton({ onDone }: { onDone: () => void | Promise<void>
     const file = e.target.files?.[0];
     e.target.value = ''; // allow re-picking the same file
     if (!file) return;
+    const dryRun = dryRef.current;
     setBusy(true); setErr(''); setResult(null);
     try {
       const text = await file.text();
-      const res = await importProductsCsv(text);
+      const res = await importProductsCsv(text, { dryRun });
       setResult(res);
-      await onDone();
+      if (!res.dryRun) await onDone(); // a preview changed nothing — no reload
     } catch (ex) {
       setErr(ex instanceof Error ? ex.message : 'Import failed');
     } finally {
       setBusy(false);
     }
+  }
+
+  function pick(dryRun: boolean) {
+    dryRef.current = dryRun;
+    ref.current?.click();
   }
 
   function downloadErrors() {
@@ -42,10 +57,19 @@ export function ImportCsvButton({ onDone }: { onDone: () => void | Promise<void>
     URL.revokeObjectURL(url);
   }
 
+  const summary = result
+    ? `${result.dryRun ? 'Preview' : 'Imported'}: ${result.created} new, ${result.updated} updated`
+      + `${result.errors.length ? `, ${result.errors.length} ${result.dryRun ? 'would fail' : 'failed'}` : ''}`
+      + `${result.unknownColumns?.length ? ` · ignored unknown column(s): ${result.unknownColumns.join(', ')}` : ''}`
+    : '';
+
   return (
     <>
       <input ref={ref} type="file" accept=".csv,text/csv" hidden onChange={onFile} data-testid="import-csv-input" />
-      <button type="button" className={s.btn} disabled={busy} data-testid="import-csv" onClick={() => ref.current?.click()}>
+      <button type="button" className={s.btn} disabled={busy} data-testid="import-csv-verify" onClick={() => pick(true)}>
+        {busy ? 'Working…' : 'Verify (dry run)'}
+      </button>
+      <button type="button" className={s.btn} disabled={busy} data-testid="import-csv" onClick={() => pick(false)}>
         {busy ? 'Importing…' : 'Import CSV'}
       </button>
       {(result || err) && (
@@ -53,9 +77,7 @@ export function ImportCsvButton({ onDone }: { onDone: () => void | Promise<void>
           role="status"
           style={{ fontSize: 12, marginLeft: 4, color: err ? 'var(--rd)' : 'var(--grey)', display: 'inline-flex', alignItems: 'center', gap: 8 }}
         >
-          {err
-            ? err
-            : `Imported: ${result!.created} new, ${result!.updated} updated${result!.errors.length ? `, ${result!.errors.length} failed` : ''}`}
+          {err ? err : summary}
           {result && result.errors.length > 0 && (
             <button type="button" className={s.ebtnGhost} style={{ padding: '2px 8px', fontSize: 11 }} onClick={downloadErrors}>
               Download errors
