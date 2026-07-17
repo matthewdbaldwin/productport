@@ -2,11 +2,17 @@
 // catalog, so it pins the shared vocabulary here (contracts v0.10.0 vocabulary
 // module, Phase 2 of prd_product_master_data). Two guarantees:
 //
-//   1. CLEARANCE_STATUSES deep-equals the GENERATED Prisma `ClearanceStatus`
-//      enum — the STRONG check. The contract declares a mirror of PP's enum;
-//      this proves that mirror can never silently drift from the schema the DB
-//      actually enforces. (This assertion can only run here — the contracts
-//      package can't read PP's schema.)
+//   1. CLEARANCE_STATUSES deep-equals the `ClearanceStatus` enum declared in
+//      prisma/schema.prisma — the STRONG check. The contract declares a mirror
+//      of PP's enum; this proves that mirror can never silently drift from the
+//      schema the DB actually enforces. (This assertion can only run here — the
+//      contracts package can't read PP's schema.) We parse the schema SOURCE
+//      rather than require('@prisma/client'): PP's suite never imports the
+//      generated client, which exists only after `prisma generate` and so
+//      throws "Cannot find module '.prisma/client/default'" in CI's fresh
+//      install (the Prisma-7 bare-client trap, feedback_prisma7_bare_client_trap).
+//      The schema is the source of truth the client is generated FROM, so
+//      parsing it gives the same guarantee, CI-safe.
 //   2. THERAPEUTIC_AREAS is golden-pinned to the exact canonical 10, so a
 //      contract-side edit that drifts the catalog's areas becomes a RED TEST
 //      here, not a silently-changed filter.
@@ -16,8 +22,22 @@
 // stale checkout stays green rather than erroring.
 'use strict';
 
-const { ClearanceStatus } = require('@prisma/client');
+const fs = require('node:fs');
+const path = require('node:path');
 const { THERAPEUTIC_AREAS: LOCAL_AREAS } = require('../src/lib/therapeuticAreas');
+
+// Read an enum's members, in declared order, from the Prisma schema SOURCE.
+function prismaEnumMembers(enumName) {
+  const schema = fs.readFileSync(path.join(__dirname, '..', 'prisma', 'schema.prisma'), 'utf8');
+  const block = new RegExp(`enum\\s+${enumName}\\s*\\{([^}]*)\\}`).exec(schema);
+  if (!block) throw new Error(`enum ${enumName} not found in prisma/schema.prisma`);
+  return block[1]
+    .split('\n')
+    .map((line) => line.replace(/\/\/.*$/, '').trim()) // drop trailing // comments
+    .filter(Boolean);
+}
+
+const SCHEMA_CLEARANCE_STATUSES = prismaEnumMembers('ClearanceStatus');
 
 let contracts = {};
 try {
@@ -48,13 +68,13 @@ const CANONICAL_10 = [
 ];
 
 (available ? describe : describe.skip)('vocabulary contract — productport', () => {
-  test('CLEARANCE_STATUSES deep-equals the generated Prisma ClearanceStatus enum', () => {
-    // The strong drift guard: contract mirror ⇔ DB-enforced enum, order included.
-    expect(CLEARANCE_STATUSES).toEqual(Object.values(ClearanceStatus));
+  test('CLEARANCE_STATUSES deep-equals the schema-declared ClearanceStatus enum', () => {
+    // The strong drift guard: contract mirror ⇔ schema-enforced enum, order included.
+    expect(CLEARANCE_STATUSES).toEqual(SCHEMA_CLEARANCE_STATUSES);
   });
 
-  test('every generated enum value is accepted by isClearanceStatus', () => {
-    for (const status of Object.values(ClearanceStatus)) {
+  test('every schema-declared enum value is accepted by isClearanceStatus', () => {
+    for (const status of SCHEMA_CLEARANCE_STATUSES) {
       expect(isClearanceStatus(status)).toBe(true);
     }
   });
