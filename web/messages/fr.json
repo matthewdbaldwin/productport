@@ -40,6 +40,7 @@
     "screenshotReplace": "Remplacer la capture",
     "screenshotRemove": "Retirer la capture",
     "screenshotPreviewAlt": "Aperçu de la capture",
+    "screenshotOptimizing": "Compression de l'image…",
     "errorTitle": "Le titre est requis.",
     "errorDetail": "La description est requise.",
     "errorScreenshotTooLarge": "La capture doit faire 2 Mo ou moins.",

@@ -40,6 +40,7 @@
     "screenshotReplace": "更换截图",
     "screenshotRemove": "移除截图",
     "screenshotPreviewAlt": "截图预览",
+    "screenshotOptimizing": "正在压缩图片……",
     "errorTitle": "请填写标题。",
     "errorDetail": "请填写描述。",
     "errorScreenshotTooLarge": "截图不得超过 2 MB。",
