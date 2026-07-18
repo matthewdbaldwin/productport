@@ -10,10 +10,9 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { useTranslations } from 'next-intl';
 import { Bug, Upload, X } from 'lucide-react';
-import { Tooltip, useModalEsc, useFocusTrap } from '@matthewdbaldwin/microport-ui';
+import { Tooltip, useModalEsc, useFocusTrap, optimizeImageForUpload } from '@matthewdbaldwin/microport-ui';
 import { useAuth } from '@/contexts/AuthContext';
 import { api } from '@/lib/api';
-import { optimizeImageForUpload } from '@/lib/imageOptimize';
 
 type Priority = 'low' | 'normal' | 'high' | 'critical';
 const PRIORITIES: Priority[] = ['low', 'normal', 'high', 'critical'];
