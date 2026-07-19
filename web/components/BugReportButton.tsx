@@ -10,13 +10,14 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { useTranslations } from 'next-intl';
 import { Bug, Upload, X } from 'lucide-react';
-import { Tooltip, useModalEsc, useFocusTrap } from '@matthewdbaldwin/microport-ui';
+import { Tooltip, useModalEsc, useFocusTrap, optimizeImageForUpload } from '@matthewdbaldwin/microport-ui';
 import { useAuth } from '@/contexts/AuthContext';
 import { api } from '@/lib/api';
 
 type Priority = 'low' | 'normal' | 'high' | 'critical';
 const PRIORITIES: Priority[] = ['low', 'normal', 'high', 'critical'];
 const APP_VERSION = process.env.NEXT_PUBLIC_APP_VERSION || '';
+const SCREENSHOT_MAX_BYTES = 2 * 1024 * 1024;
 
 // Minted at module scope, not in render — react-hooks/purity forbids Date.now()
 // (and other impure calls) inside a component/hook body; the fleet pattern is a
@@ -69,6 +70,7 @@ function BugReportModal({ onClose }: { onClose: () => void }) {
   const [priority, setPriority] = useState<Priority>('normal');
   const [screenshot, setScreenshot] = useState<File | null>(null);
   const [preview, setPreview] = useState<string | null>(null);
+  const [optimizing, setOptimizing] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [sent, setSent] = useState(false);
   const [error, setError] = useState('');
@@ -77,15 +79,23 @@ function BugReportModal({ onClose }: { onClose: () => void }) {
   useModalEsc(onClose, !submitting);
   const trapRef = useFocusTrap<HTMLDivElement>();
 
-  // Accept an image (file-picker or clipboard paste); reject > 2 MB — the API
-  // enforces the same ceiling, so fail fast client-side. A revocable object-URL
-  // drives the preview.
-  const acceptScreenshot = useCallback((file: File): boolean => {
-    if (file.size > 2 * 1024 * 1024) { setError(t('errorScreenshotTooLarge')); return false; }
-    setScreenshot(file);
-    setPreview(URL.createObjectURL(file));
+  // Accept an image (file-picker or clipboard paste). Shrink it in-browser
+  // first, then apply the 2 MB gate to the OPTIMIZED bytes — the API enforces
+  // the same ceiling, so a large screenshot that compresses under the cap is
+  // now accepted instead of rejected outright. optimizeImageForUpload never
+  // throws and falls back to the original file if it can't help. A revocable
+  // object-URL drives the preview.
+  const acceptScreenshot = useCallback(async (file: File): Promise<void> => {
     setError('');
-    return true;
+    setOptimizing(true);
+    try {
+      const optimized = await optimizeImageForUpload(file);
+      if (optimized.size > SCREENSHOT_MAX_BYTES) { setError(t('errorScreenshotTooLarge')); return; }
+      setScreenshot(optimized);
+      setPreview(URL.createObjectURL(optimized));
+    } finally {
+      setOptimizing(false);
+    }
   }, [t]);
 
   // Ctrl/Cmd+V grabs an image from the clipboard while the modal is open.
@@ -227,11 +237,12 @@ function BugReportModal({ onClose }: { onClose: () => void }) {
                 <label className="text-xs font-medium" style={{ color: 'var(--muted)' }}>{t('screenshotLabel')}</label>
                 <p className="text-xs" style={{ color: 'var(--muted)' }}>{t('screenshotHint')}</p>
                 <input ref={fileInputRef} type="file" accept="image/*" onChange={handleFileChange} className="hidden" />
-                <button type="button" onClick={() => fileInputRef.current?.click()}
-                  className="inline-flex items-center gap-2 rounded border px-3 py-2 text-sm min-h-11" style={inputStyle}>
+                <button type="button" onClick={() => fileInputRef.current?.click()} disabled={optimizing}
+                  className="inline-flex items-center gap-2 rounded border px-3 py-2 text-sm min-h-11 disabled:opacity-60" style={inputStyle}>
                   <Upload size={14} aria-hidden="true" />
                   {screenshot ? t('screenshotReplace') : t('screenshotChoose')}
                 </button>
+                {optimizing && <p className="text-xs mt-2" role="status" style={{ color: 'var(--muted)' }}>{t('screenshotOptimizing')}</p>}
                 {preview && (
                   <div className="mt-2 relative inline-block">
                     <img src={preview} alt={t('screenshotPreviewAlt')} className="max-h-48 rounded border" style={{ borderColor: 'var(--border)' }} />
@@ -258,7 +269,7 @@ function BugReportModal({ onClose }: { onClose: () => void }) {
                 <button type="button" className="rounded px-3 py-2 text-sm min-h-11" style={{ color: 'var(--muted)' }} onClick={onClose} disabled={submitting}>
                   {t('cancel')}
                 </button>
-                <button type="submit" className="btn-primary rounded px-4 py-2 text-sm min-h-11" disabled={submitting || !title.trim() || !detail.trim()}>
+                <button type="submit" className="btn-primary rounded px-4 py-2 text-sm min-h-11" disabled={submitting || optimizing || !title.trim() || !detail.trim()}>
                   {submitting ? t('sending') : t('send')}
                 </button>
               </div>

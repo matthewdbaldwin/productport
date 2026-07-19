@@ -11,7 +11,7 @@
     "e2e": "playwright test"
   },
   "dependencies": {
-    "@matthewdbaldwin/microport-ui": "^0.31.0",
+    "@matthewdbaldwin/microport-ui": "^0.34.0",
     "@sentry/nextjs": "^10.63.0",
     "next": "^16.2.6",
     "next-intl": "^4.12.0",
