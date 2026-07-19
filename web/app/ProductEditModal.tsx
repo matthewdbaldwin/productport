@@ -6,7 +6,7 @@
 // tier/classification/status are enums; empty inputs submit as null.
 
 import { useState } from 'react';
-import { useModalEsc, useFocusTrap } from '@matthewdbaldwin/microport-ui';
+import { useModalEsc, useFocusTrap, optimizeImageForUpload } from '@matthewdbaldwin/microport-ui';
 import { ApiError } from '@/lib/api';
 import s from './catalog.module.css';
 import {
@@ -126,7 +126,14 @@ export function ProductEditModal({ mode, initial, onClose, onSaved }: {
     e.target.value = ''; // allow re-picking the same file
     if (!file || uploading) return;
     setUploading(true); setErr('');
-    try { applyProduct((await uploadProductImage(i.slug as string, file)).product); }
+    try {
+      // Shrink/recompress client-side before upload — product images are display
+      // only, so downscaling to web size keeps the 6 MB gate from rejecting large
+      // source photos and trims catalog payloads. optimizeImageForUpload never
+      // throws and returns the original file if it can't help.
+      const optimized = await optimizeImageForUpload(file);
+      applyProduct((await uploadProductImage(i.slug as string, optimized)).product);
+    }
     catch (er) { setErr(er instanceof Error ? er.message : 'Image upload failed'); }
     finally { setUploading(false); }
   }
