@@ -80,12 +80,17 @@ router.post('/sso/exchange', async (req, res, next) => {
 });
 
 // POST /api/auth/logout — clear the cookie + revoke the local Session row.
-router.post('/logout', requireAuth, async (req, res) => {
-  if (req.sessionId) {
-    await db.session.update({ where: { id: req.sessionId }, data: { revokedAt: new Date() } }).catch(() => {});
-  }
-  res.clearCookie(COOKIE_NAME, { path: '/' });
-  res.json({ ok: true });
+router.post('/logout', requireAuth, async (req, res, next) => {
+  try {
+    // Revoke the Session row server-side (a cleared cookie alone lets a stolen
+    // cookie replay outlive the logout). Do NOT swallow: a failed revoke means
+    // the session is still live, so surface it (mirrors opsport's logout).
+    if (req.sessionId) {
+      await db.session.update({ where: { id: req.sessionId }, data: { revokedAt: new Date() } });
+    }
+    res.clearCookie(COOKIE_NAME, { path: '/' });
+    res.json({ ok: true });
+  } catch (err) { next(err); }
 });
 
 // GET /api/auth/me — current user (from the verified token + JIT-provisioned row).
