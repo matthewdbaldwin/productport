@@ -19,6 +19,11 @@ const csrfGuard = createCsrfGuard({
     // SSO code exchange — the 60s handoff code IS the credential; the browser
     // POST has no session cookie or CSRF header yet.
     '/api/auth/sso/exchange',
+    // HubPort fleet-union census pull — server-to-server, HMAC-only (no cookie
+    // auth, no browser Origin/X-Requested-With). Not covered by the module's
+    // default bootstrap prefixes (/api/webhooks/, /api/sso/lifecycle), so it
+    // must be listed explicitly.
+    '/api/internal/user-census',
   ],
   allowedOrigins: () => {
     const list = (process.env.WEB_ORIGIN || '').split(',').map((s) => s.trim()).filter(Boolean);
