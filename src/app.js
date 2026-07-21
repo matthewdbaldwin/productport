@@ -67,6 +67,12 @@ app.use('/api', csrfGuard);
 // + the hourly /state reconciliation probe. Fleet-canonical path + HMAC.
 app.use('/api/sso/lifecycle', require('./routes/ssoLifecycle'));
 
+// HubPort fleet-union census pull (read-only, HMAC-signed, dedicated secret —
+// see src/routes/userCensus.js). Mounted alongside the lifecycle receiver: same
+// "signature-authed ingress, no cookie auth" section, same csrf bootstrap-bypass
+// treatment.
+app.use('/api/internal/user-census', require('./routes/userCensus'));
+
 // ── Auth (login/SSO callback/logout) — its own internal gating ───────────────
 app.use('/api/auth', require('./routes/auth'));
 
