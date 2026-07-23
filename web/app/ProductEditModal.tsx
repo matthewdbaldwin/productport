@@ -7,6 +7,7 @@
 
 import { useState } from 'react';
 import { useModalEsc, useFocusTrap, optimizeImageForUpload } from '@matthewdbaldwin/microport-ui';
+import { useToast } from '@/components/ui/Toast';
 import { ApiError } from '@/lib/api';
 import s from './catalog.module.css';
 import {
@@ -87,6 +88,7 @@ export function ProductEditModal({ mode, initial, onClose, onSaved }: {
   const [clrSaved, setClrSaved] = useState(false);
   useModalEsc(onClose);
   const trapRef = useFocusTrap<HTMLDivElement>();
+  const { toast } = useToast();
 
   const setCell = (idx: number, key: keyof EditRow) =>
     (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) =>
@@ -173,18 +175,28 @@ export function ProductEditModal({ mode, initial, onClose, onSaved }: {
     try {
       if (mode === 'create') await createProduct(input);
       else await updateProduct(i.slug as string, input);
+      toast(mode === 'create' ? 'Product created.' : 'Changes saved.', 'ok');
       onSaved();
     } catch (e) {
-      setErr(e instanceof Error ? e.message : 'Save failed');
+      // The modal is tall and scrolls, so the top-of-modal error banner + field
+      // highlights can sit off-screen from the Save button. A viewport-fixed
+      // toast guarantees the failure (and the actual reason) is seen no matter
+      // where the user is scrolled.
+      const message = e instanceof Error ? e.message : 'Save failed';
+      setErr(message);
       setFieldErrors(fieldErrorsFrom(e));
+      toast(message, 'error');
       setSaving(false);
     }
   }
 
   async function del() {
     setSaving(true); setErr('');
-    try { await deleteProduct(i.slug as string); onSaved(); }
-    catch (e) { setErr(e instanceof Error ? e.message : 'Delete failed'); setSaving(false); }
+    try { await deleteProduct(i.slug as string); toast('Product deleted.', 'ok'); onSaved(); }
+    catch (e) {
+      const message = e instanceof Error ? e.message : 'Delete failed';
+      setErr(message); toast(message, 'error'); setSaving(false);
+    }
   }
 
   const invalidStyle = (k: string) => (fieldErrors[k] ? { borderColor: 'var(--rd)' } : undefined);

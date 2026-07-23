@@ -4,6 +4,7 @@ import { themeScript } from '@/lib/theme';
 import { preloadCleanupScript, chunkRecoveryScript } from '@matthewdbaldwin/microport-ui';
 import { AuthProvider } from '@/contexts/AuthContext';
 import { LocaleProvider } from '@/components/LocaleProvider';
+import { ToastProvider } from '@/components/ui/Toast';
 import { BugReportButton } from '@/components/BugReportButton';
 
 export const metadata = {
@@ -39,8 +40,10 @@ export default async function RootLayout({ children }: { children: React.ReactNo
       <body>
         <LocaleProvider locale={locale} messages={messages}>
           <AuthProvider>
-            {children}
-            <BugReportButton />
+            <ToastProvider>
+              {children}
+              <BugReportButton />
+            </ToastProvider>
           </AuthProvider>
         </LocaleProvider>
       </body>
