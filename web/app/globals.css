@@ -145,6 +145,17 @@ body {
   color: var(--text); /* --fg is not a token; the theme foreground is --text */
 }
 
+/* Raw custom-property aliases the shared microport-ui components read inline
+   (ToastProvider styles its text with var(--fg) and its error accent with
+   var(--danger); these are NOT Tailwind @theme tokens). Every other satellite
+   defines them this way — without them a mounted <ToastProvider> loses its
+   error-red border/icon. Mirrors clinicport. --danger carries the palette-red
+   hex fallback so the accent holds in any theme that doesn't set --red. */
+[data-theme] {
+  --fg: var(--text);
+  --danger: var(--red, #ff144b);
+}
+
 /* reduced-motion kill-switch MUST cap iteration-count or infinite animations strobe.
    feedback_reduced_motion_iteration_count_strobe. */
 @media (prefers-reduced-motion: reduce) {
@@ -165,5 +176,24 @@ body {
     min-height: 44px;
     background: var(--accent);
     color: var(--accent-fg);
+  }
+
+  /* Toast / panel dismiss button (microport-ui renders className="btn-close").
+     44px hit-slop via a transparent border with background-clip keeping the
+     paint compact; the negative margin cancels the layout growth. Tap-target
+     standard; mirrors clinicport/execport. */
+  .btn-close {
+    @apply inline-flex items-center justify-center rounded-sm font-medium
+           px-2.5 py-1 text-xs text-white transition-colors
+           disabled:opacity-50 disabled:cursor-not-allowed;
+    background-color: var(--danger);
+    background-clip: padding-box;
+    border: 6px solid transparent;
+    min-width: 44px;
+    min-height: 44px;
+    margin: -6px;
+  }
+  .btn-close:hover {
+    opacity: 0.88;
   }
 }
