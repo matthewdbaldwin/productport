@@ -14,7 +14,8 @@ import { api } from '@/lib/api';
 import { statusOf, orderedAreas, filterProducts } from '@/lib/catalogFilter';
 import { ProductEditModal } from './ProductEditModal';
 import { ImportCsvButton } from './ImportCsvButton';
-import { galleryImageSrc, type ProductInput, type GalleryImage } from '@/lib/products';
+import { galleryImageSrc, disableProduct, enableProduct, type ProductInput, type GalleryImage } from '@/lib/products';
+import { useToast } from '@/components/ui/Toast';
 import s from './catalog.module.css';
 
 type ClearanceStatus = 'APPROVED' | 'IN_PROGRESS' | 'SUBMITTED' | 'NOT_APPROVED' | 'NONE';
@@ -38,6 +39,7 @@ interface Product {
   regNotes: string;
   image: string | null;
   status: 'ACTIVE' | 'DISCONTINUED' | 'DRAFT';
+  disabledAt: string | null; // reversible admin kill-switch; non-null only reaches admins
   tier: ProductTier | null;
   classification: 'CORE' | 'HIPO' | 'FLAGSHIP' | null;
   businessSegment: string | null;
@@ -124,7 +126,7 @@ function ProductImg({ p, thumb }: { p: Product; thumb?: boolean }) {
   );
 }
 
-function DetailModal({ p, onClose, onEdit }: { p: Product; onClose: () => void; onEdit?: () => void }) {
+function DetailModal({ p, onClose, onEdit, onToggleDisabled }: { p: Product; onClose: () => void; onEdit?: () => void; onToggleDisabled?: () => void }) {
   const [copied, setCopied] = useState(false);
   const [heroId, setHeroId] = useState<string | null>(null); // gallery thumb → swap the hero
   useModalEsc(onClose);
@@ -191,6 +193,18 @@ function DetailModal({ p, onClose, onEdit }: { p: Product; onClose: () => void; 
               {p.tagline}<br />{p.subsidiary}{p.type ? ` · ${p.type}` : ''}
             </div>
             <div className={s.chips}><MarketChips p={p} /></div>
+            {p.disabledAt && (
+              <div
+                data-testid="disabled-badge"
+                style={{
+                  marginTop: 8, display: 'inline-block', fontSize: 12, fontWeight: 600,
+                  color: '#b42318', background: '#fef3f2', border: '1px solid #fecdca',
+                  borderRadius: 6, padding: '2px 8px',
+                }}
+              >
+                Disabled — hidden from the catalog
+              </div>
+            )}
             <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginTop: 10, alignItems: 'center' }}>
               <button
                 type="button"
@@ -209,6 +223,21 @@ function DetailModal({ p, onClose, onEdit }: { p: Product; onClose: () => void; 
                 <button type="button" className={s.ebtn} data-testid="edit-product"
                   style={{ fontSize: 13 }} onClick={onEdit}>
                   Edit
+                </button>
+              )}
+              {onToggleDisabled && (
+                <button
+                  type="button"
+                  data-testid="toggle-disabled"
+                  onClick={onToggleDisabled}
+                  aria-label={p.disabledAt ? 'Enable this product (show it in the catalog)' : 'Disable this product (hide it from the catalog)'}
+                  style={{
+                    cursor: 'pointer', minHeight: 44, fontSize: 13, padding: '4px 10px', borderRadius: 6,
+                    border: '1px solid var(--line, #d0d5dd)', background: 'transparent',
+                    color: p.disabledAt ? 'var(--blue)' : '#b42318',
+                  }}
+                >
+                  {p.disabledAt ? 'Enable' : 'Disable'}
                 </button>
               )}
             </div>
@@ -314,6 +343,7 @@ export default function CatalogPage() {
 
   const isAdmin = !!user && (user.role === 'product_admin' || user.role === 'superuser' || !!user.isSuperuser);
   const [editState, setEditState] = useState<{ mode: 'create' | 'edit'; initial?: ProductInput & { slug: string; images?: GalleryImage[]; clearances?: Clearance[] } } | null>(null);
+  const { toast } = useToast();
 
   useEffect(() => { if (!loading && !user) router.replace('/login'); }, [loading, user, router]);
 
@@ -325,6 +355,25 @@ export default function CatalogPage() {
   );
 
   useEffect(() => { if (user) loadProducts(); }, [user, loadProducts]);
+
+  // Admin kill-switch: disable (hide from the catalog) / enable (restore). The API
+  // returns the updated product; patch it into catalog state in place so the open
+  // detail (derived from `products`) reflects it immediately — no full refetch.
+  const toggleDisabled = useCallback(async (p: Product) => {
+    const wasDisabled = !!p.disabledAt;
+    try {
+      const { product } = (wasDisabled ? await enableProduct(p.id) : await disableProduct(p.id)) as { product: Product };
+      setProducts((prev) => (prev ? prev.map((x) => (x.id === product.id ? product : x)) : prev));
+      toast(
+        wasDisabled
+          ? `“${product.name}” is enabled and visible in the catalog again.`
+          : `“${product.name}” is disabled and hidden from the catalog.`,
+        'success',
+      );
+    } catch (e) {
+      toast(e instanceof Error ? e.message : 'Could not update the product.', 'error');
+    }
+  }, [toast]);
 
   // Canonical deep-link OUT — reflect the open product in the URL (so a refresh
   // or a copied link reopens it) and keep <link rel="canonical"> in sync. Uses
@@ -492,11 +541,26 @@ export default function CatalogPage() {
                   className={s.card}
                   data-testid={`product-card-${p.id}`}
                   onClick={() => setOpenId(p.id)}
+                  style={p.disabledAt ? { opacity: 0.6 } : undefined}
                 >
                   <div className={s.cimg}><ProductImg p={p} thumb /></div>
                   <div className={s.cb}>
                     <div className={s.ftag}>{p.therapeuticArea}<TierBadge tier={p.tier} /></div>
-                    <div className={s.cn}>{p.name}</div>
+                    <div className={s.cn}>
+                      {p.name}
+                      {p.disabledAt && (
+                        <span
+                          data-testid="card-disabled-tag"
+                          style={{
+                            marginLeft: 6, fontSize: 10, fontWeight: 700, color: '#b42318',
+                            background: '#fef3f2', border: '1px solid #fecdca', borderRadius: 4,
+                            padding: '1px 5px', verticalAlign: 'middle',
+                          }}
+                        >
+                          DISABLED
+                        </span>
+                      )}
+                    </div>
                     <div className={s.ct}>{p.tagline}</div>
                     <div className={s.cs}>{p.subsidiary}{p.category ? ` · ${p.category}` : ''}</div>
                     <div className={s.chips}><MarketChips p={p} /></div>
@@ -518,6 +582,7 @@ export default function CatalogPage() {
           p={opened}
           onClose={() => setOpenId(null)}
           onEdit={isAdmin ? () => setEditState({ mode: 'edit', initial: toInput(opened) }) : undefined}
+          onToggleDisabled={isAdmin ? () => toggleDisabled(opened) : undefined}
         />
       )}
 

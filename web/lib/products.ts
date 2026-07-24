@@ -57,6 +57,15 @@ export const updateProduct = (slug: string, input: ProductInput) =>
 export const deleteProduct = (slug: string) =>
   api<{ ok: true }>(`products/${encodeURIComponent(slug)}`, { method: 'DELETE' });
 
+// The reversible admin kill-switch. `disable` hides a product from the viewer
+// catalog + public detail without deleting it; `enable` restores it. Both return
+// the updated product so the caller can patch it into catalog state in place.
+export const disableProduct = (slug: string) =>
+  api<{ product: unknown }>(`products/${encodeURIComponent(slug)}/disable`, { method: 'POST' });
+
+export const enableProduct = (slug: string) =>
+  api<{ product: unknown }>(`products/${encodeURIComponent(slug)}/enable`, { method: 'POST' });
+
 // Upload a product image (multipart). Uses raw fetch, not the api() wrapper,
 // because the wrapper forces Content-Type: application/json — for FormData the
 // browser must set the multipart boundary itself. Keeps the CSRF header + cookie.

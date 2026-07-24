@@ -109,7 +109,8 @@ model Product {
   developmentStatus String?                   // lifecycle free-text ("Under Development — est. cert Feb 2026"); null = marketed
   createdAt        DateTime      @default(now())
   updatedAt        DateTime      @updatedAt
-  deletedAt        DateTime?
+  deletedAt        DateTime?               // soft-delete (trash; recoverable)
+  disabledAt       DateTime?               // reversible admin kill-switch: hidden from the viewer catalog + public detail, but not deleted
 
   clearances       RegulatoryClearance[]
   trials           Trial[]
