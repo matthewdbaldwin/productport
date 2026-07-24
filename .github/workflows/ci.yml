@@ -46,6 +46,10 @@ jobs:
         env:
           NODE_AUTH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       - run: npm run lint
+      # Component tests (vitest + jsdom). Runs BEFORE build so a behavioral
+      # regression fails fast rather than after a full Next compile.
+      # Rate limiters skip ONLY when CI=true. feedback_rate_limiter_dev_skip.
+      - run: CI=true npm test
       - run: npm run build
         env:
           NODE_AUTH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
