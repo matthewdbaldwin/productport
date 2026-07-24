@@ -21,7 +21,7 @@ const { verifyImportHeader } = require('../lib/verifyImportHeader');
 const { putAsset, getDownloadUrl } = require('../lib/assetStorage');
 const { validateImageUpload, toImageValue, isS3Image, s3KeyOf } = require('../lib/productImage');
 const { primaryAfterDelete } = require('../lib/productGallery');
-const { requireProductAdmin } = require('../middleware/auth');
+const { requireProductAdmin, isProductAdmin } = require('../middleware/auth');
 const { parse: parseCsv } = require('csv-parse/sync');
 const multer = require('multer');
 
@@ -64,11 +64,15 @@ const WITH_RELATIONS = { clearances: true, trials: true };
 // sortOrder}) — the actual images stay lazy (presigned per <img>).
 const WITH_IMAGES = { clearances: true, trials: true, images: true };
 
-// GET /api/products — the full active catalog, name-sorted.
-router.get('/', async (_req, res, next) => {
+// GET /api/products — the full active catalog, name-sorted. Disabled products
+// (the reversible admin kill-switch) are hidden from viewers but returned to
+// admins so they can find + re-enable them (the web badges them "Disabled").
+router.get('/', async (req, res, next) => {
   try {
+    const where = { deletedAt: null, status: { not: 'DRAFT' } };
+    if (!isProductAdmin(req.user)) where.disabledAt = null;
     const products = await db.product.findMany({
-      where: { deletedAt: null, status: { not: 'DRAFT' } },
+      where,
       include: WITH_IMAGES,
       orderBy: { name: 'asc' },
     });
@@ -103,7 +107,9 @@ router.get('/export.csv', requireProductAdmin, async (req, res, next) => {
   } catch (err) { next(err); }
 });
 
-// GET /api/products/:slug — single product (deep-link).
+// GET /api/products/:slug — single product (deep-link). A disabled product is a
+// 404 for viewers (not deep-linkable — stronger than DRAFT, which stays linkable);
+// admins still get it so they can view/manage/re-enable.
 router.get('/:slug', async (req, res, next) => {
   try {
     const product = await db.product.findFirst({
@@ -111,6 +117,9 @@ router.get('/:slug', async (req, res, next) => {
       include: WITH_IMAGES,
     });
     if (!product) return res.status(404).json({ error: 'Product not found' });
+    if (product.disabledAt && !isProductAdmin(req.user)) {
+      return res.status(404).json({ error: 'Product not found' });
+    }
     res.json({ product: shape(product) });
   } catch (err) {
     next(err);
@@ -344,6 +353,40 @@ router.delete('/:slug', requireProductAdmin, async (req, res, next) => {
     await db.product.update({ where: { id: target.id }, data: { deletedAt: new Date() } });
     await audit(req, 'deleted', target.id, { slug: target.slug });
     res.json({ ok: true });
+  } catch (err) { next(err); }
+});
+
+// POST /api/products/:slug/disable — reversible admin kill-switch. Hides the
+// product from the viewer catalog + public detail (a 404 for viewers) WITHOUT
+// deleting it; admins still see it badged "Disabled" and can re-enable. Distinct
+// from DELETE (trash) and from DISCONTINUED (a commercial state that stays
+// visible). Dirty-tracked: disabling an already-disabled product is a no-op (no
+// spurious audit row), mirroring the pp #6 unify-and-dirty-track lesson.
+router.post('/:slug/disable', requireProductAdmin, async (req, res, next) => {
+  try {
+    const target = await db.product.findFirst({ where: { slug: req.params.slug, deletedAt: null }, include: WITH_IMAGES });
+    if (!target) return res.status(404).json({ error: 'Product not found' });
+    if (!target.disabledAt) {
+      const updated = await db.product.update({ where: { id: target.id }, data: { disabledAt: new Date() }, include: WITH_IMAGES });
+      await audit(req, 'disabled', target.id, { slug: req.params.slug });
+      return res.json({ product: shape(updated) });
+    }
+    return res.json({ product: shape(target) }); // already disabled — idempotent
+  } catch (err) { next(err); }
+});
+
+// POST /api/products/:slug/enable — clears the disable flag (restores the product
+// to whatever ACTIVE/DISCONTINUED status it already had; the flag is orthogonal).
+router.post('/:slug/enable', requireProductAdmin, async (req, res, next) => {
+  try {
+    const target = await db.product.findFirst({ where: { slug: req.params.slug, deletedAt: null }, include: WITH_IMAGES });
+    if (!target) return res.status(404).json({ error: 'Product not found' });
+    if (target.disabledAt) {
+      const updated = await db.product.update({ where: { id: target.id }, data: { disabledAt: null }, include: WITH_IMAGES });
+      await audit(req, 'enabled', target.id, { slug: req.params.slug });
+      return res.json({ product: shape(updated) });
+    }
+    return res.json({ product: shape(target) }); // already enabled — idempotent
   } catch (err) { next(err); }
 });
 

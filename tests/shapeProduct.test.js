@@ -129,6 +129,16 @@ describe('shapeProduct — Prisma row → catalog contract', () => {
     expect(shaped.modelNumbers).toBeNull();
     expect(shaped.developmentStatus).toBeNull();
   });
+
+  test('exposes disabledAt as an ISO string when set, null otherwise (incl. pre-migration rows)', () => {
+    // row() has no disabledAt → the kill-switch is off → null.
+    expect(shapeProduct(row()).disabledAt).toBeNull();
+    const when = new Date('2026-07-24T12:00:00.000Z');
+    expect(shapeProduct(row({ disabledAt: when })).disabledAt).toBe('2026-07-24T12:00:00.000Z');
+    // A row from before the disabledAt column existed (undefined) → null, not undefined.
+    const r = row(); delete r.disabledAt;
+    expect(shapeProduct(r).disabledAt).toBeNull();
+  });
 });
 
 describe('shapeProduct — clearance cert# + qualifier (WS2)', () => {

@@ -33,6 +33,9 @@ function shapeProduct(p) {
     // list endpoint (only the detail loads images), so default to [].
     images: p.images ? galleryView(p.images) : [],
     status: p.status,
+    // Reversible admin kill-switch (set = hidden from the viewer catalog + public
+    // detail; only admins ever receive a non-null value). ISO string or null.
+    disabledAt: p.disabledAt ? new Date(p.disabledAt).toISOString() : null,
     tier: p.tier || null, // strategic tier enum; null = untiered
     classification: p.classification || null, // Core/Hi-po/Flagship; manual, separate from tier
     businessSegment: p.businessSegment || null,
