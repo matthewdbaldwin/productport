@@ -129,7 +129,9 @@ export function ProductEditModal({ mode, initial, onClose, onSaved }: {
       const optimized = await optimizeImageForUpload(file);
       applyProduct((await uploadProductImage(i.slug as string, optimized)).product);
     }
-    catch (er) { setErr(er instanceof Error ? er.message : 'Image upload failed'); }
+    // Gallery lives high in a tall scrolling modal, so the top-of-modal banner
+    // can be off-screen — also toast so the failure is always seen. Bug #6.
+    catch (er) { const m = er instanceof Error ? er.message : 'Image upload failed'; setErr(m); toast(m, 'error'); }
     finally { setUploading(false); }
   }
 
@@ -137,7 +139,7 @@ export function ProductEditModal({ mode, initial, onClose, onSaved }: {
     if (imgBusy) return;
     setErr(''); setImgBusy(imageId);
     try { applyProduct((await setPrimaryImage(i.slug as string, imageId)).product); }
-    catch (er) { setErr(er instanceof Error ? er.message : 'Could not set primary'); }
+    catch (er) { const m = er instanceof Error ? er.message : 'Could not set primary'; setErr(m); toast(m, 'error'); }
     finally { setImgBusy(null); }
   }
 
@@ -145,7 +147,7 @@ export function ProductEditModal({ mode, initial, onClose, onSaved }: {
     if (imgBusy) return;
     setErr(''); setImgBusy(imageId);
     try { applyProduct((await deleteProductImage(i.slug as string, imageId)).product); }
-    catch (er) { setErr(er instanceof Error ? er.message : 'Could not delete image'); }
+    catch (er) { const m = er instanceof Error ? er.message : 'Could not delete image'; setErr(m); toast(m, 'error'); }
     finally { setImgBusy(null); setConfirmDelImg(null); }
   }
 

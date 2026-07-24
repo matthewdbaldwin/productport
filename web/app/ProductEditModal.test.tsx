@@ -26,10 +26,16 @@ vi.mock('@/lib/products', async (importActual) => ({
   createProduct: vi.fn(),
   deleteProduct: vi.fn(),
   updateClearances: vi.fn(),
+  uploadProductImage: vi.fn(),
+  setPrimaryImage: vi.fn(),
+  deleteProductImage: vi.fn(),
 }));
 
 import { ProductEditModal } from './ProductEditModal';
-import { updateProduct, deleteProduct, updateClearances } from '@/lib/products';
+import {
+  updateProduct, deleteProduct, updateClearances,
+  uploadProductImage, setPrimaryImage, deleteProductImage,
+} from '@/lib/products';
 
 const initial = {
   slug: 'dnfinity115',
@@ -46,6 +52,9 @@ beforeEach(() => {
   vi.mocked(updateProduct).mockReset();
   vi.mocked(deleteProduct).mockReset();
   vi.mocked(updateClearances).mockReset();
+  vi.mocked(uploadProductImage).mockReset();
+  vi.mocked(setPrimaryImage).mockReset();
+  vi.mocked(deleteProductImage).mockReset();
 });
 
 describe('ProductEditModal save feedback', () => {
@@ -144,5 +153,45 @@ describe('ProductEditModal unified clearance save', () => {
   it('no longer renders a standalone "Save clearances" button', () => {
     renderModal();
     expect(screen.queryByRole('button', { name: 'Save clearances' })).toBeNull();
+  });
+});
+
+describe('ProductEditModal image sub-operation feedback', () => {
+  // The gallery mutations (upload / set-primary / delete-image) route failures to
+  // the top-of-modal banner, which sits off-screen from the gallery on a tall
+  // scrolling modal — the same "nothing happened" defect as the main Save. Each
+  // must ALSO fire a viewport-fixed error toast. (No success toast: these are
+  // immediate mutations, only the explicit Save announces success.)
+  const withImage = { ...initial, images: [{ id: 'img1', isPrimary: false, sortOrder: 0 }] };
+  const renderWithImage = () =>
+    render(<ProductEditModal mode="edit" initial={withImage} onClose={vi.fn()} onSaved={vi.fn()} />);
+
+  it('fires an error toast when setting a primary image fails', async () => {
+    vi.mocked(setPrimaryImage).mockRejectedValue(new ApiError(500, 'Could not set primary image'));
+
+    renderWithImage();
+    fireEvent.click(screen.getByRole('button', { name: 'Set primary' }));
+
+    await waitFor(() => expect(toastSpy).toHaveBeenCalledWith('Could not set primary image', 'error'));
+  });
+
+  it('fires an error toast when deleting an image fails', async () => {
+    vi.mocked(deleteProductImage).mockRejectedValue(new ApiError(500, 'Could not delete image'));
+
+    renderWithImage();
+    fireEvent.click(screen.getByRole('button', { name: 'Delete image' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Yes' }));
+
+    await waitFor(() => expect(toastSpy).toHaveBeenCalledWith('Could not delete image', 'error'));
+  });
+
+  it('fires an error toast when an image upload fails', async () => {
+    vi.mocked(uploadProductImage).mockRejectedValue(new ApiError(413, 'Image too large'));
+
+    const { container } = renderWithImage();
+    const fileInput = container.querySelector('input[type="file"]') as HTMLInputElement;
+    fireEvent.change(fileInput, { target: { files: [new File(['x'], 'x.png', { type: 'image/png' })] } });
+
+    await waitFor(() => expect(toastSpy).toHaveBeenCalledWith('Image too large', 'error'));
   });
 });
