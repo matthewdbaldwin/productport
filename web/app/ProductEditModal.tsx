@@ -26,7 +26,7 @@ const CLR_REGIONS = ['CE', 'FDA', 'NMPA', 'PMDA', 'TGA'] as const;
 const CLR_STATUSES: ClearanceStatus[] = ['NONE', 'IN_PROGRESS', 'SUBMITTED', 'APPROVED', 'NOT_APPROVED'];
 
 // The matrix is edited as plain strings (all inputs emit strings), so state is
-// this all-string row — never ClearanceRow. saveClearances() maps it back to
+// this all-string row — never ClearanceRow. clearancePayload() maps it back to
 // ClearanceRow (cast status, blank → null). This dodges the computed-key write
 // on a union-typed field (string ≠ the ClearanceStatus union under tsc).
 type EditRow = { region: string; status: string; certificateNumbers: string; qualifier: string; notes: string };
@@ -83,37 +83,30 @@ export function ProductEditModal({ mode, initial, onClose, onSaved }: {
   const [imgBusy, setImgBusy] = useState<string | null>(null);      // image id with an in-flight mutation
   const [confirmDelImg, setConfirmDelImg] = useState<string | null>(null); // image id pending delete confirm
   const [matrix, setMatrix] = useState<EditRow[]>(() => seedMatrix(i.clearances));
-  const [clrSaving, setClrSaving] = useState(false);
-  const [clrErr, setClrErr] = useState('');
-  const [clrSaved, setClrSaved] = useState(false);
+  // The clearance matrix persists with the primary "Save changes" button (there
+  // is no separate save). clrDirty gates the extra write so an untouched-matrix
+  // product save doesn't emit a spurious clearance.updated audit row. Bug #6.
+  const [clrDirty, setClrDirty] = useState(false);
   useModalEsc(onClose);
   const trapRef = useFocusTrap<HTMLDivElement>();
   const { toast } = useToast();
 
   const setCell = (idx: number, key: keyof EditRow) =>
-    (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) =>
+    (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
+      setClrDirty(true);
       setMatrix((m) => m.map((row, j) => (j === idx ? { ...row, [key]: e.target.value } : row)));
+    };
 
-  async function saveClearances() {
-    setClrSaving(true); setClrErr(''); setClrSaved(false);
-    // Send blank cert/qualifier/notes as null; the server validator also trims.
-    const payload: ClearanceRow[] = matrix.map((r) => ({
+  // Map the all-string edit matrix back to the ClearanceRow wire shape (cast
+  // status; blank cert/qualifier/notes → null; the server validator also trims).
+  const clearancePayload = (): ClearanceRow[] =>
+    matrix.map((r) => ({
       region: r.region,
       status: r.status as ClearanceStatus,
       certificateNumbers: r.certificateNumbers.trim() || null,
       qualifier: r.qualifier.trim() || null,
       notes: r.notes.trim() || null,
     }));
-    try {
-      await updateClearances(i.slug as string, payload);
-      setClrSaved(true);
-      onSaved();
-    } catch (e) {
-      setClrErr(e instanceof Error ? e.message : 'Could not save clearances');
-    } finally {
-      setClrSaving(false);
-    }
-  }
 
   // All gallery mutations return the full product (with images) — reflect it and
   // refresh the catalog (the primary drives the card thumbnail).
@@ -173,8 +166,18 @@ export function ProductEditModal({ mode, initial, onClose, onSaved }: {
       status: (f.status as ProductStatus),
     };
     try {
-      if (mode === 'create') await createProduct(input);
-      else await updateProduct(i.slug as string, input);
+      if (mode === 'create') {
+        await createProduct(input);
+      } else {
+        await updateProduct(i.slug as string, input);
+        // Clearances live in the same modal but a separate endpoint; the primary
+        // Save persists them too so an edited region can't be silently dropped
+        // (bug #6). Only when the matrix was actually touched.
+        if (clrDirty) {
+          await updateClearances(i.slug as string, clearancePayload());
+          setClrDirty(false);
+        }
+      }
       toast(mode === 'create' ? 'Product created.' : 'Changes saved.', 'ok');
       onSaved();
     } catch (e) {
@@ -332,34 +335,30 @@ export function ProductEditModal({ mode, initial, onClose, onSaved }: {
                     <tr key={row.region}>
                       <td style={{ padding: '4px 6px', fontWeight: 600 }}>{row.region}</td>
                       <td style={{ padding: '4px 6px' }}>
-                        <select className={s.einput} value={row.status} onChange={setCell(idx, 'status')}>
+                        <select className={s.einput} aria-label={`${row.region} clearance status`} value={row.status} onChange={setCell(idx, 'status')}>
                           {CLR_STATUSES.map((st) => <option key={st} value={st}>{st}</option>)}
                         </select>
                       </td>
                       <td style={{ padding: '4px 6px' }}>
-                        <input className={s.einput} value={row.certificateNumbers ?? ''} onChange={setCell(idx, 'certificateNumbers')} placeholder="e.g. CE-100|CE-200" />
+                        <input className={s.einput} aria-label={`${row.region} certificate numbers`} value={row.certificateNumbers ?? ''} onChange={setCell(idx, 'certificateNumbers')} placeholder="e.g. CE-100|CE-200" />
                       </td>
                       <td style={{ padding: '4px 6px' }}>
-                        <select className={s.einput} value={row.qualifier ?? ''} onChange={setCell(idx, 'qualifier')}>
+                        <select className={s.einput} aria-label={`${row.region} qualifier`} value={row.qualifier ?? ''} onChange={setCell(idx, 'qualifier')}>
                           <option value="">— none —</option>
                           {CLEARANCE_QUALIFIERS.map((q) => <option key={q} value={q}>{q}</option>)}
                         </select>
                       </td>
                       <td style={{ padding: '4px 6px' }}>
-                        <input className={s.einput} value={row.notes ?? ''} onChange={setCell(idx, 'notes')} />
+                        <input className={s.einput} aria-label={`${row.region} clearance notes`} value={row.notes ?? ''} onChange={setCell(idx, 'notes')} />
                       </td>
                     </tr>
                   ))}
                 </tbody>
               </table>
             </div>
-            {clrErr && <em style={{ color: 'var(--rd)', fontSize: 12 }}>{clrErr}</em>}
-            <div style={{ display: 'flex', gap: 10, alignItems: 'center', marginTop: 6 }}>
-              <button type="button" className={s.ebtnGhost} disabled={clrSaving} onClick={saveClearances}>
-                {clrSaving ? 'Saving…' : 'Save clearances'}
-              </button>
-              {clrSaved && <em style={{ color: 'var(--ok)', fontSize: 12 }}>Saved.</em>}
-            </div>
+            <em style={{ color: 'var(--grey)', fontSize: 12, marginTop: 6, display: 'block' }}>
+              Clearance changes save with “Save changes” below.
+            </em>
           </div>
         )}
 

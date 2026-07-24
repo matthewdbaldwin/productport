@@ -25,10 +25,11 @@ vi.mock('@/lib/products', async (importActual) => ({
   updateProduct: vi.fn(),
   createProduct: vi.fn(),
   deleteProduct: vi.fn(),
+  updateClearances: vi.fn(),
 }));
 
 import { ProductEditModal } from './ProductEditModal';
-import { updateProduct, deleteProduct } from '@/lib/products';
+import { updateProduct, deleteProduct, updateClearances } from '@/lib/products';
 
 const initial = {
   slug: 'dnfinity115',
@@ -44,6 +45,7 @@ beforeEach(() => {
   toastSpy.mockClear();
   vi.mocked(updateProduct).mockReset();
   vi.mocked(deleteProduct).mockReset();
+  vi.mocked(updateClearances).mockReset();
 });
 
 describe('ProductEditModal save feedback', () => {
@@ -90,5 +92,57 @@ describe('ProductEditModal delete feedback', () => {
     confirmDelete();
 
     await waitFor(() => expect(toastSpy).toHaveBeenCalledWith('Product deleted.', 'ok'));
+  });
+});
+
+describe('ProductEditModal unified clearance save', () => {
+  // Bug #6 ("CE Approved change cannot be saved"): the clearance matrix used to
+  // have its OWN low-emphasis "Save clearances" button, so editing a region and
+  // clicking the prominent "Save changes" button persisted the product fields but
+  // silently DROPPED the clearance edit. The primary Save must persist both.
+
+  it('persists a clearance edit through the primary "Save changes" button', async () => {
+    vi.mocked(updateProduct).mockResolvedValue({ product: {} });
+    vi.mocked(updateClearances).mockResolvedValue({ product: {} });
+
+    renderModal();
+    fireEvent.change(screen.getByLabelText('CE clearance status'), { target: { value: 'APPROVED' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Save changes' }));
+
+    await waitFor(() =>
+      expect(updateClearances).toHaveBeenCalledWith(
+        'dnfinity115',
+        expect.arrayContaining([expect.objectContaining({ region: 'CE', status: 'APPROVED' })]),
+      ),
+    );
+    expect(updateClearances).toHaveBeenCalledTimes(1);
+  });
+
+  it('does NOT write clearances when the matrix was not touched', async () => {
+    vi.mocked(updateProduct).mockResolvedValue({ product: {} });
+    vi.mocked(updateClearances).mockResolvedValue({ product: {} });
+
+    renderModal();
+    fireEvent.click(screen.getByRole('button', { name: 'Save changes' }));
+
+    await waitFor(() => expect(toastSpy).toHaveBeenCalledWith('Changes saved.', 'ok'));
+    expect(updateClearances).not.toHaveBeenCalled();
+  });
+
+  it('surfaces an error toast (not "Changes saved.") when the clearance write fails', async () => {
+    vi.mocked(updateProduct).mockResolvedValue({ product: {} });
+    vi.mocked(updateClearances).mockRejectedValue(new ApiError(400, 'invalid qualifier "x"'));
+
+    renderModal();
+    fireEvent.change(screen.getByLabelText('CE clearance status'), { target: { value: 'APPROVED' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Save changes' }));
+
+    await waitFor(() => expect(toastSpy).toHaveBeenCalledWith('invalid qualifier "x"', 'error'));
+    expect(toastSpy).not.toHaveBeenCalledWith('Changes saved.', 'ok');
+  });
+
+  it('no longer renders a standalone "Save clearances" button', () => {
+    renderModal();
+    expect(screen.queryByRole('button', { name: 'Save clearances' })).toBeNull();
   });
 });
