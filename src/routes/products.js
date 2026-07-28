@@ -16,6 +16,13 @@ const { validateProductWrite } = require('../lib/productWrite');
 const { validateClearanceMatrix } = require('../lib/clearanceWrite');
 const { importProducts } = require('../lib/importProducts');
 const { serializeProductRow, EXPORT_COLUMNS } = require('../lib/serializeProductRow');
+// Fleet-shared formula-safe CSV writer. Replaces a local `esc()` that did
+// RFC-4180 quoting but not the OWASP formula guard, so a product name /
+// tagline / overview starting with = + - @ exported as a live Excel formula.
+// One shared copy fleet-wide — see project_fleet_csv_export_security_sweep.
+const { csvRow } = require('@matthewdbaldwin/microport-contracts/csv');
+// Ceiling for the synchronous full-catalog CSV render (DoS half of the sweep).
+const EXPORT_ROW_CAP = 5000;
 const { upsertProductRow, previewProductRow } = require('../lib/productUpsert');
 const { verifyImportHeader } = require('../lib/verifyImportHeader');
 const { putAsset, getDownloadUrl } = require('../lib/assetStorage');
@@ -90,15 +97,15 @@ router.get('/export.csv', requireProductAdmin, async (req, res, next) => {
       where: { deletedAt: null },
       include: { clearances: true },
       orderBy: { name: 'asc' },
+      // The whole catalog is rendered into one string synchronously below, so
+      // an uncapped table blocks the event loop as it grows. ~400 products
+      // today, but nothing enforced a ceiling. (2026-07-27 fleet sweep.)
+      take: EXPORT_ROW_CAP,
     });
-    const esc = (v) => {
-      const str = String(v ?? '');
-      return /[",\n]/.test(str) ? `"${str.replace(/"/g, '""')}"` : str;
-    };
-    const lines = [EXPORT_COLUMNS.join(',')];
+    const lines = [csvRow(EXPORT_COLUMNS)];
     for (const p of products) {
       const row = serializeProductRow(p, p.clearances);
-      lines.push(EXPORT_COLUMNS.map((c) => esc(row[c])).join(','));
+      lines.push(csvRow(EXPORT_COLUMNS.map((c) => row[c])));
     }
     await audit(req, 'export', null, { count: products.length });
     res.setHeader('Content-Type', 'text/csv; charset=utf-8');

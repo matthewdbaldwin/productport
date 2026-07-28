@@ -11,6 +11,7 @@
 // a canonical column), because the import replaces every column and a partial
 // header would erase data; the rejection message names the missing columns.
 
+import { csvRow } from '@matthewdbaldwin/microport-contracts/csv';
 import { useRef, useState } from 'react';
 import s from './catalog.module.css';
 import { importProductsCsv, type ImportResult } from '@/lib/products';
@@ -49,8 +50,12 @@ export function ImportCsvButton({ onDone }: { onDone: () => void | Promise<void>
 
   function downloadErrors() {
     if (!result?.errors.length) return;
+    // Cells go through the fleet-shared formula-safe writer: `slug` and
+    // `error` echo content back from the uploaded file, so an uploaded CSV
+    // could otherwise plant a formula that fires when the admin opens the
+    // error report in Excel. (2026-07-27 fleet export sweep, client finding.)
     const rows = [['row', 'slug', 'error'], ...result.errors.map((x) => [x.row, x.slug, x.error])];
-    const csv = rows.map((r) => r.map((c) => `"${String(c).replace(/"/g, '""')}"`).join(',')).join('\n');
+    const csv = rows.map((r) => csvRow(r)).join('\n');
     const url = URL.createObjectURL(new Blob([csv], { type: 'text/csv' }));
     const a = document.createElement('a');
     a.href = url; a.download = 'import-errors.csv'; a.click();
