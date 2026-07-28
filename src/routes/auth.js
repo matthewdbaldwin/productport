@@ -64,7 +64,7 @@ router.post('/sso/exchange', async (req, res, next) => {
 
     const upstream = await fetch(`${IDP_API.replace(/\/$/, '')}/api/auth/handoff/exchange`, {
       method:  'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: { 'Content-Type': 'application/json', 'X-Correlation-Id': req.id },
       body:    JSON.stringify({ code }),
       // Bound the IdP call — this is the login critical path; a hung hub must
       // fail the exchange fast (→ error handler), never hang the request.
@@ -124,6 +124,7 @@ router.get('/app-launcher', (_req, res) => {
     { id: 'clinicport', label: 'ClinicPort', tagline: 'Clinical contacts',            envVar: 'CLINICPORT_WEB_URL' },
     { id: 'execport',   label: 'ExecPort',   tagline: 'Exec analytics',               envVar: 'EXECPORT_WEB_URL'   },
     { id: 'productport', label: 'ProductPort', tagline: 'Product catalog',            envVar: 'PRODUCTPORT_WEB_URL' },
+    { id: 'engageport', label: 'EngagePort', tagline: 'Physician engagement',         envVar: 'ENGAGEPORT_WEB_URL' },
   ];
   const apps = defs
     .filter((d) => d.id !== HOST_APP)
