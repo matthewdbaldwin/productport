@@ -10,7 +10,7 @@ const logger = pino({
   name: 'productport-api',
   level: process.env.LOG_LEVEL || 'info',
   base: { service: 'productport-api', env: process.env.NODE_ENV || 'development' },
-  redact: logRedact,
+  redact: logRedact.redact,
 });
 
 module.exports = logger;
