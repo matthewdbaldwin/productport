@@ -84,8 +84,12 @@ function censorHeaders(headers, safeList) {
 const SAFE_REQ = new Set(SAFE_REQUEST_HEADERS);
 const SAFE_RES = new Set(SAFE_RESPONSE_HEADERS);
 
-// Built lazily so this module stays require()-able without pino present (the
-// shape is asserted by tests/logRedact.test.js).
+// Takes pino as a parameter, but this is NOT a dependency-injection seam and
+// this module is NOT require()-able without pino: the only call site is the
+// eager `buildSerializers(require('pino'))` in the exports below, which runs at
+// module load, and buildSerializers itself is not exported — so no caller can
+// pass a different pino in. A real seam is being designed separately; until it
+// lands, read the parameter as a local alias, not as optional-pino support.
 function buildSerializers(pino) {
   return {
     req(req) {
@@ -108,9 +112,16 @@ module.exports = {
       'password', 'passwordHash',
       'req.headers.authorization', 'req.headers.cookie',
       'res.headers["set-cookie"]',
-      // NOTE: these three are single-level globs and do NOT reach header depth.
-      // They are here for bare `{ token: ... }` style log payloads only. The
-      // header surface is covered by `serializers`, not by these.
+      // token/secret/key need BOTH forms. pino's `*` is a SINGLE-LEVEL glob: it
+      // matches a property exactly one level below root, so `*.token` covers
+      // `{ data: { token } }` and never a bare top-level `{ token }`. Until
+      // 2026-08-01 only the globs were listed, and the comment here claimed they
+      // were "for bare `{ token: ... }` payloads" — the exact shape they miss.
+      // Top-level credentials logged straight onto the record leaked. The
+      // literals below close that; `password` was only ever safe because it is a
+      // literal path too. Neither form reaches header depth — headers are
+      // covered by `serializers`, not by these.
+      'token', 'secret', 'key',
       '*.token', '*.secret', '*.key',
     ],
     censor: CENSOR,
