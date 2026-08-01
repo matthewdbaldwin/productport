@@ -120,10 +120,33 @@ describe('log redaction — wiring', () => {
   // pino-http overrides base-logger serializers, so the allowlist is only live
   // if app.js passes it to pinoHttp(). Guard the wiring itself: removing it
   // would otherwise leave every test above passing while prod leaks.
-  it('app.js passes serializers to pinoHttp', () => {
+  // Returns the source of the whole `pinoHttp( ... )` call, brace-matched. The
+  // previous version sliced to the first '}))', which is fragile, and asserted
+  // only `toContain('serializers')`, which is not enough — see below.
+  function pinoHttpCall() {
     const src = fs.readFileSync(path.join(__dirname, '..', 'src', 'app.js'), 'utf8');
-    const call = src.slice(src.indexOf('pinoHttp('));
-    expect(call.slice(0, call.indexOf('}))'))).toContain('serializers');
+    const i = src.indexOf('pinoHttp(');
+    if (i < 0) throw new Error('no pinoHttp( call in app.js');
+    let depth = 0;
+    for (let k = i; k < src.length; k += 1) {
+      if (src[k] === '(') depth += 1;
+      else if (src[k] === ')') { depth -= 1; if (depth === 0) return src.slice(i, k); }
+    }
+    throw new Error('unbalanced pinoHttp( call');
+  }
+
+  it('app.js passes the logRedact serializers to pinoHttp', () => {
+    expect(pinoHttpCall()).toContain('logRedact.serializers');
+  });
+
+  // Count the key, don't just look for the word. On 2026-08-01 the allowlist
+  // fan-out added a SECOND `serializers:` key to salesport's pinoHttp call; a
+  // duplicate key in an object literal silently overrides the first, so the
+  // allowlist was dead there — and `toContain('serializers')` passed anyway,
+  // precisely BECAUSE there were two. eslint's no-dupe-keys catches this, but
+  // only in the repos that actually have a lint script.
+  it('app.js declares exactly one serializers key on pinoHttp (a second silently overrides the first)', () => {
+    expect(pinoHttpCall().match(/\bserializers\s*:/g) || []).toHaveLength(1);
   });
 
   it('logger.js applies the redact config', () => {
