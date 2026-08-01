@@ -107,12 +107,32 @@ describe('log redaction — allowlist behaviour', () => {
 });
 
 describe('log redaction — base redact (non-header payloads)', () => {
-  it('redacts password and bare token/secret/key fields on logged objects', () => {
+  // Renamed: this only ever covered the NESTED shape. `*.token` is a
+  // single-level glob, so `data.token` is exactly the case it does handle —
+  // and the old name ("bare token/secret/key") claimed the one case it did not.
+  it('redacts password and NESTED token/secret/key fields on logged objects', () => {
     const out = sink();
     const log = pino({ redact: logRedact.redact }, out);
     log.info({ password: 'pw-raw', data: { token: 'tok-raw', secret: 'sec-raw', key: 'key-raw' } }, 'x');
     const text = out.text();
     for (const v of ['pw-raw', 'tok-raw', 'sec-raw', 'key-raw']) expect(text).not.toContain(v);
+    expect(text).toContain('[REDACTED]');
+  });
+
+  // The shape the block above does NOT reach. pino's `*` matches a property
+  // exactly ONE level below root, so `*.token` covers `data.token` and never a
+  // top-level `{ token }`. `password` survives only because it is a literal
+  // path, not a glob. Literal 'token'/'secret'/'key' paths are what close this.
+  it('redacts TOP-LEVEL bare token/secret/key fields on logged objects', () => {
+    const out = sink();
+    const log = pino({ redact: logRedact.redact }, out);
+    log.info({ token: 'tok-top', secret: 'sec-top', key: 'key-top' }, 'x');
+    const text = out.text();
+    for (const v of ['tok-top', 'sec-top', 'key-top']) expect(text).not.toContain(v);
+    // Positive control. A "value absent" assertion also passes when nothing was
+    // logged at all, so the redaction must be observed FIRING, not just inferred
+    // from an absence.
+    expect(text).toContain('[REDACTED]');
   });
 });
 
