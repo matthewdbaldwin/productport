@@ -1,12 +1,24 @@
 // SSO auto-redirect brake.
 //
-// The three auto-redirecting satellites (productport, EngagePort, execport)
-// send an unauthenticated visitor straight to /api/auth/sso/start with no
-// human in the loop, so they need a machine brake or a failing session loops
-// forever. The other five apps render a login FORM — the user is the brake —
-// which is why only these three carry this module.
+// FIVE satellites auto-redirect an unauthenticated visitor straight to
+// /api/auth/sso/start with no human in the loop, so they need a machine brake
+// or a failing session loops forever: productport, EngagePort, execport,
+// reviewport and opsport.
 //
-// Extracted from app/login/page.tsx 2026-07-31 so the brake is UNIT-TESTABLE.
+// ⚠ CORRECTED 2026-07-31 (second pass). The first pass said THREE, and said the
+// other five "render a login FORM — the user is the brake". That was wrong for
+// reviewport and opsport. The check grepped each `web/app/login/page.tsx` for an
+// unconditional SSO navigation — but in those two the redirect lives in
+// `LoginClient.tsx`, which page.tsx merely renders, so the grep saw a clean
+// page.tsx and typed them as safe. They do render a form, but only AFTER the
+// brake trips; it is a dead-end screen, not a pre-redirect prompt. Both carried
+// the identical fail-OPEN inline brake this module exists to replace.
+// Lesson: grep the file that performs the navigation, not the route entry point.
+//
+// Genuinely form-first (no auto-redirect, no brake needed): salesport, hubport.
+// clinicport has no login route of its own.
+//
+// Extracted from the login page 2026-07-31 so the brake is UNIT-TESTABLE.
 // It previously lived inline as one try/catch that returned `false` ("no loop")
 // on ANY storage exception. That is fail-OPEN, and it disabled the brake in
 // precisely the browser most likely to throw: Safari with "Block all cookies"
