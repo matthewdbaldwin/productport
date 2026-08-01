@@ -18,7 +18,10 @@ export const STORAGE_KEY = 'productport_theme';
 
 function saveThemeRemote(id: ThemeId): void {
   if (typeof window === 'undefined') return;
-  const token = localStorage.getItem('productport_token');
+  // Guarded: Safari with "Block all cookies" THROWS on localStorage access,
+  // and this runs on the SSO callback path via reconcileThemeWithUser.
+  let token: string | null = null;
+  try { token = localStorage.getItem('productport_token'); } catch { /* storage blocked */ }
   // Fire even without a localStorage token; the HttpOnly cookie may still
   // authenticate the request. reconcile guards on hasLocal.
   fetch('/api/auth/me/theme', {

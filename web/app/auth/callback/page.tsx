@@ -17,10 +17,17 @@ export default function Page() {
   return (
     <SsoCallbackPage
       onToken={(token, data) => {
-        localStorage.setItem('productport_token', token);
+        // Both side-effects are BEST-EFFORT and must never fail the login.
+        // The shared SsoCallbackPage calls onToken *inside* the exchange
+        // promise and reports any throw via its .catch() as "exchange failed"
+        // — so an unguarded localStorage write turned a SUCCESSFUL exchange
+        // (HttpOnly cookie already set) into a dead-end error page on any
+        // browser that refuses storage, e.g. Safari with "Block all cookies".
+        // Guarded independently so a theme failure can't skip the token cache.
+        try { localStorage.setItem('productport_token', token); } catch { /* storage blocked */ }
         // Apply the SSO-returned theme before navigating so we don't flash the
         // previous device's theme until AuthContext's /api/auth/me resolves.
-        if (data) reconcileThemeWithUser(data.user?.theme ?? null);
+        try { if (data) reconcileThemeWithUser(data.user?.theme ?? null); } catch { /* storage blocked */ }
       }}
       onSuccess={() => router.replace('/')}
       onBack={() => router.push('/')}
