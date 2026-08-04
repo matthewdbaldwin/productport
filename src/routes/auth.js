@@ -96,14 +96,22 @@ router.post('/logout', requireAuth, async (req, res, next) => {
 // GET /api/auth/me — current user (from the verified token + JIT-provisioned row).
 router.get('/me', requireAuth, (req, res) => res.json(req.user));
 
-// PATCH /api/auth/me/theme — fire-and-forget proxy to the IdP, which OWNS the
+// PATCH /api/auth/me/theme — fire-and-forget relay to the IdP, which OWNS the
 // theme. ProductPort deliberately has no local `theme` column: the IdP persists
 // the pick and stamps it into the SSO token's `theme` claim, and requireAuth
 // reads it back from that claim (middleware/auth.js) — never from our table. A
 // local column would be written and never read, so this needs no migration.
-// Matches reviewport/opsport/clinicport/execport, with one deliberate difference
-// (the token fallback below). Free-form ≤64 chars by design, so each app
-// validates against its own ThemeId union; null clears.
+// Free-form ≤64 chars by design, so each app validates against its own ThemeId
+// union; null clears.
+//
+// 2026-08-04: the FLEET GAP this route used to document is FIXED — hub's
+// requireAuth stays cookie-only, and satellites relay over the /api/service
+// channel instead (hub cd7f0a1, per-satellite THEME_SERVICE_KEY, constant-time
+// compare, fail-closed). The old bearer/cookie token forwarding is gone: the
+// key authenticates THIS APP, and the already-authenticated user's email names
+// the row — which also removes the Safari block-all-cookies 401 this route
+// previously worked around. Matches rp/op/cp/ep. Inert (skip + warn) until
+// IDP_API_URL + THEME_SERVICE_KEY are provisioned.
 // project_productport_theme_persist_missing_route_2026-07-31
 router.patch('/me/theme', requireAuth, async (req, res) => {
   const { theme } = req.body || {};
@@ -111,39 +119,24 @@ router.patch('/me/theme', requireAuth, async (req, res) => {
     return res.status(400).json({ error: 'theme must be a non-empty string ≤ 64 chars, or null to clear.' });
   }
 
-  // Read at request time (the fleet convention for this route). IDP_API_URL is
-  // the handle that gets repointed at the HubPort flip, so the theme write
-  // follows the IdP automatically; SALESPORT_API_URL is only the fallback
-  // because it also feeds CSP connectSrc + the bug-report relay and must not be
-  // the var that moves.
-  const idpApi = process.env.IDP_API_URL || process.env.SALESPORT_API_URL || '';
-  if (!idpApi) {
-    logger.warn('IDP_API_URL/SALESPORT_API_URL not configured — theme write skipped');
+  // Read at request time (the fleet convention for this route). Deliberately NO
+  // SALESPORT_API_URL fallback any more: sp's row no longer feeds the claim, so
+  // a fallback write there is exactly the dead write this rewrite removes.
+  const idpApi     = process.env.IDP_API_URL || '';
+  const serviceKey = process.env.THEME_SERVICE_KEY || '';
+  if (!idpApi || !serviceKey) {
+    logger.warn('IDP_API_URL/THEME_SERVICE_KEY not configured — theme write skipped');
     return res.json({ ok: true });
   }
-
-  // ProductPort is post-Phase-4 COOKIE-ONLY (middleware/auth.js reads only the
-  // cookie), and web/lib/theme.ts sends the bearer only when localStorage is
-  // readable — Safari with "Block all cookies" throws on access. The other four
-  // satellites 401 without a bearer; copying that here would reject exactly
-  // those users and re-create the silent no-op this route exists to fix. The
-  // request is already authenticated, so the cookie is a first-class fallback.
-  const header = req.headers.authorization || '';
-  const token  = header.startsWith('Bearer ')
-    ? header.slice(7)
-    : (req.cookies && req.cookies[COOKIE_NAME]) || null;
-  if (!token) return res.status(401).json({ error: 'Authentication required.' });
 
   // Fire-and-forget: a failed upstream write must never surface to the user,
   // whose local cache still wins the session. But it MUST be visible to us —
   // checking only `.catch` is what made the original bug invisible, since fetch
-  // resolves (not rejects) on a 4xx. See the FLEET GAP note below: HubPort is
-  // the IdP for every satellite and its requireAuth is cookie-only, so a
-  // proxied bearer currently comes back 401 and would otherwise vanish.
-  fetch(`${idpApi.replace(/\/$/, '')}/api/auth/me/theme`, {
+  // resolves (not rejects) on a 4xx.
+  fetch(`${idpApi.replace(/\/$/, '')}/api/service/users/theme`, {
     method:  'PATCH',
-    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
-    body:    JSON.stringify({ theme }),
+    headers: { 'Content-Type': 'application/json', 'X-Theme-Service-Key': serviceKey },
+    body:    JSON.stringify({ email: req.user.email, theme: theme ?? null }),
   })
     .then(r => {
       if (!r.ok) logger.error({ status: r.status, idpApi }, 'IdP theme write rejected');
@@ -152,20 +145,6 @@ router.patch('/me/theme', requireAuth, async (req, res) => {
 
   res.json({ ok: true });
 });
-// ⚠ FLEET GAP (found 2026-08-04, NOT fixed here — needs an architecture call).
-// Every satellite now runs with IDP_API_URL=https://hub.microport.com, so
-// HubPort mints the tokens and signs `theme` from ITS OWN User row
-// (hub src/lib/identity.js:146 → signer.js:59). But hub's requireAuth reads the
-// token ONLY from its own cookie (hub src/middleware/auth.js:63) — there is no
-// Authorization: Bearer path — so a server-to-server proxy from any satellite
-// gets a 401. Meanwhile reviewport/opsport/clinicport/execport still hardcode
-// SALESPORT_API_URL, writing theme to SalesPort's User row, which no longer
-// feeds the claim (hub's spUserProjection was a ONE-TIME cutover seed, and no
-// sp→hub theme sync exists). Net: theme persistence is a no-op fleet-wide, not
-// just here. The three candidate fixes — widen hub's auth to accept a
-// satellite bearer, give satellites a service-token channel to hub, or have
-// the browser call hub directly — are all security decisions, so this route
-// logs the rejection loudly instead of pretending to succeed.
 
 // GET /api/auth/role-catalog — public catalog of this satellite's roles.
 // SalesPort's People & Access aggregator pulls this to build the role picker.
