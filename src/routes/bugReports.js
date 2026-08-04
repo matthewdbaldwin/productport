@@ -20,7 +20,7 @@ const multer  = require('multer');
 const logger  = require('../lib/logger');
 const { signWebhookBody, makeLimiters } = require('@matthewdbaldwin/microport-auth');
 const { forwardWithRetry } = require('../lib/forwardWithRetry');
-const { assertFileSignature } = require('../lib/uploadGuard');
+const { assertFileSignature, ALLOWED_IMAGE_MIMES } = require('../lib/uploadGuard');
 const { BugReportCrossApp } = require('@matthewdbaldwin/microport-contracts');
 const { requireAuth } = require('../middleware/auth');
 
@@ -45,12 +45,16 @@ const { file: fileLimiter } = makeLimiters({
 // SVG is deliberately excluded (scriptable). memoryStorage is fine: the buffer is
 // forwarded to the central queue inside the handler, not kept in process. This
 // mirrors the hub receiver's multer exactly (signer/receiver parity).
-const ALLOWED_SCREENSHOT_MIMES = new Set(['image/png', 'image/jpeg', 'image/webp', 'image/gif']);
+//
+// Sourced from uploadGuard's ALLOWED_IMAGE_MIMES rather than a local copy — this
+// used to be a byte-identical hand-rolled Set that could drift from the shared
+// one silently (2026-08-04 fix-queue finding). Values unchanged; still png/jpeg/
+// webp/gif, no behavior change.
 const upload = multer({
   storage: multer.memoryStorage(),
   limits:  { fileSize: 2 * 1024 * 1024 },
   fileFilter: (_req, file, cb) => {
-    if (ALLOWED_SCREENSHOT_MIMES.has(file.mimetype)) return cb(null, true);
+    if (ALLOWED_IMAGE_MIMES.has(file.mimetype)) return cb(null, true);
     cb(Object.assign(new Error('Screenshot must be a PNG, JPEG, WebP, or GIF image.'), { code: 'UNSUPPORTED_SCREENSHOT_TYPE' }));
   },
 });
