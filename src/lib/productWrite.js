@@ -15,6 +15,7 @@
 const { PRODUCT_TIERS } = require('./tierPalette');
 const { PRODUCT_CLASSIFICATIONS } = require('./classification');
 const { THERAPEUTIC_AREAS, isTherapeuticArea } = require('./therapeuticAreas');
+const { normalizeModelNumbers } = require('./modelNumbers');
 
 const STATUSES = ['ACTIVE', 'DISCONTINUED', 'DRAFT'];
 const SLUG_RE = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
@@ -62,7 +63,13 @@ function validateProductWrite(input, opts = {}) {
     const required = REQUIRED.includes(key);
     if (partial && !has(key)) continue;              // untouched on update
     if (!partial && !has(key) && !required) { data[key] = null; continue; }
-    const val = trimOrNull(input[key]);
+    let val = trimOrNull(input[key]);
+    // modelNumbers is a pipe-delimited blob every consumer splits on `|`, but the
+    // editor is a free textarea — a spreadsheet paste arrives newline-separated
+    // and becomes one opaque token. Normalise BEFORE the length check: doing so
+    // can only shrink the value (separators stay one char), so a paste that fits
+    // once tidied must not be rejected for its original whitespace. (B5.)
+    if (key === 'modelNumbers') val = normalizeModelNumbers(val);
     if (required && !val) throw fieldError(key, `missing ${key}`);
     if (val && val.length > max) throw fieldError(key, `${key} too long (max ${max})`);
     if (key === 'slug' && val && !SLUG_RE.test(val)) {

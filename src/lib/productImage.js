@@ -6,6 +6,8 @@
 // Tested in tests/productImage.test.js.
 'use strict';
 
+const { fileHasAllowedSignature } = require('./uploadGuard');
+
 const MAX_BYTES = 6 * 1024 * 1024; // 6 MB
 // mimetype → canonical file extension for the S3 key.
 const ALLOWED = {
@@ -14,7 +16,18 @@ const ALLOWED = {
   'image/webp': 'webp',
 };
 
-// file: { mimetype, size, originalname }. Returns { ext, mimeType }.
+// file: { mimetype, size, originalname, buffer }. Returns { ext, mimeType }.
+//
+// The mime allowlist below is NOT sufficient on its own. `mimetype` is
+// client-supplied and putAsset writes it into the S3 object's ContentType, so an
+// attacker relabels a script payload as image/png and has it served back under a
+// type of their choosing — stored XSS. The buffer is therefore magic-byte
+// verified against the allowed formats. (audit backlog 2026-07-31 P0-1.)
+//
+// Scope limit, deliberate: the check proves the bytes are a genuine allowed
+// image, not that they match the declared subtype. A PNG labelled image/jpeg
+// passes — both are inert raster formats, and being stricter would reject real
+// browser uploads that mislabel.
 function validateImageUpload(file) {
   if (!file || !file.buffer && !file.size) throw new Error('no image file uploaded');
   const mimeType = (file.mimetype || '').toLowerCase();
@@ -22,6 +35,9 @@ function validateImageUpload(file) {
   if (!ext) throw new Error(`unsupported image type "${file.mimetype || 'unknown'}" (allowed: JPEG, PNG, WebP)`);
   if (typeof file.size === 'number' && file.size > MAX_BYTES) {
     throw Object.assign(new Error(`image too large (max ${Math.round(MAX_BYTES / 1024 / 1024)} MB)`), { status: 413 });
+  }
+  if (!fileHasAllowedSignature(file.buffer)) {
+    throw Object.assign(new Error('image contents do not match an allowed image type'), { status: 400 });
   }
   return { ext, mimeType };
 }

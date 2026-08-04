@@ -25,6 +25,12 @@ jest.mock('../src/middleware/auth', () => ({
 jest.mock('../src/lib/logger', () => ({ info: jest.fn(), warn: jest.fn(), error: jest.fn() }));
 
 const express = require('express');
+// Real PNG header. The screenshot path magic-byte-verifies the buffer
+// (src/lib/uploadGuard.js) because the declared mime is client-supplied and
+// becomes the S3 ContentType downstream, so a fixture whose bytes contradict its
+// declared type is now rejected 400. (audit backlog 2026-07-31 P0-1.)
+const PNG_BYTES = Buffer.from([0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A, 0, 0, 0, 13]);
+
 const request = require('supertest');
 const logger  = require('../src/lib/logger');
 
@@ -88,7 +94,7 @@ describe('multipart forward', () => {
       .field('description', 'The save button does nothing')
       .field('priority', 'high')
       .field('eventId', 'evt-mp-1')
-      .attach('screenshot', Buffer.from('PNGDATA'), { filename: 'shot.png', contentType: 'image/png' });
+      .attach('screenshot', PNG_BYTES, { filename: 'shot.png', contentType: 'image/png' });
 
     expect(res.status).toBe(201);
     expect(global.fetch).toHaveBeenCalledTimes(1);
@@ -126,7 +132,7 @@ describe('JSON-only fallback', () => {
     const res = await request(app).post('/api/bug-reports')
       .field('title', 'JSON-only receiver')
       .field('eventId', 'evt-json-1')
-      .attach('screenshot', Buffer.from('PNGDATA'), { filename: 'shot.png', contentType: 'image/png' });
+      .attach('screenshot', PNG_BYTES, { filename: 'shot.png', contentType: 'image/png' });
 
     expect(res.status).toBe(201);
     expect(global.fetch).toHaveBeenCalledTimes(1);
