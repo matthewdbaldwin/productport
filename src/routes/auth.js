@@ -96,6 +96,56 @@ router.post('/logout', requireAuth, async (req, res, next) => {
 // GET /api/auth/me — current user (from the verified token + JIT-provisioned row).
 router.get('/me', requireAuth, (req, res) => res.json(req.user));
 
+// PATCH /api/auth/me/theme — fire-and-forget relay to the IdP, which OWNS the
+// theme. ProductPort deliberately has no local `theme` column: the IdP persists
+// the pick and stamps it into the SSO token's `theme` claim, and requireAuth
+// reads it back from that claim (middleware/auth.js) — never from our table. A
+// local column would be written and never read, so this needs no migration.
+// Free-form ≤64 chars by design, so each app validates against its own ThemeId
+// union; null clears.
+//
+// 2026-08-04: the FLEET GAP this route used to document is FIXED — hub's
+// requireAuth stays cookie-only, and satellites relay over the /api/service
+// channel instead (hub cd7f0a1, per-satellite THEME_SERVICE_KEY, constant-time
+// compare, fail-closed). The old bearer/cookie token forwarding is gone: the
+// key authenticates THIS APP, and the already-authenticated user's email names
+// the row — which also removes the Safari block-all-cookies 401 this route
+// previously worked around. Matches rp/op/cp/ep. Inert (skip + warn) until
+// IDP_API_URL + THEME_SERVICE_KEY are provisioned.
+// project_productport_theme_persist_missing_route_2026-07-31
+router.patch('/me/theme', requireAuth, async (req, res) => {
+  const { theme } = req.body || {};
+  if (theme !== null && (typeof theme !== 'string' || theme.length === 0 || theme.length > 64)) {
+    return res.status(400).json({ error: 'theme must be a non-empty string ≤ 64 chars, or null to clear.' });
+  }
+
+  // Read at request time (the fleet convention for this route). Deliberately NO
+  // SALESPORT_API_URL fallback any more: sp's row no longer feeds the claim, so
+  // a fallback write there is exactly the dead write this rewrite removes.
+  const idpApi     = process.env.IDP_API_URL || '';
+  const serviceKey = process.env.THEME_SERVICE_KEY || '';
+  if (!idpApi || !serviceKey) {
+    logger.warn('IDP_API_URL/THEME_SERVICE_KEY not configured — theme write skipped');
+    return res.json({ ok: true });
+  }
+
+  // Fire-and-forget: a failed upstream write must never surface to the user,
+  // whose local cache still wins the session. But it MUST be visible to us —
+  // checking only `.catch` is what made the original bug invisible, since fetch
+  // resolves (not rejects) on a 4xx.
+  fetch(`${idpApi.replace(/\/$/, '')}/api/service/users/theme`, {
+    method:  'PATCH',
+    headers: { 'Content-Type': 'application/json', 'X-Theme-Service-Key': serviceKey },
+    body:    JSON.stringify({ email: req.user.email, theme: theme ?? null }),
+  })
+    .then(r => {
+      if (!r.ok) logger.error({ status: r.status, idpApi }, 'IdP theme write rejected');
+    })
+    .catch(err => logger.error({ err: err.message, idpApi }, 'IdP theme write failed'));
+
+  res.json({ ok: true });
+});
+
 // GET /api/auth/role-catalog — public catalog of this satellite's roles.
 // SalesPort's People & Access aggregator pulls this to build the role picker.
 // viewer is the universal default (every employee has it); the others are the

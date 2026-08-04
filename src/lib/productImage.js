@@ -9,7 +9,12 @@
 const { fileHasAllowedSignature } = require('./uploadGuard');
 
 const MAX_BYTES = 6 * 1024 * 1024; // 6 MB
-// mimetype → canonical file extension for the S3 key.
+// mimetype → canonical file extension for the S3 key. DELIBERATELY narrower
+// than uploadGuard's shared ALLOWED_IMAGE_MIMES (which also allows image/gif):
+// product photos are a still-image catalog field, and tests/productImage.test.js
+// asserts GIF is rejected here. Don't "fix" this drift by importing
+// ALLOWED_IMAGE_MIMES directly — that would silently permit animated GIFs as
+// product images and break that test. (2026-08-04 fix-queue: audited, kept.)
 const ALLOWED = {
   'image/jpeg': 'jpg',
   'image/png': 'png',
