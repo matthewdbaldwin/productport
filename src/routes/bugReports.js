@@ -20,6 +20,7 @@ const multer  = require('multer');
 const logger  = require('../lib/logger');
 const { signWebhookBody, makeLimiters } = require('@matthewdbaldwin/microport-auth');
 const { forwardWithRetry } = require('../lib/forwardWithRetry');
+const { assertFileSignature } = require('../lib/uploadGuard');
 const { BugReportCrossApp } = require('@matthewdbaldwin/microport-contracts');
 const { requireAuth } = require('../middleware/auth');
 
@@ -70,7 +71,7 @@ function uploadScreenshot(req, res, next) {
 // never costs an upload parse) → uploadScreenshot (populates req.body from the
 // multipart text fields + req.file BEFORE the handler reads them; a JSON request
 // passes straight through multer untouched).
-router.post('/', requireAuth, fileLimiter, uploadScreenshot, async (req, res) => {
+router.post('/', requireAuth, fileLimiter, uploadScreenshot, assertFileSignature, async (req, res) => {
   // Env-indirected for a clean sp->hub cutover flip: both default to the
   // SalesPort channel so prod/dev are UNCHANGED until the flip sets
   // BUGREPORT_FORWARD_URL=<hub> + BUGREPORT_FORWARD_SECRET=WEBHOOK_SECRET_PRODUCTPORT_HUBPORT.
