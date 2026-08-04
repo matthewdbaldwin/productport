@@ -8,6 +8,7 @@
 // tests/productRow.test.js.
 'use strict';
 const { clearanceStatus } = require('./clearanceStatus');
+const { normalizeModelNumbers } = require('./modelNumbers');
 const { isQualifier, CLEARANCE_QUALIFIERS } = require('./clearanceQualifier');
 const { tierFromWord } = require('./tierPalette');
 const { classificationFromWord } = require('./classification');
@@ -62,7 +63,10 @@ function parseProductRow(r) {
     image: blankToNull(r.image),
     businessSegment: blankToNull(r.business_segment),
     applicableDepartments: blankToNull(r.applicable_departments),
-    modelNumbers: blankToNull(r.model_numbers),
+    // Same pipe-delimiter normalisation as the admin editor — the CSV cell is
+    // just as free-form as the textarea, and fixing only one writer leaves the
+    // other open. (audit backlog 2026-07-31, B5.)
+    modelNumbers: normalizeModelNumbers(r.model_numbers),
     developmentStatus: blankToNull(r.development_status),
   };
 
