@@ -18,14 +18,20 @@ app.disable('x-powered-by');
 // client IP from X-Forwarded-For rather than the proxy's internal address.
 app.set('trust proxy', 1);
 
+// kevlar security-hardening remediation (2026-08-05): this service is a pure
+// JSON API — every route in src/routes/*.js responds with res.json/redirect;
+// there is no res.render, no express.static, no view engine anywhere in src/
+// (the rendered frontend is the separately-deployed web/ Next.js app, which
+// carries its own CSP). So there is no legitimate same-origin script/style/
+// image/connect load for THIS service to permit, and the previous
+// defaultSrc:'self' policy (plus an open imgSrc 'https:') was needless attack
+// surface. Matches opsport/execport/clinicport/salesport's strict shape.
 app.use(helmet({
   contentSecurityPolicy: {
+    useDefaults: false,
     directives: {
-      defaultSrc: ["'self'"],
-      scriptSrc:  ["'self'"],
-      styleSrc:   ["'self'", "'unsafe-inline'"],
-      imgSrc:     ["'self'", 'data:', 'https:'],
-      connectSrc: ["'self'", process.env.SALESPORT_API_URL].filter(Boolean),
+      'default-src':     ["'none'"],
+      'frame-ancestors': ["'none'"],
     },
   },
 }));
