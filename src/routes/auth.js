@@ -18,7 +18,8 @@
 'use strict';
 const express = require('express');
 const logger = require('../lib/logger');
-const { requireAuth, COOKIE_NAME } = require('../middleware/auth');
+const { requireAuth } = require('../middleware/auth');
+const { setSessionCookie, clearSessionCookie } = require('../lib/cookies');
 const db = require('../lib/db');
 
 const router = express.Router();
@@ -36,15 +37,6 @@ const PORTAL_WEB = process.env.PORTAL_WEB_URL || SALESPORT_WEB;
 // SalesPort is still the IdP; at flip time set IDP_API_URL alongside PORTAL_WEB_URL.
 const IDP_API = process.env.IDP_API_URL || SALESPORT_API;
 
-function setSessionCookie(res, token) {
-  res.cookie(COOKIE_NAME, token, {
-    httpOnly: true,
-    sameSite: 'lax',
-    secure:   process.env.NODE_ENV === 'production',
-    path:     '/',
-  });
-}
-
 // GET /api/auth/sso/start — browser entry point; redirect to SalesPort login.
 router.get('/sso/start', (req, res) => {
   if (!PORTAL_WEB) return res.status(503).json({ error: 'SSO not configured on this instance.' });
@@ -55,8 +47,18 @@ router.get('/sso/start', (req, res) => {
 
 // POST /api/auth/sso/exchange — relay the one-time code to SalesPort's handoff
 // exchange (server-to-server; the code is the credential, so no requireAuth /
-// CSRF header). On success set the HttpOnly cookie; forward the payload verbatim
-// so the web frontend can stash the token + apply theme during the transition.
+// CSRF header). On success set the HttpOnly cookie (via lib/cookies.js — Max-Age
+// = jwtTtlSec(), so this is no longer a browser-session-only cookie); forward
+// the payload verbatim so the web frontend can stash the token + apply theme
+// during the transition.
+//
+// NO REFRESH COOKIE: unlike clinicport's B1 Phase 4a.1 opt-in, this exchange
+// does not send `X-Satellite-Refresh: 1`, so the IdP's handoff/exchange mints
+// only the legacy single access token here — `payload.refreshToken` is never
+// populated for this app. There is therefore no refresh token to carry in a
+// cookie today; see src/lib/cookies.js's file header for what a real opt-in
+// would need (feature flag + refreshClient.js + opportunistic-refresh
+// middleware) and why it's out of scope for this pass.
 router.post('/sso/exchange', async (req, res, next) => {
   try {
     if (!IDP_API) return res.status(503).json({ error: 'SSO not configured on this instance.' });
@@ -88,7 +90,7 @@ router.post('/logout', requireAuth, async (req, res, next) => {
     if (req.sessionId) {
       await db.session.update({ where: { id: req.sessionId }, data: { revokedAt: new Date() } });
     }
-    res.clearCookie(COOKIE_NAME, { path: '/' });
+    clearSessionCookie(res);
     res.json({ ok: true });
   } catch (err) { next(err); }
 });
