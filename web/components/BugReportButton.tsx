@@ -78,9 +78,24 @@ function BugReportModal({ onClose }: { onClose: () => void }) {
   const [submitting, setSubmitting] = useState(false);
   const [sent, setSent] = useState(false);
   const [error, setError] = useState('');
+  const [titleInvalid, setTitleInvalid] = useState(false);
+  const [detailInvalid, setDetailInvalid] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  useModalEsc(onClose, !submitting);
+  // Any typed content (or an attached screenshot / a priority moved off the
+  // default) is worth confirming before it's discarded.
+  const isDirty = !!title.trim() || !!detail.trim() || !!screenshot || priority !== 'normal';
+  // Every dismissal path (ESC, backdrop click, the X button, Cancel) funnels
+  // through here. `submitting` already gates ESC via useModalEsc's second arg
+  // below; backdrop/X/Cancel re-check it too so a stray call can't slip through
+  // mid-submit. A dirty, unsent report asks for confirmation before discarding.
+  const requestClose = () => {
+    if (submitting) return;
+    if (isDirty && !confirm(t('confirmDiscard'))) return;
+    onClose();
+  };
+
+  useModalEsc(requestClose, !submitting);
   const trapRef = useFocusTrap<HTMLDivElement>();
 
   // Accept an image (file-picker or clipboard paste). Shrink it in-browser
@@ -142,8 +157,12 @@ function BugReportModal({ onClose }: { onClose: () => void }) {
   async function submit(e: React.FormEvent) {
     e.preventDefault();
     setError('');
-    if (!title.trim()) { setError(t('errorTitle')); return; }
-    if (!detail.trim()) { setError(t('errorDetail')); return; }
+    const titleBad = !title.trim();
+    const detailBad = !detail.trim();
+    setTitleInvalid(titleBad);
+    setDetailInvalid(detailBad);
+    if (titleBad) { setError(t('errorTitle')); return; }
+    if (detailBad) { setError(t('errorDetail')); return; }
     setSubmitting(true);
     try {
       if (screenshot) {
@@ -194,7 +213,7 @@ function BugReportModal({ onClose }: { onClose: () => void }) {
 
   return (
     <>
-      <div className="fixed inset-0 z-50" style={{ background: 'var(--color-overlay)' }} onClick={submitting ? undefined : onClose} />
+      <div className="fixed inset-0 z-50 bg-overlay" onClick={submitting ? undefined : requestClose} />
       <div className="fixed inset-0 z-50 flex items-center justify-center p-4 pointer-events-none">
         <div
           ref={trapRef}
@@ -207,7 +226,7 @@ function BugReportModal({ onClose }: { onClose: () => void }) {
               <span style={{ color: 'var(--red)' }}><Bug size={18} aria-hidden="true" /></span>{t('label')}
             </h2>
             <Tooltip content={t('close')}>
-              <button type="button" onClick={onClose} aria-label={t('close')} disabled={submitting} {...testId(NS, 'close')}
+              <button type="button" onClick={requestClose} aria-label={t('close')} disabled={submitting} {...testId(NS, 'close')}
                 className="inline-flex items-center justify-center rounded"
                 style={{ color: 'var(--muted)', fontSize: 22, lineHeight: 1, width: 44, height: 44 }}>&times;</button>
             </Tooltip>
@@ -220,14 +239,18 @@ function BugReportModal({ onClose }: { onClose: () => void }) {
               {error && <p role="alert" className="text-sm" style={{ color: 'var(--red)' }}>{error}</p>}
               <div className="space-y-1">
                 <label htmlFor="bug-title" className="text-xs font-medium" style={{ color: 'var(--muted)' }}>{t('titleLabel')}</label>
-                <input id="bug-title" className="w-full rounded border px-2.5 py-2 text-sm" style={inputStyle}
-                  value={title} onChange={(e) => setTitle(e.target.value)} maxLength={200} autoFocus {...testId(NS, 'title')}
+                <input id="bug-title" className="w-full rounded border px-2.5 py-2 text-sm"
+                  style={titleInvalid ? { ...inputStyle, borderColor: 'var(--red)' } : inputStyle}
+                  aria-invalid={titleInvalid ? true : undefined}
+                  value={title} onChange={(e) => { setTitle(e.target.value); setTitleInvalid(false); }} maxLength={200} autoFocus {...testId(NS, 'title')}
                   placeholder={t('titlePlaceholder')} />
               </div>
               <div className="space-y-1">
                 <label htmlFor="bug-detail" className="text-xs font-medium" style={{ color: 'var(--muted)' }}>{t('detailLabel')}</label>
-                <textarea id="bug-detail" className="w-full rounded border px-2.5 py-2 text-sm resize-none" style={inputStyle}
-                  rows={4} value={detail} onChange={(e) => setDetail(e.target.value)} maxLength={10000} {...testId(NS, 'detail')}
+                <textarea id="bug-detail" className="w-full rounded border px-2.5 py-2 text-sm resize-none"
+                  style={detailInvalid ? { ...inputStyle, borderColor: 'var(--red)' } : inputStyle}
+                  aria-invalid={detailInvalid ? true : undefined}
+                  rows={4} value={detail} onChange={(e) => { setDetail(e.target.value); setDetailInvalid(false); }} maxLength={10000} {...testId(NS, 'detail')}
                   placeholder={t('detailPlaceholder')} />
               </div>
               <div className="space-y-1">
@@ -253,7 +276,7 @@ function BugReportModal({ onClose }: { onClose: () => void }) {
                     <Tooltip content={t('screenshotRemove')}>
                       <button type="button" aria-label={t('screenshotRemove')} {...testId(NS, 'screenshotRemove')}
                         onClick={() => { setScreenshot(null); setPreview(null); if (fileInputRef.current) fileInputRef.current.value = ''; }}
-                        className="absolute top-1 right-1 inline-flex items-center justify-center rounded-full border w-7 h-7"
+                        className="absolute top-1 right-1 inline-flex items-center justify-center rounded-full border w-11 h-11"
                         style={{ background: 'var(--surface)', borderColor: 'var(--border)', color: 'var(--text)' }}>
                         <X size={14} aria-hidden="true" />
                       </button>
@@ -272,7 +295,7 @@ function BugReportModal({ onClose }: { onClose: () => void }) {
                 </dl>
               </details>
               <div className="flex justify-end gap-2 pt-1">
-                <button type="button" className="rounded px-3 py-2 text-sm min-h-11" style={{ color: 'var(--muted)' }} onClick={onClose} disabled={submitting} {...testId(NS, 'cancel')}>
+                <button type="button" className="rounded px-3 py-2 text-sm min-h-11" style={{ color: 'var(--muted)' }} onClick={requestClose} disabled={submitting} {...testId(NS, 'cancel')}>
                   {t('cancel')}
                 </button>
                 <button type="submit" className="btn-primary rounded px-4 py-2 text-sm min-h-11" disabled={submitting || optimizing || !title.trim() || !detail.trim()} {...testId(NS, 'submit')}>

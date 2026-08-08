@@ -94,9 +94,28 @@ export function ProductEditModal({ mode, initial, onClose, onSaved, onGalleryCha
   // is no separate save). clrDirty gates the extra write so an untouched-matrix
   // product save doesn't emit a spurious clearance.updated audit row. Bug #6.
   const [clrDirty, setClrDirty] = useState(false);
-  useModalEsc(onClose);
+  // Snapshot of the form fields as seeded on mount, captured once (the lazy
+  // useState initializer only runs on the first render; this value itself is
+  // never updated). Compared against the live `f` to know whether the user has
+  // typed anything worth confirming a discard of — a plain state read (unlike
+  // a ref) is safe during render. Gallery mutations persist immediately (not
+  // part of this), so they're deliberately excluded.
+  const [initialF] = useState(f);
+  const isDirty = clrDirty || Object.keys(f).some((k) => f[k] !== initialF[k]);
   const trapRef = useFocusTrap<HTMLDivElement>();
   const { toast } = useToast();
+
+  // Every dismissal path (ESC, backdrop click, the X button, Cancel) funnels
+  // through here: a dirty, unsaved form asks for confirmation before discarding
+  // it. useModalEsc's own `!saving` gate (below) already blocks ESC outright
+  // while a save is in flight; backdrop/X/Cancel re-check `saving` too so a
+  // stray call can't slip through and pop the confirm mid-save.
+  const requestClose = () => {
+    if (saving) return;
+    if (isDirty && !confirm('Discard your unsaved changes?')) return;
+    onClose();
+  };
+  useModalEsc(requestClose, !saving);
 
   const setCell = (idx: number, key: keyof EditRow) =>
     (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
@@ -240,10 +259,10 @@ export function ProductEditModal({ mode, initial, onClose, onSaved, onGalleryCha
   );
 
   return (
-    <div className={s.ov} onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}>
+    <div className={s.ov} onClick={(e) => { if (saving) return; if (e.target === e.currentTarget) requestClose(); }}>
       <div ref={trapRef} className={s.modal} role="dialog" aria-modal="true" style={{ maxWidth: 720, maxHeight: '92vh', overflowY: 'auto', padding: 24 }}>
         <Tooltip content="Close">
-          <button className={s.x} onClick={onClose} aria-label="Close" {...testId(NS, 'close')}>&times;</button>
+          <button className={s.x} onClick={requestClose} disabled={saving} aria-label="Close" {...testId(NS, 'close')}>&times;</button>
         </Tooltip>
         <h2 style={{ margin: '4px 0 14px' }}>{mode === 'create' ? 'Add product' : `Edit ${i.name ?? ''}`}</h2>
 
@@ -399,7 +418,7 @@ export function ProductEditModal({ mode, initial, onClose, onSaved, onGalleryCha
             )
           )}
           <span style={{ display: 'inline-flex', gap: 10, marginLeft: 'auto', flexWrap: 'wrap' }}>
-            <button className={s.ebtnGhost} disabled={saving} onClick={onClose} {...testId(NS, 'cancel')}>Cancel</button>
+            <button className={s.ebtnGhost} disabled={saving} onClick={requestClose} {...testId(NS, 'cancel')}>Cancel</button>
             <button className={s.ebtn} disabled={saving} onClick={save} {...testId(NS, 'save')}>{saving ? 'Saving…' : mode === 'create' ? 'Create' : 'Save changes'}</button>
           </span>
         </div>
