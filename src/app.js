@@ -92,6 +92,12 @@ app.use('/api/products', requireAuth, require('./routes/products'));
 // (signed, fleet pattern). bug-report-fanout.
 app.use('/api/bug-reports', require('./routes/bugReports'));
 
+// Inbound OpsPort integration (HubPort forum #22, D6) — product lookup + a
+// country-clearance read. Own bearer-key gate (requireOpsportKey), not the
+// human cookie session; GET-only, so the /api csrfGuard mounted above is a
+// no-op here (safe methods bypass it).
+app.use('/api/opsport', require('./routes/opsport'));
+
 // Error handler LAST — 5xx → generic body (no leak), 4xx surface their message,
 // err.status/.code honored. From microport-auth.
 app.use(errorHandler({ logger }));
