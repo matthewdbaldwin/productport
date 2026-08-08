@@ -6,9 +6,10 @@
 // tier/classification/status are enums; empty inputs submit as null.
 
 import { useState } from 'react';
-import { useModalEsc, useFocusTrap, optimizeImageForUpload } from '@matthewdbaldwin/microport-ui';
+import { useModalEsc, useFocusTrap, optimizeImageForUpload, Tooltip } from '@matthewdbaldwin/microport-ui';
 import { useToast } from '@/components/ui/Toast';
 import { ApiError } from '@/lib/api';
+import { testId } from '@/lib/i18nIds';
 import s from './catalog.module.css';
 import {
   createProduct, updateProduct, deleteProduct, uploadProductImage, deleteProductImage, setPrimaryImage,
@@ -24,6 +25,7 @@ const CLASSES: ProductClassification[] = ['CORE', 'HIPO', 'FLAGSHIP'];
 const STATUSES: ProductStatus[] = ['ACTIVE', 'DISCONTINUED', 'DRAFT'];
 const CLR_REGIONS = ['CE', 'FDA', 'NMPA', 'PMDA', 'TGA'] as const;
 const CLR_STATUSES: ClearanceStatus[] = ['NONE', 'IN_PROGRESS', 'SUBMITTED', 'APPROVED', 'NOT_APPROVED'];
+const NS = 'productEdit';
 
 // The matrix is edited as plain strings (all inputs emit strings), so state is
 // this all-string row — never ClearanceRow. clearancePayload() maps it back to
@@ -218,7 +220,7 @@ export function ProductEditModal({ mode, initial, onClose, onSaved }: {
   const text = (k: string, label: string, req?: boolean, focus?: boolean) => (
     <label key={k} className={s.efield}>
       <span>{label}{req && <b style={{ color: 'var(--rd)' }}> *</b>}</span>
-      <input className={s.einput} value={f[k]} onChange={set(k)}
+      <input className={s.einput} value={f[k]} onChange={set(k)} {...testId(NS, k)}
         autoFocus={focus} aria-invalid={fieldErrors[k] ? true : undefined} style={invalidStyle(k)} />
       {fieldErr(k)}
     </label>
@@ -226,7 +228,7 @@ export function ProductEditModal({ mode, initial, onClose, onSaved }: {
   const area = (k: string, label: string, hint?: string) => (
     <label key={k} className={s.efield}>
       <span>{label}{hint && <em style={{ color: 'var(--grey)', fontWeight: 400 }}> — {hint}</em>}</span>
-      <textarea className={s.einput} rows={2} value={f[k]} onChange={set(k)}
+      <textarea className={s.einput} rows={2} value={f[k]} onChange={set(k)} {...testId(NS, k)}
         aria-invalid={fieldErrors[k] ? true : undefined} style={invalidStyle(k)} />
       {fieldErr(k)}
     </label>
@@ -235,7 +237,9 @@ export function ProductEditModal({ mode, initial, onClose, onSaved }: {
   return (
     <div className={s.ov} onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}>
       <div ref={trapRef} className={s.modal} role="dialog" aria-modal="true" style={{ maxWidth: 720, maxHeight: '92vh', overflowY: 'auto', padding: 24 }}>
-        <button className={s.x} onClick={onClose} aria-label="Close">&times;</button>
+        <Tooltip content="Close">
+          <button className={s.x} onClick={onClose} aria-label="Close" {...testId(NS, 'close')}>&times;</button>
+        </Tooltip>
         <h2 style={{ margin: '4px 0 14px' }}>{mode === 'create' ? 'Add product' : `Edit ${i.name ?? ''}`}</h2>
 
         {err && <p role="alert" style={{ background: 'var(--rdb)', color: 'var(--rd)', padding: '8px 12px', borderRadius: 6, fontSize: 13 }}>{err}</p>}
@@ -245,7 +249,7 @@ export function ProductEditModal({ mode, initial, onClose, onSaved }: {
           {text('slug', 'Slug (url key)', true)}
           {text('subsidiary', 'Subsidiary', true)}
           <label className={s.efield}><span>Therapeutic area <b style={{ color: 'var(--rd)' }}>*</b></span>
-            <select className={s.einput} value={f.therapeuticArea} onChange={set('therapeuticArea')}
+            <select className={s.einput} value={f.therapeuticArea} onChange={set('therapeuticArea')} {...testId(NS, 'therapeuticArea')}
               aria-invalid={fieldErrors.therapeuticArea ? true : undefined} style={invalidStyle('therapeuticArea')}>
               <option value="">— select —</option>{THERAPEUTIC_AREAS.map((a) => <option key={a} value={a}>{a}</option>)}
             </select>
@@ -256,19 +260,19 @@ export function ProductEditModal({ mode, initial, onClose, onSaved }: {
           {text('type', 'Type')}
           {text('image', 'Image filename')}
           <label className={s.efield}><span>Tier</span>
-            <select className={s.einput} value={f.tier} onChange={set('tier')} style={invalidStyle('tier')}>
+            <select className={s.einput} value={f.tier} onChange={set('tier')} {...testId(NS, 'tier')} style={invalidStyle('tier')}>
               <option value="">— none —</option>{TIERS.map((t) => <option key={t} value={t}>{t.replace('TIER', 'Tier ')}</option>)}
             </select>
             {fieldErr('tier')}
           </label>
           <label className={s.efield}><span>Classification</span>
-            <select className={s.einput} value={f.classification} onChange={set('classification')} style={invalidStyle('classification')}>
+            <select className={s.einput} value={f.classification} onChange={set('classification')} {...testId(NS, 'classification')} style={invalidStyle('classification')}>
               <option value="">— none —</option>{CLASSES.map((c) => <option key={c} value={c}>{c}</option>)}
             </select>
             {fieldErr('classification')}
           </label>
           <label className={s.efield}><span>Status</span>
-            <select className={s.einput} value={f.status} onChange={set('status')} style={invalidStyle('status')}>
+            <select className={s.einput} value={f.status} onChange={set('status')} {...testId(NS, 'status')} style={invalidStyle('status')}>
               {STATUSES.map((st) => <option key={st} value={st}>{st}</option>)}
             </select>
             {fieldErr('status')}
@@ -287,32 +291,32 @@ export function ProductEditModal({ mode, initial, onClose, onSaved }: {
                   <div key={img.id} style={{ width: 96, opacity: busy ? 0.55 : 1 }}>
                     <div style={{ position: 'relative' }}>
                       <img src={galleryImageSrc(i.slug as string, img.id)} alt="" style={{ width: 96, height: 96, objectFit: 'cover', borderRadius: 6, border: img.isPrimary ? '2px solid var(--blue)' : '1px solid var(--lgrey)' }} />
-                      {img.isPrimary && <span style={{ position: 'absolute', top: 3, left: 3, background: 'var(--blue)', color: '#fff', fontSize: 10, padding: '1px 5px', borderRadius: 4 }}>Primary</span>}
+                      {img.isPrimary && <span className={s.primaryBadge}>Primary</span>}
                     </div>
                     {/* Small labels, but a 44px-tall hit area (padding) per the tap-target standard. */}
                     {confirming ? (
                       <div style={{ display: 'flex', gap: 4, marginTop: 3, fontSize: 11, alignItems: 'center' }}>
                         <span style={{ color: 'var(--rd)' }}>Delete?</span>
-                        <button type="button" onClick={() => onDeleteImage(img.id)} disabled={busy}
+                        <button type="button" onClick={() => onDeleteImage(img.id)} disabled={busy} {...testId(NS, `deleteImageConfirm-${img.id}`)}
                           style={{ background: 'none', border: 'none', color: 'var(--rd)', fontWeight: 600, cursor: 'pointer', padding: '11px 6px', minHeight: 44 }}>{busy ? '…' : 'Yes'}</button>
-                        <button type="button" onClick={() => setConfirmDelImg(null)} disabled={busy}
+                        <button type="button" onClick={() => setConfirmDelImg(null)} disabled={busy} {...testId(NS, `deleteImageCancel-${img.id}`)}
                           style={{ background: 'none', border: 'none', color: 'var(--grey)', cursor: 'pointer', padding: '11px 6px', minHeight: 44 }}>No</button>
                       </div>
                     ) : (
                       <div style={{ display: 'flex', gap: 6, marginTop: 3, fontSize: 11, alignItems: 'center', minHeight: 44 }}>
-                        {!img.isPrimary && <button type="button" onClick={() => onSetPrimary(img.id)} disabled={busy}
+                        {!img.isPrimary && <button type="button" onClick={() => onSetPrimary(img.id)} disabled={busy} {...testId(NS, `setPrimaryImage-${img.id}`)}
                           style={{ background: 'none', border: 'none', color: 'var(--blue)', cursor: 'pointer', padding: '11px 4px', minHeight: 44 }}>{busy ? '…' : 'Set primary'}</button>}
-                        <button type="button" onClick={() => setConfirmDelImg(img.id)} disabled={busy} aria-label="Delete image"
+                        <button type="button" onClick={() => setConfirmDelImg(img.id)} disabled={busy} aria-label="Delete image" {...testId(NS, `deleteImage-${img.id}`)}
                           style={{ background: 'none', border: 'none', color: 'var(--rd)', cursor: 'pointer', padding: '11px 4px', minHeight: 44, marginLeft: 'auto' }}>Delete</button>
                       </div>
                     )}
                   </div>
                 );
               })}
-              <label className={s.ebtnGhost} aria-disabled={uploading}
+              <label className={s.ebtnGhost} aria-disabled={uploading} {...testId(NS, 'addImage')}
                 style={{ cursor: uploading ? 'default' : 'pointer', pointerEvents: uploading ? 'none' : undefined, width: 96, height: 96, display: 'grid', placeItems: 'center', textAlign: 'center', fontSize: 12 }}>
                 {uploading ? 'Uploading…' : '+ Add image'}
-                <input type="file" accept="image/jpeg,image/png,image/webp" onChange={onPickImage} disabled={uploading} style={{ display: 'none' }} />
+                <input type="file" accept="image/jpeg,image/png,image/webp" onChange={onPickImage} disabled={uploading} style={{ display: 'none' }} {...testId(NS, 'imageFileInput')} />
               </label>
             </div>
           </div>
@@ -382,16 +386,16 @@ export function ProductEditModal({ mode, initial, onClose, onSaved }: {
             confirmDel ? (
               <span style={{ display: 'inline-flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
                 <span style={{ fontSize: 13 }}>Delete this product?</span>
-                <button className={s.ebtnDanger} disabled={saving} onClick={del}>Confirm delete</button>
-                <button className={s.ebtnGhost} disabled={saving} onClick={() => setConfirmDel(false)}>No</button>
+                <button className={s.ebtnDanger} disabled={saving} onClick={del} {...testId(NS, 'confirmDelete')}>Confirm delete</button>
+                <button className={s.ebtnGhost} disabled={saving} onClick={() => setConfirmDel(false)} {...testId(NS, 'cancelDelete')}>No</button>
               </span>
             ) : (
-              <button className={s.ebtnDanger} disabled={saving} onClick={() => setConfirmDel(true)}>Delete</button>
+              <button className={s.ebtnDanger} disabled={saving} onClick={() => setConfirmDel(true)} {...testId(NS, 'deleteProduct')}>Delete</button>
             )
           )}
           <span style={{ display: 'inline-flex', gap: 10, marginLeft: 'auto', flexWrap: 'wrap' }}>
-            <button className={s.ebtnGhost} disabled={saving} onClick={onClose}>Cancel</button>
-            <button className={s.ebtn} disabled={saving} onClick={save}>{saving ? 'Saving…' : mode === 'create' ? 'Create' : 'Save changes'}</button>
+            <button className={s.ebtnGhost} disabled={saving} onClick={onClose} {...testId(NS, 'cancel')}>Cancel</button>
+            <button className={s.ebtn} disabled={saving} onClick={save} {...testId(NS, 'save')}>{saving ? 'Saving…' : mode === 'create' ? 'Create' : 'Save changes'}</button>
           </span>
         </div>
       </div>

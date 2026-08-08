@@ -15,6 +15,9 @@ import { csvRow } from '@matthewdbaldwin/microport-contracts/csv';
 import { useRef, useState } from 'react';
 import s from './catalog.module.css';
 import { importProductsCsv, type ImportResult } from '@/lib/products';
+import { testId } from '@/lib/i18nIds';
+
+const NS = 'importCsv';
 
 export function ImportCsvButton({ onDone }: { onDone: () => void | Promise<void> }) {
   const ref = useRef<HTMLInputElement>(null);
@@ -70,11 +73,11 @@ export function ImportCsvButton({ onDone }: { onDone: () => void | Promise<void>
 
   return (
     <>
-      <input ref={ref} type="file" accept=".csv,text/csv" hidden onChange={onFile} data-testid="import-csv-input" />
-      <button type="button" className={s.btn} disabled={busy} data-testid="import-csv-verify" onClick={() => pick(true)}>
+      <input ref={ref} type="file" accept=".csv,text/csv" hidden onChange={onFile} {...testId(NS, 'input')} />
+      <button type="button" className={s.btn} disabled={busy} {...testId(NS, 'verify')} onClick={() => pick(true)}>
         {busy ? 'Working…' : 'Verify (dry run)'}
       </button>
-      <button type="button" className={s.btn} disabled={busy} data-testid="import-csv" onClick={() => pick(false)}>
+      <button type="button" className={s.btn} disabled={busy} {...testId(NS, 'import')} onClick={() => pick(false)}>
         {busy ? 'Importing…' : 'Import CSV'}
       </button>
       {(result || err) && (
@@ -84,7 +87,7 @@ export function ImportCsvButton({ onDone }: { onDone: () => void | Promise<void>
         >
           {err ? err : summary}
           {result && result.errors.length > 0 && (
-            <button type="button" className={s.ebtnGhost} style={{ padding: '2px 8px', fontSize: 11 }} onClick={downloadErrors}>
+            <button type="button" className={s.ebtnGhost} style={{ padding: '2px 8px', fontSize: 11 }} onClick={downloadErrors} {...testId(NS, 'downloadErrors')}>
               Download errors
             </button>
           )}
