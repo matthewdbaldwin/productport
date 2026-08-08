@@ -90,14 +90,14 @@ const TIER_META: Record<ProductTier, { label: string; bg: string; fg: string }> 
   TIER3: { label: 'Tier 3', bg: '#C77B3B', fg: '#2E1600' },
 };
 
-function TierBadge({ id, tier }: { id: string; tier: ProductTier | null }) {
+function TierBadge({ id, tier, scope }: { id: string; tier: ProductTier | null; scope: 'grid' | 'detail' }) {
   if (!tier) return null;
   const m = TIER_META[tier];
   return (
     <span
       className={s.tier}
       style={{ background: m.bg, color: m.fg }}
-      {...testId(NS, `tierBadge-${id}`)}
+      {...testId(NS, `tierBadge-${scope}-${id}`)}
     >
       {m.label}
     </span>
@@ -198,7 +198,7 @@ function DetailModal({ p, onClose, onEdit, onToggleDisabled, toggling }: {
             )}
           </div>
           <div className={s.mbody}>
-            <div className={s.mft}>{p.therapeuticArea}{p.category ? ` · ${p.category}` : ''}<TierBadge id={p.id} tier={p.tier} /></div>
+            <div className={s.mft}>{p.therapeuticArea}{p.category ? ` · ${p.category}` : ''}<TierBadge id={p.id} tier={p.tier} scope="detail" /></div>
             <h1 id="pp-modal-title">{p.name}</h1>
             <div className={s.msub}>
               {p.tagline}<br />{p.subsidiary}{p.type ? ` · ${p.type}` : ''}
@@ -573,7 +573,7 @@ export default function CatalogPage() {
                 >
                   <div className={s.cimg}><ProductImg p={p} thumb /></div>
                   <div className={s.cb}>
-                    <div className={s.ftag}>{p.therapeuticArea}<TierBadge id={p.id} tier={p.tier} /></div>
+                    <div className={s.ftag}>{p.therapeuticArea}<TierBadge id={p.id} tier={p.tier} scope="grid" /></div>
                     <div className={s.cn}>
                       {p.name}
                       {p.disabledAt && (
