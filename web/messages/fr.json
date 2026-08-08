@@ -30,6 +30,7 @@
     "ctxAppVersion": "Version",
     "ctxBrowser": "Navigateur",
     "cancel": "Annuler",
+    "confirmDiscard": "Abandonner ce rapport de bug ? Vos modifications seront perdues.",
     "send": "Envoyer le rapport",
     "sending": "Envoi…",
     "close": "Fermer",

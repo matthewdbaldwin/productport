@@ -90,14 +90,14 @@ const TIER_META: Record<ProductTier, { label: string; bg: string; fg: string }> 
   TIER3: { label: 'Tier 3', bg: '#C77B3B', fg: '#2E1600' },
 };
 
-function TierBadge({ id, tier }: { id: string; tier: ProductTier | null }) {
+function TierBadge({ id, tier, scope }: { id: string; tier: ProductTier | null; scope: 'grid' | 'detail' }) {
   if (!tier) return null;
   const m = TIER_META[tier];
   return (
     <span
       className={s.tier}
       style={{ background: m.bg, color: m.fg }}
-      {...testId(NS, `tierBadge-${id}`)}
+      {...testId(NS, `tierBadge-${scope}-${id}`)}
     >
       {m.label}
     </span>
@@ -128,10 +128,17 @@ function ProductImg({ p, thumb }: { p: Product; thumb?: boolean }) {
   );
 }
 
-function DetailModal({ p, onClose, onEdit, onToggleDisabled }: { p: Product; onClose: () => void; onEdit?: () => void; onToggleDisabled?: () => void }) {
+function DetailModal({ p, onClose, onEdit, onToggleDisabled, toggling }: {
+  p: Product; onClose: () => void; onEdit?: () => void; onToggleDisabled?: () => void;
+  // True while THIS product's disable/enable call is in flight — gates ESC and
+  // backdrop dismissal the same way ProductEditModal/BugReportModal gate on
+  // their own saving/submitting flag, so the outcome (toast) is always seen
+  // instead of the modal vanishing mid-request.
+  toggling?: boolean;
+}) {
   const [copied, setCopied] = useState(false);
   const [heroId, setHeroId] = useState<string | null>(null); // gallery thumb → swap the hero
-  useModalEsc(onClose);
+  useModalEsc(onClose, !toggling);
   const trapRef = useFocusTrap<HTMLDivElement>();
   const heroSrc = heroId ? galleryImageSrc(p.id, heroId) : fullSrc(p);
   useEffect(() => {
@@ -159,10 +166,10 @@ function DetailModal({ p, onClose, onEdit, onToggleDisabled }: { p: Product; onC
   const hasDetail = !!(p.indication || p.patientPopulation || specs.length);
 
   return (
-    <div className={s.ov} onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}>
+    <div className={s.ov} onClick={(e) => { if (toggling) return; if (e.target === e.currentTarget) onClose(); }}>
       <div ref={trapRef} className={s.modal} role="dialog" aria-modal="true" aria-labelledby="pp-modal-title" style={{ maxHeight: '92vh', overflowY: 'auto' }}>
         <Tooltip content="Close">
-          <button className={s.x} onClick={onClose} aria-label="Close">&times;</button>
+          <button className={s.x} onClick={onClose} disabled={toggling} aria-label="Close">&times;</button>
         </Tooltip>
         <div className={s.mhead}>
           <div>
@@ -191,7 +198,7 @@ function DetailModal({ p, onClose, onEdit, onToggleDisabled }: { p: Product; onC
             )}
           </div>
           <div className={s.mbody}>
-            <div className={s.mft}>{p.therapeuticArea}{p.category ? ` · ${p.category}` : ''}<TierBadge id={p.id} tier={p.tier} /></div>
+            <div className={s.mft}>{p.therapeuticArea}{p.category ? ` · ${p.category}` : ''}<TierBadge id={p.id} tier={p.tier} scope="detail" /></div>
             <h1 id="pp-modal-title">{p.name}</h1>
             <div className={s.msub}>
               {p.tagline}<br />{p.subsidiary}{p.type ? ` · ${p.type}` : ''}
@@ -234,14 +241,15 @@ function DetailModal({ p, onClose, onEdit, onToggleDisabled }: { p: Product; onC
                   type="button"
                   {...testId(NS, 'toggleDisabled')}
                   onClick={onToggleDisabled}
+                  disabled={toggling}
                   aria-label={p.disabledAt ? 'Enable this product (show it in the catalog)' : 'Disable this product (hide it from the catalog)'}
                   style={{
-                    cursor: 'pointer', minHeight: 44, fontSize: 13, padding: '4px 10px', borderRadius: 6,
-                    border: '1px solid var(--lgrey)', background: 'transparent',
+                    cursor: toggling ? 'default' : 'pointer', minHeight: 44, fontSize: 13, padding: '4px 10px', borderRadius: 6,
+                    border: '1px solid var(--lgrey)', background: 'transparent', opacity: toggling ? 0.6 : 1,
                     color: p.disabledAt ? 'var(--blue)' : 'var(--rd)',
                   }}
                 >
-                  {p.disabledAt ? 'Enable' : 'Disable'}
+                  {toggling ? (p.disabledAt ? 'Enabling…' : 'Disabling…') : p.disabledAt ? 'Enable' : 'Disable'}
                 </button>
               )}
             </div>
@@ -277,19 +285,24 @@ function DetailModal({ p, onClose, onEdit, onToggleDisabled }: { p: Product; onC
           )}
           <div className={s.sec}>
             <h2>Regulatory status by market</h2>
-            <table className={s.tbl} style={{ maxWidth: 360 }}>
-              <tbody>
-                {REGIONS.map((r) => {
-                  const st = statusOf(p, r);
-                  return (
-                    <tr key={r}>
-                      <td style={{ fontWeight: 500 }}>{r}</td>
-                      <td><Chip label={STATUS_META[st].label} status={st} /></td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
+            {/* Own horizontal-scroll context: the ancestor .modal is overflow:hidden,
+                so without this a narrow viewport can still clip the table with no
+                way to reach the rest — same pattern as the trials table below. */}
+            <div style={{ overflowX: 'auto' }}>
+              <table className={s.tbl} style={{ maxWidth: 360 }}>
+                <tbody>
+                  {REGIONS.map((r) => {
+                    const st = statusOf(p, r);
+                    return (
+                      <tr key={r}>
+                        <td style={{ fontWeight: 500 }}>{r}</td>
+                        <td><Chip label={STATUS_META[st].label} status={st} /></td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
             {p.regNotes && <div className={s.note}>{p.regNotes}</div>}
           </div>
           {p.trials.length > 0 && (
@@ -363,8 +376,14 @@ export default function CatalogPage() {
   // Admin kill-switch: disable (hide from the catalog) / enable (restore). The API
   // returns the updated product; patch it into catalog state in place so the open
   // detail (derived from `products`) reflects it immediately — no full refetch.
+  // togglingId is the pending-state guard (matches the imgBusy/uploading pattern
+  // in ProductEditModal): it blocks a double-fire from a fast double-click and
+  // lets DetailModal show a busy state + gate ESC/backdrop while the call is out.
+  const [togglingId, setTogglingId] = useState<string | null>(null);
   const toggleDisabled = useCallback(async (p: Product) => {
+    if (togglingId) return;
     const wasDisabled = !!p.disabledAt;
+    setTogglingId(p.id);
     try {
       const { product } = (wasDisabled ? await enableProduct(p.id) : await disableProduct(p.id)) as { product: Product };
       setProducts((prev) => (prev ? prev.map((x) => (x.id === product.id ? product : x)) : prev));
@@ -376,8 +395,10 @@ export default function CatalogPage() {
       );
     } catch (e) {
       toast(e instanceof Error ? e.message : 'Could not update the product.', 'error');
+    } finally {
+      setTogglingId(null);
     }
-  }, [toast]);
+  }, [toast, togglingId]);
 
   // Canonical deep-link OUT — reflect the open product in the URL (so a refresh
   // or a copied link reopens it) and keep <link rel="canonical"> in sync. Uses
@@ -552,7 +573,7 @@ export default function CatalogPage() {
                 >
                   <div className={s.cimg}><ProductImg p={p} thumb /></div>
                   <div className={s.cb}>
-                    <div className={s.ftag}>{p.therapeuticArea}<TierBadge id={p.id} tier={p.tier} /></div>
+                    <div className={s.ftag}>{p.therapeuticArea}<TierBadge id={p.id} tier={p.tier} scope="grid" /></div>
                     <div className={s.cn}>
                       {p.name}
                       {p.disabledAt && (
@@ -590,6 +611,7 @@ export default function CatalogPage() {
           onClose={() => setOpenId(null)}
           onEdit={isAdmin ? () => setEditState({ mode: 'edit', initial: toInput(opened) }) : undefined}
           onToggleDisabled={isAdmin ? () => toggleDisabled(opened) : undefined}
+          toggling={togglingId === opened.id}
         />
       )}
 

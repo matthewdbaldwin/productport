@@ -30,6 +30,7 @@
     "ctxAppVersion": "Version",
     "ctxBrowser": "Browser",
     "cancel": "Cancel",
+    "confirmDiscard": "Discard this bug report? Your changes will be lost.",
     "send": "Submit report",
     "sending": "Submitting…",
     "close": "Close",

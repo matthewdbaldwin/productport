@@ -30,6 +30,7 @@
     "ctxAppVersion": "应用版本",
     "ctxBrowser": "浏览器",
     "cancel": "取消",
+    "confirmDiscard": "放弃此问题报告？未提交的内容将丢失。",
     "send": "提交报告",
     "sending": "提交中…",
     "close": "关闭",
