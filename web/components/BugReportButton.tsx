@@ -13,6 +13,9 @@ import { Bug, Upload, X } from 'lucide-react';
 import { Tooltip, useModalEsc, useFocusTrap, optimizeImageForUpload } from '@matthewdbaldwin/microport-ui';
 import { useAuth } from '@/contexts/AuthContext';
 import { api } from '@/lib/api';
+import { testId } from '@/lib/i18nIds';
+
+const NS = 'bugReport';
 
 type Priority = 'low' | 'normal' | 'high' | 'critical';
 const PRIORITIES: Priority[] = ['low', 'normal', 'high', 'critical'];
@@ -46,6 +49,7 @@ export function BugReportButton() {
           onClick={() => setOpen(true)}
           aria-label={t('label')}
           data-bug-report-launcher="true"
+          {...testId(NS, 'launcher')}
           className="group fixed bottom-20 right-4 md:bottom-4 z-40 inline-flex items-center justify-center min-w-11 min-h-11"
           style={{ color: 'var(--accent-fg)' }}
         >
@@ -190,11 +194,11 @@ function BugReportModal({ onClose }: { onClose: () => void }) {
 
   return (
     <>
-      <div className="fixed inset-0 z-50" style={{ background: 'rgba(0,0,0,0.5)' }} onClick={submitting ? undefined : onClose} />
+      <div className="fixed inset-0 z-50" style={{ background: 'var(--color-overlay)' }} onClick={submitting ? undefined : onClose} />
       <div className="fixed inset-0 z-50 flex items-center justify-center p-4 pointer-events-none">
         <div
           ref={trapRef}
-          className="w-full max-w-lg rounded-xl shadow-xl border pointer-events-auto"
+          className="w-full max-w-lg rounded-xl shadow-xl border pointer-events-auto max-h-[90dvh] overflow-y-auto"
           style={{ background: 'var(--surface)', borderColor: 'var(--border)' }}
           role="dialog" aria-modal="true" aria-labelledby="bug-modal-title"
         >
@@ -203,7 +207,7 @@ function BugReportModal({ onClose }: { onClose: () => void }) {
               <span style={{ color: 'var(--red)' }}><Bug size={18} aria-hidden="true" /></span>{t('label')}
             </h2>
             <Tooltip content={t('close')}>
-              <button type="button" onClick={onClose} aria-label={t('close')} disabled={submitting}
+              <button type="button" onClick={onClose} aria-label={t('close')} disabled={submitting} {...testId(NS, 'close')}
                 className="inline-flex items-center justify-center rounded"
                 style={{ color: 'var(--muted)', fontSize: 22, lineHeight: 1, width: 44, height: 44 }}>&times;</button>
             </Tooltip>
@@ -217,27 +221,27 @@ function BugReportModal({ onClose }: { onClose: () => void }) {
               <div className="space-y-1">
                 <label htmlFor="bug-title" className="text-xs font-medium" style={{ color: 'var(--muted)' }}>{t('titleLabel')}</label>
                 <input id="bug-title" className="w-full rounded border px-2.5 py-2 text-sm" style={inputStyle}
-                  value={title} onChange={(e) => setTitle(e.target.value)} maxLength={200} autoFocus
+                  value={title} onChange={(e) => setTitle(e.target.value)} maxLength={200} autoFocus {...testId(NS, 'title')}
                   placeholder={t('titlePlaceholder')} />
               </div>
               <div className="space-y-1">
                 <label htmlFor="bug-detail" className="text-xs font-medium" style={{ color: 'var(--muted)' }}>{t('detailLabel')}</label>
                 <textarea id="bug-detail" className="w-full rounded border px-2.5 py-2 text-sm resize-none" style={inputStyle}
-                  rows={4} value={detail} onChange={(e) => setDetail(e.target.value)} maxLength={10000}
+                  rows={4} value={detail} onChange={(e) => setDetail(e.target.value)} maxLength={10000} {...testId(NS, 'detail')}
                   placeholder={t('detailPlaceholder')} />
               </div>
               <div className="space-y-1">
                 <label htmlFor="bug-priority" className="text-xs font-medium" style={{ color: 'var(--muted)' }}>{t('priorityLabel')}</label>
                 <select id="bug-priority" className="w-full rounded border px-2.5 py-2 text-sm" style={inputStyle}
-                  value={priority} onChange={(e) => setPriority(e.target.value as Priority)}>
+                  value={priority} onChange={(e) => setPriority(e.target.value as Priority)} {...testId(NS, 'priority')}>
                   {PRIORITIES.map((p) => <option key={p} value={p}>{t(`priority_${p}`)}</option>)}
                 </select>
               </div>
               <div className="space-y-1">
                 <label className="text-xs font-medium" style={{ color: 'var(--muted)' }}>{t('screenshotLabel')}</label>
                 <p className="text-xs" style={{ color: 'var(--muted)' }}>{t('screenshotHint')}</p>
-                <input ref={fileInputRef} type="file" accept="image/*" onChange={handleFileChange} className="hidden" />
-                <button type="button" onClick={() => fileInputRef.current?.click()} disabled={optimizing}
+                <input ref={fileInputRef} type="file" accept="image/*" onChange={handleFileChange} className="hidden" {...testId(NS, 'screenshotInput')} />
+                <button type="button" onClick={() => fileInputRef.current?.click()} disabled={optimizing} {...testId(NS, 'screenshotChoose')}
                   className="inline-flex items-center gap-2 rounded border px-3 py-2 text-sm min-h-11 disabled:opacity-60" style={inputStyle}>
                   <Upload size={14} aria-hidden="true" />
                   {screenshot ? t('screenshotReplace') : t('screenshotChoose')}
@@ -246,12 +250,14 @@ function BugReportModal({ onClose }: { onClose: () => void }) {
                 {preview && (
                   <div className="mt-2 relative inline-block">
                     <img src={preview} alt={t('screenshotPreviewAlt')} className="max-h-48 rounded border" style={{ borderColor: 'var(--border)' }} />
-                    <button type="button" aria-label={t('screenshotRemove')}
-                      onClick={() => { setScreenshot(null); setPreview(null); if (fileInputRef.current) fileInputRef.current.value = ''; }}
-                      className="absolute top-1 right-1 inline-flex items-center justify-center rounded-full border w-7 h-7"
-                      style={{ background: 'var(--surface)', borderColor: 'var(--border)', color: 'var(--text)' }}>
-                      <X size={14} aria-hidden="true" />
-                    </button>
+                    <Tooltip content={t('screenshotRemove')}>
+                      <button type="button" aria-label={t('screenshotRemove')} {...testId(NS, 'screenshotRemove')}
+                        onClick={() => { setScreenshot(null); setPreview(null); if (fileInputRef.current) fileInputRef.current.value = ''; }}
+                        className="absolute top-1 right-1 inline-flex items-center justify-center rounded-full border w-7 h-7"
+                        style={{ background: 'var(--surface)', borderColor: 'var(--border)', color: 'var(--text)' }}>
+                        <X size={14} aria-hidden="true" />
+                      </button>
+                    </Tooltip>
                   </div>
                 )}
               </div>
@@ -266,10 +272,10 @@ function BugReportModal({ onClose }: { onClose: () => void }) {
                 </dl>
               </details>
               <div className="flex justify-end gap-2 pt-1">
-                <button type="button" className="rounded px-3 py-2 text-sm min-h-11" style={{ color: 'var(--muted)' }} onClick={onClose} disabled={submitting}>
+                <button type="button" className="rounded px-3 py-2 text-sm min-h-11" style={{ color: 'var(--muted)' }} onClick={onClose} disabled={submitting} {...testId(NS, 'cancel')}>
                   {t('cancel')}
                 </button>
-                <button type="submit" className="btn-primary rounded px-4 py-2 text-sm min-h-11" disabled={submitting || optimizing || !title.trim() || !detail.trim()}>
+                <button type="submit" className="btn-primary rounded px-4 py-2 text-sm min-h-11" disabled={submitting || optimizing || !title.trim() || !detail.trim()} {...testId(NS, 'submit')}>
                   {submitting ? t('sending') : t('send')}
                 </button>
               </div>

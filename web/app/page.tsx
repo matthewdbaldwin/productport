@@ -12,6 +12,7 @@ import { useRouter } from 'next/navigation';
 import { useAuth } from '@/contexts/AuthContext';
 import { api } from '@/lib/api';
 import { statusOf, orderedAreas, filterProducts } from '@/lib/catalogFilter';
+import { testId } from '@/lib/i18nIds';
 import { ProductEditModal } from './ProductEditModal';
 import { ImportCsvButton } from './ImportCsvButton';
 import { galleryImageSrc, disableProduct, enableProduct, type ProductInput, type GalleryImage } from '@/lib/products';
@@ -53,13 +54,14 @@ interface Product {
 
 const REGIONS = ['CE', 'FDA', 'NMPA', 'PMDA', 'TGA'] as const;
 const APP_VERSION = process.env.NEXT_PUBLIC_APP_VERSION || '';
+const NS = 'catalog';
 
 const STATUS_META: Record<ClearanceStatus, { label: string; bg: string; fg: string }> = {
   APPROVED:     { label: 'Cleared',     bg: 'var(--okb)', fg: 'var(--ok)' },
   IN_PROGRESS:  { label: 'In progress', bg: 'var(--amb)', fg: 'var(--am)' },
   SUBMITTED:    { label: 'Submitted',   bg: 'var(--blb)', fg: 'var(--bl)' },
   NOT_APPROVED: { label: 'Not cleared', bg: 'var(--rdb)', fg: 'var(--rd)' },
-  NONE:         { label: '—',           bg: '#eef0f3',    fg: '#6b7280' },
+  NONE:         { label: '—',           bg: 'var(--lgrey)', fg: 'var(--grey)' },
 };
 
 // Grid cards use a lightweight ~240px WebP thumbnail (products/thumbs/, generated
@@ -88,14 +90,14 @@ const TIER_META: Record<ProductTier, { label: string; bg: string; fg: string }> 
   TIER3: { label: 'Tier 3', bg: '#C77B3B', fg: '#2E1600' },
 };
 
-function TierBadge({ tier }: { tier: ProductTier | null }) {
+function TierBadge({ id, tier }: { id: string; tier: ProductTier | null }) {
   if (!tier) return null;
   const m = TIER_META[tier];
   return (
     <span
       className={s.tier}
       style={{ background: m.bg, color: m.fg }}
-      data-testid={`tier-badge-${tier}`}
+      {...testId(NS, `tierBadge-${id}`)}
     >
       {m.label}
     </span>
@@ -159,7 +161,9 @@ function DetailModal({ p, onClose, onEdit, onToggleDisabled }: { p: Product; onC
   return (
     <div className={s.ov} onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}>
       <div ref={trapRef} className={s.modal} role="dialog" aria-modal="true" aria-labelledby="pp-modal-title" style={{ maxHeight: '92vh', overflowY: 'auto' }}>
-        <button className={s.x} onClick={onClose} aria-label="Close">&times;</button>
+        <Tooltip content="Close">
+          <button className={s.x} onClick={onClose} aria-label="Close">&times;</button>
+        </Tooltip>
         <div className={s.mhead}>
           <div>
             <div className={s.mimg}>
@@ -187,7 +191,7 @@ function DetailModal({ p, onClose, onEdit, onToggleDisabled }: { p: Product; onC
             )}
           </div>
           <div className={s.mbody}>
-            <div className={s.mft}>{p.therapeuticArea}{p.category ? ` · ${p.category}` : ''}<TierBadge tier={p.tier} /></div>
+            <div className={s.mft}>{p.therapeuticArea}{p.category ? ` · ${p.category}` : ''}<TierBadge id={p.id} tier={p.tier} /></div>
             <h1 id="pp-modal-title">{p.name}</h1>
             <div className={s.msub}>
               {p.tagline}<br />{p.subsidiary}{p.type ? ` · ${p.type}` : ''}
@@ -195,10 +199,10 @@ function DetailModal({ p, onClose, onEdit, onToggleDisabled }: { p: Product; onC
             <div className={s.chips}><MarketChips p={p} /></div>
             {p.disabledAt && (
               <div
-                data-testid="disabled-badge"
+                {...testId(NS, 'disabledBadge')}
                 style={{
                   marginTop: 8, display: 'inline-block', fontSize: 12, fontWeight: 600,
-                  color: '#b42318', background: '#fef3f2', border: '1px solid #fecdca',
+                  color: 'var(--rd)', background: 'var(--rdb)', border: '1px solid var(--rd)',
                   borderRadius: 6, padding: '2px 8px',
                 }}
               >
@@ -213,14 +217,14 @@ function DetailModal({ p, onClose, onEdit, onToggleDisabled }: { p: Product; onC
                 style={{
                   cursor: 'pointer', minHeight: 44,
                   fontSize: 12, padding: '4px 10px', borderRadius: 6,
-                  border: '1px solid var(--line, #d0d5dd)', background: 'transparent',
+                  border: '1px solid var(--lgrey)', background: 'transparent',
                   color: 'inherit',
                 }}
               >
                 {copied ? '✓ Link copied' : '🔗 Copy link'}
               </button>
               {onEdit && (
-                <button type="button" className={s.ebtn} data-testid="edit-product"
+                <button type="button" className={s.ebtn} {...testId(NS, 'editProduct')}
                   style={{ fontSize: 13 }} onClick={onEdit}>
                   Edit
                 </button>
@@ -228,13 +232,13 @@ function DetailModal({ p, onClose, onEdit, onToggleDisabled }: { p: Product; onC
               {onToggleDisabled && (
                 <button
                   type="button"
-                  data-testid="toggle-disabled"
+                  {...testId(NS, 'toggleDisabled')}
                   onClick={onToggleDisabled}
                   aria-label={p.disabledAt ? 'Enable this product (show it in the catalog)' : 'Disable this product (hide it from the catalog)'}
                   style={{
                     cursor: 'pointer', minHeight: 44, fontSize: 13, padding: '4px 10px', borderRadius: 6,
-                    border: '1px solid var(--line, #d0d5dd)', background: 'transparent',
-                    color: p.disabledAt ? 'var(--blue)' : '#b42318',
+                    border: '1px solid var(--lgrey)', background: 'transparent',
+                    color: p.disabledAt ? 'var(--blue)' : 'var(--rd)',
                   }}
                 >
                   {p.disabledAt ? 'Enable' : 'Disable'}
@@ -423,7 +427,7 @@ export default function CatalogPage() {
           <div className={s.sw}>
             <svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="7" /><path d="M21 21l-4-4" /></svg>
             <input
-              data-testid="catalog-search"
+              {...testId(NS, 'search')}
               value={q}
               onChange={(e) => setQ(e.target.value)}
               placeholder="Search products, indications, types…"
@@ -436,13 +440,13 @@ export default function CatalogPage() {
           </span>
           <span className={s.conf}>For Internal Use Only</span>
           {isAdmin && (
-            <button type="button" className={s.btn} data-testid="add-product" onClick={() => setEditState({ mode: 'create' })}>
+            <button type="button" className={s.btn} {...testId(NS, 'addProduct')} onClick={() => setEditState({ mode: 'create' })}>
               + Add product
             </button>
           )}
           {isAdmin && <ImportCsvButton onDone={loadProducts} />}
           {isAdmin && (
-            <a className={s.btn} href="/api/products/export.csv" data-testid="export-csv" style={{ textDecoration: 'none' }}>
+            <a className={s.btn} href="/api/products/export.csv" {...testId(NS, 'exportCsv')} style={{ textDecoration: 'none' }}>
               Export CSV
             </a>
           )}
@@ -465,6 +469,7 @@ export default function CatalogPage() {
                     key={a}
                     type="button"
                     className={`${s.pill} ${fr === a ? s.pillOn : ''}`}
+                    {...testId(NS, `areaPill-${a.replace(/\s+/g, '-')}`)}
                     onClick={() => setFr(fr === a ? null : a)}
                   >
                     {a}<span className={s.pcount}>{countBy('therapeuticArea', a)}</span>
@@ -476,7 +481,7 @@ export default function CatalogPage() {
               <span className={s.lbl}>Subsidiary</span>
               <div className={s.acc}>
                 <div className={s.accSec}>
-                  <button type="button" className={s.accHead} aria-expanded={subsOpen} onClick={() => setSubsOpen((o) => !o)}>
+                  <button type="button" className={s.accHead} {...testId(NS, 'subsidiaryToggle')} aria-expanded={subsOpen} onClick={() => setSubsOpen((o) => !o)}>
                     <span className={s.accChev} data-open={subsOpen || undefined} aria-hidden="true">▸</span>
                     <span className={s.accName}>{sub ? sub.replace('MicroPort ', '') : 'All subsidiaries'}</span>
                     <span className={s.pcount}>{subs.length}</span>
@@ -488,6 +493,7 @@ export default function CatalogPage() {
                           key={sb}
                           type="button"
                           className={`${s.pill} ${sub === sb ? s.pillOn : ''}`}
+                          {...testId(NS, `subsidiaryPill-${sb.replace(/\s+/g, '-')}`)}
                           onClick={() => setSub(sub === sb ? null : sb)}
                         >
                           {sb.replace('MicroPort ', '')}<span className={s.pcount}>{countBy('subsidiary', sb)}</span>
@@ -506,6 +512,7 @@ export default function CatalogPage() {
                     key={r}
                     type="button"
                     className={`${s.pill} ${mk === r ? s.pillOn : ''}`}
+                    {...testId(NS, `marketPill-${r}`)}
                     onClick={() => setMk(mk === r ? null : r)}
                   >
                     {r}
@@ -525,11 +532,11 @@ export default function CatalogPage() {
                 {cats.map((c) => <option key={c} value={c}>{c} ({countBy('category', c)})</option>)}
               </select>
               {hasFilters && (
-                <button type="button" className={`${s.btn} ${s.clearbtn}`} onClick={clearAll}>Clear filters</button>
+                <button type="button" className={`${s.btn} ${s.clearbtn}`} {...testId(NS, 'clearFilters')} onClick={clearAll}>Clear filters</button>
               )}
             </div>
 
-            <div className={s.count} data-testid="catalog-count">
+            <div className={s.count} {...testId(NS, 'count')}>
               {filtered.length} shown · {products.length} in catalog
             </div>
 
@@ -539,21 +546,21 @@ export default function CatalogPage() {
                   key={p.id}
                   type="button"
                   className={s.card}
-                  data-testid={`product-card-${p.id}`}
+                  {...testId(NS, `productCard-${p.id}`)}
                   onClick={() => setOpenId(p.id)}
                   style={p.disabledAt ? { opacity: 0.6 } : undefined}
                 >
                   <div className={s.cimg}><ProductImg p={p} thumb /></div>
                   <div className={s.cb}>
-                    <div className={s.ftag}>{p.therapeuticArea}<TierBadge tier={p.tier} /></div>
+                    <div className={s.ftag}>{p.therapeuticArea}<TierBadge id={p.id} tier={p.tier} /></div>
                     <div className={s.cn}>
                       {p.name}
                       {p.disabledAt && (
                         <span
-                          data-testid="card-disabled-tag"
+                          {...testId(NS, `cardDisabledTag-${p.id}`)}
                           style={{
-                            marginLeft: 6, fontSize: 10, fontWeight: 700, color: '#b42318',
-                            background: '#fef3f2', border: '1px solid #fecdca', borderRadius: 4,
+                            marginLeft: 6, fontSize: 10, fontWeight: 700, color: 'var(--rd)',
+                            background: 'var(--rdb)', border: '1px solid var(--rd)', borderRadius: 4,
                             padding: '1px 5px', verticalAlign: 'middle',
                           }}
                         >
@@ -597,6 +604,7 @@ export default function CatalogPage() {
             if (wasEdit) setOpenId(null); // a rename/delete would leave a stale detail open
             await loadProducts();
           }}
+          onGalleryChanged={loadProducts}
         />
       )}
     </div>

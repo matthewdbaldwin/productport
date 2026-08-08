@@ -113,6 +113,7 @@ model Product {
   disabledAt       DateTime?               // reversible admin kill-switch: hidden from the viewer catalog + public detail, but not deleted
 
   clearances       RegulatoryClearance[]
+  countryClearances CountryClearance[]
   trials           Trial[]
   audits           ProductAudit[]
   images           ProductImage[]
@@ -144,6 +145,26 @@ model RegulatoryClearance {
   @@unique([productId, region])
   @@index([region, status])
   @@map("regulatory_clearances")
+}
+
+// Per-product, per-ISO-country clearance row (HubPort forum #22, D6). Covers
+// every market RegulatoryClearance's five jurisdictions don't (see CONTEXT.md,
+// ADR-0001) — country is validated in app code to REJECT any country already
+// covered by RegulatoryClearance, so the two models are mutually exclusive by
+// construction and never need reconciling. materialRef is a second, separate
+// gate (local ERP material number) — null means not yet assigned.
+model CountryClearance {
+  id          String          @id @default(cuid())
+  productId   String
+  product     Product         @relation(fields: [productId], references: [id], onDelete: Cascade)
+  country     String          // ISO 3166-1 alpha-2
+  status      ClearanceStatus @default(NONE)
+  materialRef String?
+  updatedAt   DateTime        @updatedAt
+
+  @@unique([productId, country])
+  @@index([country, status])
+  @@map("country_clearances")
 }
 
 // Product image gallery (2026-07-01). Many images per product; one flagged

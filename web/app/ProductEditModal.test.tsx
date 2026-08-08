@@ -17,6 +17,7 @@ vi.mock('@matthewdbaldwin/microport-ui', () => ({
   optimizeImageForUpload: async (f: File) => f,
   ToastProvider: ({ children }: { children: React.ReactNode }) => children,
   useToast: () => ({ toast: toastSpy }),
+  Tooltip: ({ children }: { children: React.ReactNode }) => children,
 }));
 
 // Keep the real vocab constants (rendered by the form) but stub the network calls.
