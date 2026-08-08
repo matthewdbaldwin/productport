@@ -604,6 +604,7 @@ export default function CatalogPage() {
             if (wasEdit) setOpenId(null); // a rename/delete would leave a stale detail open
             await loadProducts();
           }}
+          onGalleryChanged={loadProducts}
         />
       )}
     </div>

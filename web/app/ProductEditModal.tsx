@@ -61,11 +61,16 @@ function fieldErrorsFrom(e: unknown): Record<string, string> {
   return {};
 }
 
-export function ProductEditModal({ mode, initial, onClose, onSaved }: {
+export function ProductEditModal({ mode, initial, onClose, onSaved, onGalleryChanged }: {
   mode: 'create' | 'edit';
   initial?: Initial;
   onClose: () => void;
   onSaved: () => void;
+  // Gallery mutations (set primary / delete / upload) persist immediately and
+  // refresh the catalog thumbnail, but must NOT close the modal — the primary
+  // form fields may still be dirty. Bug: this used to call onSaved(), which
+  // closes the whole edit surface and silently drops any unsaved field edits.
+  onGalleryChanged?: () => void | Promise<void>;
 }) {
   const i = initial ?? {};
   const [f, setF] = useState<Record<string, string>>({
@@ -115,7 +120,7 @@ export function ProductEditModal({ mode, initial, onClose, onSaved }: {
   const applyProduct = (product: unknown) => {
     setGallery((product as { images?: GalleryImage[] }).images ?? []);
     setF((p) => ({ ...p, image: (product as { image?: string }).image ?? '' }));
-    onSaved();
+    onGalleryChanged?.();
   };
 
   async function onPickImage(e: React.ChangeEvent<HTMLInputElement>) {

@@ -198,7 +198,7 @@ function BugReportModal({ onClose }: { onClose: () => void }) {
       <div className="fixed inset-0 z-50 flex items-center justify-center p-4 pointer-events-none">
         <div
           ref={trapRef}
-          className="w-full max-w-lg rounded-xl shadow-xl border pointer-events-auto"
+          className="w-full max-w-lg rounded-xl shadow-xl border pointer-events-auto max-h-[90dvh] overflow-y-auto"
           style={{ background: 'var(--surface)', borderColor: 'var(--border)' }}
           role="dialog" aria-modal="true" aria-labelledby="bug-modal-title"
         >
