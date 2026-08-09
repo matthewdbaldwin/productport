@@ -33,6 +33,7 @@ router.get('/products', requireOpsportKey, async (req, res, next) => {
     const q = (req.query.q || '').trim();
     const where = {
       deletedAt: null,
+      status: { not: 'DRAFT' },
       ...(q ? { OR: [
         { name: { contains: q, mode: 'insensitive' } },
         { slug: { contains: q, mode: 'insensitive' } },
@@ -55,7 +56,7 @@ router.get('/products', requireOpsportKey, async (req, res, next) => {
 router.get('/products/:slug/clearance/:country', requireOpsportKey, async (req, res, next) => {
   try {
     const product = await db.product.findFirst({
-      where: { slug: req.params.slug, deletedAt: null },
+      where: { slug: req.params.slug, deletedAt: null, status: { not: 'DRAFT' } },
       select: { id: true },
     });
     if (!product) return res.status(404).json({ error: 'Product not found.' });
