@@ -1,8 +1,8 @@
 // src/routes/ssoLifecycle.js
 // Inbound SSO-lifecycle webhook from salesport, mounted at /api/sso/lifecycle.
-// This is the fleet-canonical receiver (matches opsport/reviewport/clinicport/
-// execport): HMAC-verified via microport-auth's createLifecycleGuard over the
-// raw body, header x-salesport-signature, shared secret SALESPORT_LIFECYCLE_SECRET.
+// Mirrors opsport's pattern, like the other satellites: HMAC-verified via
+// microport-auth's createLifecycleGuard over the raw body, header
+// x-salesport-signature, shared secret SALESPORT_LIFECYCLE_SECRET.
 // Replaced the scaffold's /api/webhooks/salesport orphan, which was built against
 // the legacy webhook naming and never matched salesport's sender (Apple 2026-07-01).
 //
