@@ -780,12 +780,16 @@ term, Registration is the narrower certificate evidence."
 
 **Files:**
 - Create: `web/lib/help/popovers.ts`
+- Create: `web/lib/help/popovers.zh.ts`
+- Create: `web/lib/help/popovers.fr.ts`
 - Create: `web/lib/help/searchDocs.ts`
 - Test: `web/lib/help/searchDocs.test.ts`
 
 **Interfaces:**
 - Consumes: `lookupHelpItem` from `./sections` (Task 2); `getHelpContent`, `HELP_CONTENT_SLUGS`, `normalizeLocale` from `./content` (Task 3); `HelpBlock`, `HelpSearchDoc` types and `HelpContent` type from microport-ui (Task 1).
-- Produces: `GALLERY_POPOVER: HelpContent`, `CLEARANCE_POPOVER: HelpContent` — consumed by Task 7 (`ProductEditModal.tsx`'s `<HelpButton>` wiring). `buildSearchDocs(locale?: string): HelpSearchDoc[]` — consumed by Task 6 (`/help` routes) and Task 8 (`HelpLauncher.tsx`).
+- Produces: `GALLERY_POPOVER: HelpContent`, `CLEARANCE_POPOVER: HelpContent` (the English defaults), `getPopoverContent(key: 'gallery'|'clearance', locale?: string): HelpContent`, `getPopoverTitle(key: 'gallery'|'clearance', locale?: string): string` — consumed by Task 7 (`ProductEditModal.tsx`'s `<HelpButton>` wiring, locale-aware). `buildSearchDocs(locale?: string): HelpSearchDoc[]` — consumed by Task 6 (`/help` routes) and Task 8 (`HelpLauncher.tsx`).
+
+**i18n note (resolved during plan self-review):** the Global Constraints require every new string, chrome copy and article prose alike, to draft zh/fr via `ask-local` — no carve-out for the two popovers. `GALLERY_POPOVER`/`CLEARANCE_POPOVER` stay the English constants (this task's own test and Task 7's existing references name them directly), but they're no longer what search or the live UI render in zh/fr — `getPopoverContent`/`getPopoverTitle` select the right-language variant, mirroring `content.ts`'s `getHelpContent` pattern from Task 3.
 
 - [ ] **Step 1: Write the failing test**
 
@@ -834,7 +838,7 @@ describe('buildSearchDocs', () => {
 Run: `cd /home/mantis/dev/productport/web && npx vitest run lib/help/searchDocs.test.ts`
 Expected: FAIL — `Error: Failed to resolve import "./searchDocs"`.
 
-- [ ] **Step 3: Write the popover content**
+- [ ] **Step 3: Write the popover content (English defaults + locale-aware getters)**
 
 ```ts
 // web/lib/help/popovers.ts
@@ -848,7 +852,14 @@ Expected: FAIL — `Error: Failed to resolve import "./searchDocs"`.
 // product, chosen interactively, not via a deep link) — a search result
 // click lands on the catalog root, from which the user opens Edit on any
 // product to reach the section the popover describes.
+//
+// getPopoverContent/getPopoverTitle are locale-aware, mirroring content.ts's
+// getHelpContent pattern — Global Constraints require zh/fr for every new
+// string, popovers included, no carve-out.
 import type { HelpContent } from '@matthewdbaldwin/microport-ui/help';
+import { normalizeLocale } from './content';
+import { POPOVERS as POPOVERS_ZH, POPOVER_TITLES as TITLES_ZH } from './popovers.zh';
+import { POPOVERS as POPOVERS_FR, POPOVER_TITLES as TITLES_FR } from './popovers.fr';
 
 export const GALLERY_POPOVER: HelpContent = {
   summary: 'Manage this product’s gallery — add, set primary, or delete images.',
@@ -866,9 +877,55 @@ export const CLEARANCE_POPOVER: HelpContent = {
     'Clearance changes save together with the rest of the form, via Save changes.',
   ],
 };
+
+export const POPOVER_TITLES = {
+  gallery:   'Managing product images',
+  clearance: 'Editing the Clearance matrix',
+} as const;
+
+export type PopoverKey = 'gallery' | 'clearance';
+
+const EN: Record<PopoverKey, HelpContent> = { gallery: GALLERY_POPOVER, clearance: CLEARANCE_POPOVER };
+const CONTENT_BY_LOCALE: Record<'en' | 'zh' | 'fr', Record<PopoverKey, HelpContent>> = { en: EN, zh: POPOVERS_ZH, fr: POPOVERS_FR };
+const TITLES_BY_LOCALE:  Record<'en' | 'zh' | 'fr', Record<PopoverKey, string>> = { en: POPOVER_TITLES, zh: TITLES_ZH, fr: TITLES_FR };
+
+export function getPopoverContent(key: PopoverKey, locale: string = 'en-US'): HelpContent {
+  return CONTENT_BY_LOCALE[normalizeLocale(locale)]?.[key] ?? EN[key];
+}
+
+export function getPopoverTitle(key: PopoverKey, locale: string = 'en-US'): string {
+  return TITLES_BY_LOCALE[normalizeLocale(locale)]?.[key] ?? POPOVER_TITLES[key];
+}
 ```
 
-- [ ] **Step 4: Write `searchDocs.ts`**
+- [ ] **Step 4: Write the zh and fr translations via the local 3090 tier**
+
+Same pattern as Task 3 Step 4, applied to the two popovers' summary/bullets and their two titles:
+
+```bash
+ask-local --translate zh "Translate this JSON object's string VALUES only from English to Chinese. Keep every key name exactly as-is (gallery, clearance, summary, bullets). Return ONLY the resulting JSON object, no commentary, no markdown fence: {\"POPOVERS\": {\"gallery\": {\"summary\": \"Manage this product's gallery — add, set primary, or delete images.\", \"bullets\": [\"Add image accepts JPEG, PNG, or WebP up to 6 MB.\", \"Set primary controls which image shows on the catalog card.\", \"Delete asks you to confirm before removing an image.\"]}, \"clearance\": {\"summary\": \"One row per region. Status, certificate number(s), qualifier, and notes are independent per row.\", \"bullets\": [\"Certificate number(s) is the Registration evidence for an approved Clearance — separate multiple numbers with a pipe (CE-100|CE-200).\", \"Clearance changes save together with the rest of the form, via Save changes.\"]}}, \"POPOVER_TITLES\": {\"gallery\": \"Managing product images\", \"clearance\": \"Editing the Clearance matrix\"}}"
+```
+
+Repeat with `--translate fr` for French. Spot-check that the Clearance translation keeps "Clearance"/"Registration" distinguishable — the same domain-terminology discipline Task 3's `product-edit` article applies — manually correct that one field if `ask-local` collapses them. Write each result as a sibling module (no import from `./popovers` — a self-contained `Record` literal, so there's no circular import with the file that imports these):
+
+```ts
+// web/lib/help/popovers.zh.ts
+import type { HelpContent } from '@matthewdbaldwin/microport-ui/help';
+
+export const POPOVERS: Record<'gallery' | 'clearance', HelpContent> = {
+  gallery:   { summary: '<translated>', bullets: ['<translated>', '<translated>', '<translated>'] },
+  clearance: { summary: '<translated>', bullets: ['<translated>', '<translated>'] },
+};
+
+export const POPOVER_TITLES: Record<'gallery' | 'clearance', string> = {
+  gallery:   '<translated>',
+  clearance: '<translated>',
+};
+```
+
+Write `web/lib/help/popovers.fr.ts` in the same shape with the French values.
+
+- [ ] **Step 5: Write `searchDocs.ts`**
 
 ```ts
 // web/lib/help/searchDocs.ts
@@ -877,7 +934,7 @@ export const CLEARANCE_POPOVER: HelpContent = {
 // searchHelpFuzzy) consumes.
 import { HELP_CONTENT_SLUGS, getHelpContent, normalizeLocale } from './content';
 import { lookupHelpItem } from './sections';
-import { GALLERY_POPOVER, CLEARANCE_POPOVER } from './popovers';
+import { getPopoverContent, getPopoverTitle } from './popovers';
 import type { HelpBlock, HelpSearchDoc } from '@matthewdbaldwin/microport-ui/help/logic';
 import type { HelpContent } from '@matthewdbaldwin/microport-ui/help';
 
@@ -916,27 +973,30 @@ export function buildSearchDocs(locale: string = 'en-US'): HelpSearchDoc[] {
       body: body.join(' '), roles: entry?.item.roles, kind: 'article',
     });
   }
-  docs.push(popoverDoc('product-edit-gallery-popover', 'Managing product images', GALLERY_POPOVER));
-  docs.push(popoverDoc('product-edit-clearance-popover', 'Editing the Clearance matrix', CLEARANCE_POPOVER));
+  docs.push(popoverDoc('product-edit-gallery-popover', getPopoverTitle('gallery', locale), getPopoverContent('gallery', locale)));
+  docs.push(popoverDoc('product-edit-clearance-popover', getPopoverTitle('clearance', locale), getPopoverContent('clearance', locale)));
   return docs;
 }
 ```
 
-- [ ] **Step 5: Run test to verify it passes**
+- [ ] **Step 6: Run test to verify it passes**
 
 Run: `cd /home/mantis/dev/productport/web && npx vitest run lib/help/searchDocs.test.ts`
-Expected: PASS — 4 tests.
+Expected: PASS — 4 tests. (Step 1's test only exercises `buildSearchDocs('en-US')`, which resolves to the `GALLERY_POPOVER`/`CLEARANCE_POPOVER` English constants via `getPopoverContent`'s `en` branch — the assertions against those two constants still hold unchanged.)
 
-- [ ] **Step 6: Commit**
+- [ ] **Step 7: Commit**
 
 ```bash
 cd /home/mantis/dev/productport
-git add web/lib/help/popovers.ts web/lib/help/searchDocs.ts web/lib/help/searchDocs.test.ts
-git commit -m "Add buildSearchDocs + the 2 contextual popover content constants
+git add web/lib/help/popovers.ts web/lib/help/popovers.zh.ts web/lib/help/popovers.fr.ts web/lib/help/searchDocs.ts web/lib/help/searchDocs.test.ts
+git commit -m "Add buildSearchDocs + the 2 contextual popovers, localized en/zh/fr
 
 Popovers are indexed as kind:'popover' docs (targetHref: '/', since
 neither gallery nor Clearance-matrix editing has its own addressable URL)
-alongside the 6 kind:'article' docs — same search corpus, same ranking."
+alongside the 6 kind:'article' docs — same search corpus, same ranking.
+getPopoverContent/getPopoverTitle select the right-language variant
+(zh/fr drafted via the local 3090 tier), matching the Global Constraint
+that every new string gets all three locales, popovers included."
 ```
 
 ---
@@ -1394,7 +1454,7 @@ git commit -m "Wire the /help route tree — index, article pages, command palet
 - Test: `web/app/ProductEditModal.help.test.tsx`
 
 **Interfaces:**
-- Consumes: `HelpButton` from `@matthewdbaldwin/microport-ui/help` (Task 1); `GALLERY_POPOVER`, `CLEARANCE_POPOVER` from `@/lib/help/popovers` (Task 4).
+- Consumes: `HelpButton` from `@matthewdbaldwin/microport-ui/help` (Task 1); `getPopoverContent` from `@/lib/help/popovers` (Task 4, locale-aware — not the raw `GALLERY_POPOVER`/`CLEARANCE_POPOVER` constants, so the live popover matches the user's locale the same way search results already do); `useAuth` from `@/contexts/AuthContext`; `DEFAULT_LOCALE` from `@/lib/locales`.
 - Produces: nothing new consumed elsewhere — these are UI leaves matching the search docs Task 4 already built.
 
 - [ ] **Step 1: Write the failing test**
@@ -1442,7 +1502,7 @@ describe('ProductEditModal help popovers (edit mode only)', () => {
 Run: `cd /home/mantis/dev/productport/web && npx vitest run app/ProductEditModal.help.test.tsx`
 Expected: FAIL — no `HelpButton`/"about this" trigger exists yet (0 matches, expected ≥2).
 
-- [ ] **Step 3: Wire the two `HelpButton`s**
+- [ ] **Step 3: Wire the two `HelpButton`s, locale-aware**
 
 ```diff
  import {
@@ -1452,7 +1512,20 @@ Expected: FAIL — no `HelpButton`/"about this" trigger exists yet (0 matches, e
    type ClearanceRow, type ClearanceStatus,
  } from '@/lib/products';
 +import { HelpButton } from '@matthewdbaldwin/microport-ui/help';
-+import { GALLERY_POPOVER, CLEARANCE_POPOVER } from '@/lib/help/popovers';
++import { getPopoverContent } from '@/lib/help/popovers';
++import { useAuth } from '@/contexts/AuthContext';
++import { DEFAULT_LOCALE } from '@/lib/locales';
+```
+
+`ProductEditModal.tsx` doesn't currently call `useAuth()` anywhere — this is its first use in the file. `AuthContext`'s `Ctx` default (`{ user: null, loading: true }`) means calling `useAuth()` without a wrapping `AuthProvider` is safe and just returns `user: null` — the existing `ProductEditModal.help.test.tsx` (Step 1) renders `<ProductEditModal>` with no `AuthProvider`, so `user?.locale ?? DEFAULT_LOCALE` falls back to English there, which is what the test already asserts against:
+
+```diff
+ }) {
+   const i = initial ?? {};
++  const { user } = useAuth();
++  const galleryPopover = getPopoverContent('gallery', user?.locale ?? DEFAULT_LOCALE);
++  const clearancePopover = getPopoverContent('clearance', user?.locale ?? DEFAULT_LOCALE);
+   const [f, setF] = useState<Record<string, string>>({
 ```
 
 ```diff
@@ -1461,7 +1534,7 @@ Expected: FAIL — no `HelpButton`/"about this" trigger exists yet (0 matches, e
 -            <span>Product images <em style={{ color: 'var(--grey)', fontWeight: 400 }}>— gallery; the primary shows on the catalog card. JPEG/PNG/WebP, max 6 MB each.</em></span>
 +            <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
 +              Product images <em style={{ color: 'var(--grey)', fontWeight: 400 }}>— gallery; the primary shows on the catalog card. JPEG/PNG/WebP, max 6 MB each.</em>
-+              <HelpButton content={GALLERY_POPOVER} inline />
++              <HelpButton content={galleryPopover} inline />
 +            </span>
 ```
 
@@ -1471,7 +1544,7 @@ Expected: FAIL — no `HelpButton`/"about this" trigger exists yet (0 matches, e
 -            <span>Regulatory clearances <em style={{ color: 'var(--grey)', fontWeight: 400 }}>— status, certificate number(s) (pipe-separated), and any caveat, per region.</em></span>
 +            <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
 +              Regulatory clearances <em style={{ color: 'var(--grey)', fontWeight: 400 }}>— status, certificate number(s) (pipe-separated), and any caveat, per region.</em>
-+              <HelpButton content={CLEARANCE_POPOVER} inline />
++              <HelpButton content={clearancePopover} inline />
 +            </span>
 ```
 
@@ -1493,7 +1566,9 @@ git add web/app/ProductEditModal.tsx web/app/ProductEditModal.help.test.tsx
 git commit -m "Wire the gallery + Clearance-matrix help popovers into ProductEditModal
 
 Both use the legacy HelpButton component (not a full article) — matches
-Task 4's kind:'popover' search-doc indexing for the same two sections."
+Task 4's kind:'popover' search-doc indexing for the same two sections.
+Content is locale-aware via getPopoverContent(key, user?.locale), same
+as everywhere else in this plan."
 ```
 
 ---
@@ -1714,10 +1789,10 @@ Expected: FAIL — `scripts/help-audit.js` doesn't exist yet.
 //      web/lib/help/content/<slug>.ts with slug/title/intro/lastUpdated/
 //      sections/related present, in all 3 locales (en/zh/fr).
 //   3. Locale parity for the 2 popovers (web/lib/help/popovers.ts + its
-//      zh/fr siblings, once those exist — Task 4 as written ships en-only
-//      popovers; this is a WARNING not a blocker, matching the PRD's
-//      "no native-speaker zh/fr QA" scope cut, but locale PARITY —
-//      whether a .zh.ts/.fr.ts sibling exists at all — is still checked).
+//      zh/fr siblings, which Task 4 creates — a missing sibling is a
+//      WARNING not a blocker, same convention as Check 2's zh/fr articles:
+//      the real enforcement is Task 4's own vitest suite, this is a
+//      redundant regression detector).
 //   4. Every content module's labels: [...] fields appear verbatim
 //      somewhere in web/components/**, web/app/**, or web/messages/*.json
 //      (stale-label detection).
@@ -1820,12 +1895,19 @@ for (const item of helpItems) {
 }
 
 // ── Check 3 — popover locale parity ─────────────────────────────────────────
+// Same severity convention as Check 2: the real enforcement is Task 4's own
+// vitest suite (buildSearchDocs resolves locale-aware content); this is a
+// redundant regression detector, so a missing zh/fr module is a warning, not
+// a blocker — same as a missing zh/fr article module above.
 const popoverFile = path.join(WEB, 'lib', 'help', 'popovers.ts');
 if (!fs.existsSync(popoverFile)) {
   add('blocker', 'popovers-missing', 'web/lib/help/popovers.ts not found.', popoverFile);
 } else {
   for (const locale of ['zh', 'fr']) {
-    add('warning', 'popover-locale-missing', `popovers.ts has no ${locale} translation module yet (en-only ships in this plan; zh/fr for popovers is a follow-up).`, popoverFile);
+    const file = path.join(WEB, 'lib', 'help', `popovers.${locale}.ts`);
+    if (!fs.existsSync(file)) {
+      add('warning', 'popover-locale-missing', `popovers.ts has no ${locale} translation module.`, file);
+    }
   }
 }
 
