@@ -21,7 +21,15 @@ jest.mock('../src/lib/db', () => ({
       if (data.senderEventId) mockStore.events.set(data.senderEventId, row);
       return row;
     }),
-    update: jest.fn(async () => ({})),
+    update: jest.fn(async ({ where, data }) => {
+      for (const row of mockStore.events.values()) {
+        if (row.id === where.id) {
+          Object.assign(row, data);
+          return row;
+        }
+      }
+      return {};
+    }),
   },
   user: {
     findUnique: jest.fn(async () => (mockStore.user ? { id: mockStore.user.id, active: mockStore.user.active, role: mockStore.user.role } : null)),
@@ -32,6 +40,7 @@ jest.mock('../src/lib/db', () => ({
 const express = require('express');
 const request = require('supertest');
 const { signWebhookBody } = require('@matthewdbaldwin/microport-auth');
+const db = require('../src/lib/db');
 
 function makeApp() {
   const app = express();
@@ -80,6 +89,29 @@ describe('POST /api/sso/lifecycle/event', () => {
     const second = await post(app, '/api/sso/lifecycle/event', body, { eventId: 'ob-1' });
     expect(second.status).toBe(200);
     expect(second.body.deduplicated).toBe(true);
+  });
+
+  test('retried delivery whose prior attempt never finished (processedAt: null) re-processes instead of deduping', async () => {
+    const app = makeApp();
+    // Simulate a prior delivery that logged the audit row but died mid-processing
+    // (e.g. a transient db.user.update failure) — the catch block sets `error`
+    // but leaves `processedAt: null` and 5xx's so the sender retries.
+    mockStore.events.set('ob-2', {
+      id: 'evt_prior', senderEventId: 'ob-2', email: 'gone@test.local', kind: 'disable',
+      prevRole: null, newRole: null, actorEmail: 'admin@test.local', actorRole: 'admin',
+      payload: evt(), processedAt: null, error: 'transient failure',
+    });
+
+    const res = await post(app, '/api/sso/lifecycle/event', evt(), { eventId: 'ob-2' });
+
+    expect(res.status).toBe(200);
+    expect(res.body.deduplicated).toBeUndefined();
+    // Processing actually re-ran: the disable side-effect landed this time.
+    expect(mockStore.user.active).toBe(false);
+    expect(db.user.update).toHaveBeenCalled();
+    // The existing row was reused, not re-created (senderEventId is @unique —
+    // a second create() for the same id would throw a unique-constraint error).
+    expect(db.userLifecycleEvent.create).not.toHaveBeenCalled();
   });
 
   test('malformed payload → 200 dropped (soft-drop, no outbox retry)', async () => {

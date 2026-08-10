@@ -1,8 +1,8 @@
 // src/routes/ssoLifecycle.js
 // Inbound SSO-lifecycle webhook from salesport, mounted at /api/sso/lifecycle.
-// This is the fleet-canonical receiver (matches opsport/reviewport/clinicport/
-// execport): HMAC-verified via microport-auth's createLifecycleGuard over the
-// raw body, header x-salesport-signature, shared secret SALESPORT_LIFECYCLE_SECRET.
+// Mirrors opsport's pattern, like the other satellites: HMAC-verified via
+// microport-auth's createLifecycleGuard over the raw body, header
+// x-salesport-signature, shared secret SALESPORT_LIFECYCLE_SECRET.
 // Replaced the scaffold's /api/webhooks/salesport orphan, which was built against
 // the legacy webhook naming and never matched salesport's sender (Apple 2026-07-01).
 //
@@ -57,31 +57,42 @@ router.post('/event', lifecycleGuard, async (req, res) => {
   const normEmail = email.toLowerCase().trim();
 
   // Idempotency: salesport's outbox retries carry X-Lifecycle-Event-Id (its
-  // LifecycleOutbox.id). A repeat delivery collides on senderEventId → short-circuit.
+  // LifecycleOutbox.id). A repeat delivery collides on senderEventId → short-circuit
+  // ONLY if that prior delivery actually finished (processedAt set). A row whose
+  // processing died mid-way (processedAt: null — see the catch block below) must
+  // be reused and re-processed, not treated as done, or the event is silently
+  // dropped forever.
   const senderEventId = req.get('X-Lifecycle-Event-Id') || null;
+  let eventRow;
   if (senderEventId) {
     const dup = await db.userLifecycleEvent
-      .findUnique({ where: { senderEventId }, select: { id: true } })
+      .findUnique({ where: { senderEventId }, select: { id: true, processedAt: true, error: true } })
       .catch(() => null);
-    if (dup) return res.json({ ok: true, eventId: dup.id, deduplicated: true });
+    if (dup) {
+      if (dup.processedAt) return res.json({ ok: true, eventId: dup.id, deduplicated: true });
+      eventRow = dup;
+    }
   }
 
   // Log first — the audit row must exist even if the local user doesn't. A
   // failed write is the one case we 5xx (transient) so the event is redelivered.
-  let eventRow;
-  try {
-    eventRow = await db.userLifecycleEvent.create({
-      data: {
-        senderEventId, email: normEmail, kind,
-        prevRole: prevRole ?? null, newRole: newRole ?? null,
-        actorEmail: actorEmail ?? null, actorRole: actorRole ?? null,
-        payload,
-      },
-    });
-  } catch (err) {
-    logger.error({ err: err.message, correlationId, email: normEmail, kind },
-      '[sso-lifecycle] audit write failed — 5xx to allow salesport retry');
-    return res.status(500).json({ error: 'Event log write failed.' });
+  // Skipped when reusing an existing unprocessed row (senderEventId is @unique —
+  // a second create() for the same id would throw a unique-constraint error).
+  if (!eventRow) {
+    try {
+      eventRow = await db.userLifecycleEvent.create({
+        data: {
+          senderEventId, email: normEmail, kind,
+          prevRole: prevRole ?? null, newRole: newRole ?? null,
+          actorEmail: actorEmail ?? null, actorRole: actorRole ?? null,
+          payload,
+        },
+      });
+    } catch (err) {
+      logger.error({ err: err.message, correlationId, email: normEmail, kind },
+        '[sso-lifecycle] audit write failed — 5xx to allow salesport retry');
+      return res.status(500).json({ error: 'Event log write failed.' });
+    }
   }
 
   try {

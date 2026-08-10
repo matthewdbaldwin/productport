@@ -73,6 +73,35 @@ describe('GET /api/opsport/products — search', () => {
     const { where } = db.product.findMany.mock.calls[0][0];
     expect(where.deletedAt).toBeNull();
   });
+
+  // Boundary-blindness regression (products.js:79 already excludes DRAFT on
+  // this repo's own catalog route; this cross-app picker was missing it).
+  test('the query excludes DRAFT products (where.status matches products.js)', async () => {
+    db.product.findMany.mockResolvedValue([]);
+    await auth(request(makeApp()).get('/api/opsport/products'));
+    const { where } = db.product.findMany.mock.calls[0][0];
+    expect(where.status).toEqual({ not: 'DRAFT' });
+  });
+
+  test('a DRAFT product is not returned by the picker', async () => {
+    const rows = [
+      { id: 'p1', slug: 'accusniper', name: 'AccuSniper', status: 'ACTIVE', deletedAt: null },
+      { id: 'p2', slug: 'draftsniper', name: 'DraftSniper', status: 'DRAFT', deletedAt: null },
+    ];
+    db.product.findMany.mockImplementation(({ where, select }) => {
+      const matches = rows.filter((r) =>
+        r.deletedAt === where.deletedAt &&
+        (!where.status || r.status !== where.status.not));
+      return Promise.resolve(matches.map((r) => {
+        const shaped = {};
+        for (const key of Object.keys(select)) shaped[key] = r[key];
+        return shaped;
+      }));
+    });
+    const res = await auth(request(makeApp()).get('/api/opsport/products'));
+    expect(res.status).toBe(200);
+    expect(res.body.products).toEqual([{ slug: 'accusniper', name: 'AccuSniper' }]);
+  });
 });
 
 describe('GET /api/opsport/products/:slug/clearance/:country', () => {
@@ -82,6 +111,32 @@ describe('GET /api/opsport/products/:slug/clearance/:country', () => {
   test('404s when the product slug does not exist', async () => {
     const res = await auth(request(makeApp()).get('/api/opsport/products/nope/clearance/BR'));
     expect(res.status).toBe(404);
+  });
+
+  // Boundary-blindness regression: the clearance-resolve lookup must exclude
+  // DRAFT products too, matching the picker query and products.js:79.
+  test('the product lookup excludes DRAFT products (where.status matches products.js)', async () => {
+    db.product.findFirst.mockResolvedValue({ id: 'p1' });
+    await auth(request(makeApp()).get('/api/opsport/products/accusniper/clearance/BR'));
+    const { where } = db.product.findFirst.mock.calls[0][0];
+    expect(where.status).toEqual({ not: 'DRAFT' });
+  });
+
+  test('a DRAFT product 404s instead of resolving clearance', async () => {
+    const rows = [
+      { id: 'p1', slug: 'accusniper', status: 'ACTIVE', deletedAt: null },
+      { id: 'p2', slug: 'draftsniper', status: 'DRAFT', deletedAt: null },
+    ];
+    db.product.findFirst.mockImplementation(({ where }) => {
+      const match = rows.find((r) =>
+        r.slug === where.slug &&
+        r.deletedAt === where.deletedAt &&
+        (!where.status || r.status !== where.status.not));
+      return Promise.resolve(match ? { id: match.id } : null);
+    });
+    const res = await auth(request(makeApp()).get('/api/opsport/products/draftsniper/clearance/BR'));
+    expect(res.status).toBe(404);
+    expect(db.countryClearance.findFirst).not.toHaveBeenCalled();
   });
 
   test('400s on a malformed country code', async () => {
