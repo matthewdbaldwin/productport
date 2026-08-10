@@ -30,6 +30,10 @@ jest.mock('../src/lib/db', () => ({
       }
       return {};
     }),
+    // Default to "wins the claim" so every existing test — which never
+    // exercises the race itself — keeps passing unmodified. Concurrency
+    // tests below override with mockResolvedValueOnce.
+    updateMany: jest.fn().mockResolvedValue({ count: 1 }),
   },
   user: {
     findUnique: jest.fn(async () => (mockStore.user ? { id: mockStore.user.id, active: mockStore.user.active, role: mockStore.user.role } : null)),
@@ -127,6 +131,87 @@ describe('POST /api/sso/lifecycle/event', () => {
     const res = await post(app, '/api/sso/lifecycle/event', evt({ email: 'ghost@test.local' }));
     expect(res.status).toBe(200);
     expect(res.body.ok).toBe(true);
+  });
+});
+
+describe('POST /api/sso/lifecycle/event — concurrent-delivery atomic claim', () => {
+  beforeEach(() => { mockStore.events.clear(); mockStore.user = { id: 7, email: 'gone@test.local', active: true, role: 'product_admin' }; jest.clearAllMocks(); });
+
+  // Seeds an existing-but-unprocessed audit row, same shape the dedup lookup
+  // (senderEventId → processedAt: null) reuses rather than re-creating.
+  const seedUnprocessed = (senderEventId, id) => {
+    mockStore.events.set(senderEventId, {
+      id, senderEventId, email: 'gone@test.local', kind: 'disable',
+      prevRole: null, newRole: null, actorEmail: 'admin@test.local', actorRole: 'admin',
+      payload: evt(), processedAt: null, error: null,
+    });
+  };
+
+  test('the claim is a single updateMany scoped by id AND processedAt: null, in the same statement that sets processedAt', async () => {
+    const app = makeApp();
+    seedUnprocessed('claim-1', 'evt_claim');
+
+    await post(app, '/api/sso/lifecycle/event', evt(), { eventId: 'claim-1' });
+
+    expect(db.userLifecycleEvent.updateMany).toHaveBeenCalledWith({
+      where: { id: 'evt_claim', processedAt: null },
+      data: { processedAt: expect.any(Date) },
+    });
+  });
+
+  test('two concurrent deliveries of the same unprocessed row: the User side-effect fires exactly once', async () => {
+    const app = makeApp();
+    // Both concurrent deliveries must read the row BEFORE either has committed.
+    // Queuing two identical processedAt:null snapshots (rather than the live
+    // seeded-row lookup) guarantees that, regardless of which request's event
+    // loop turn actually finishes first — supertest is real (if loopback) I/O,
+    // so that order isn't deterministic — neither dedup pre-check can be
+    // retroactively short-circuited by the other's completion. That would test
+    // Node scheduling, not the atomic claim below it.
+    db.userLifecycleEvent.findUnique
+      .mockResolvedValueOnce({ id: 'evt_race', senderEventId: 'race-1', processedAt: null, error: null })
+      .mockResolvedValueOnce({ id: 'evt_race', senderEventId: 'race-1', processedAt: null, error: null });
+    db.userLifecycleEvent.updateMany
+      .mockResolvedValueOnce({ count: 1 })
+      .mockResolvedValueOnce({ count: 0 });
+
+    const [r1, r2] = await Promise.all([
+      post(app, '/api/sso/lifecycle/event', evt(), { eventId: 'race-1' }),
+      post(app, '/api/sso/lifecycle/event', evt(), { eventId: 'race-1' }),
+    ]);
+
+    const deduped = [r1.body.deduplicated, r2.body.deduplicated];
+    expect(deduped.filter((d) => d === true)).toHaveLength(1);
+    expect(deduped.filter((d) => d !== true)).toHaveLength(1);
+    expect(db.user.update).toHaveBeenCalledTimes(1);
+  });
+
+  test('the loser of the atomic claim never reads or writes the User row', async () => {
+    const app = makeApp();
+    seedUnprocessed('lose-1', 'evt_lose');
+    db.userLifecycleEvent.updateMany.mockResolvedValueOnce({ count: 0 });
+
+    const res = await post(app, '/api/sso/lifecycle/event', evt(), { eventId: 'lose-1' });
+
+    expect(res.body.deduplicated).toBe(true);
+    expect(db.user.findUnique).not.toHaveBeenCalled();
+    expect(db.user.update).not.toHaveBeenCalled();
+  });
+
+  test('a processing failure after winning the claim resets processedAt back to null', async () => {
+    const app = makeApp();
+    seedUnprocessed('fail-1', 'evt_fail');
+    db.user.findUnique.mockRejectedValueOnce(new Error('boom'));
+
+    const res = await post(app, '/api/sso/lifecycle/event', evt(), { eventId: 'fail-1' });
+
+    expect(res.status).toBe(500);
+    expect(db.userLifecycleEvent.update).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: { id: 'evt_fail' },
+        data: expect.objectContaining({ processedAt: null }),
+      })
+    );
   });
 });
 

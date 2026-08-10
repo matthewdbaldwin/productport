@@ -96,6 +96,22 @@ router.post('/event', lifecycleGuard, async (req, res) => {
   }
 
   try {
+    // Atomic claim: the dedup check above (and the reuse of an existing
+    // unprocessed row) only protects against SEQUENTIAL retries — two
+    // concurrent deliveries of the same event can both read processedAt: null
+    // before either commits, and both fall through into the side effects
+    // below. This conditional UPDATE is a single indivisible statement:
+    // Postgres evaluates the WHERE and performs the write together under the
+    // row's lock, so of two callers racing on the same row at most one can
+    // see count === 1. The loser deduplicates without touching the User row.
+    const claim = await db.userLifecycleEvent.updateMany({
+      where: { id: eventRow.id, processedAt: null },
+      data: { processedAt: new Date() },
+    });
+    if (claim.count === 0) {
+      return res.json({ ok: true, eventId: eventRow.id, deduplicated: true });
+    }
+
     const existing = await db.user.findUnique({
       where: { email: normEmail },
       select: { id: true, active: true },
@@ -112,8 +128,12 @@ router.post('/event', lifecycleGuard, async (req, res) => {
     });
     return res.json({ ok: true, eventId: eventRow.id, ...(decision.data ? { applied: true } : {}) });
   } catch (err) {
+    // Reset processedAt back to null: the claim above already marked this row
+    // processed, but processing itself failed, so a genuine retry must be able
+    // to reclaim it — otherwise the claim leaves the row permanently looking
+    // "done" and the event is silently dropped forever.
     await db.userLifecycleEvent
-      .update({ where: { id: eventRow.id }, data: { error: String(err.message).slice(0, 500) } })
+      .update({ where: { id: eventRow.id }, data: { error: String(err.message).slice(0, 500), processedAt: null } })
       .catch(() => { /* secondary failure — swallow */ });
     logger.error({ err: err.message, correlationId, email: normEmail, kind, eventId: eventRow.id },
       '[sso-lifecycle] processing failed');
