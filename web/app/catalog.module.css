@@ -142,19 +142,31 @@
   background: var(--ok);
   display: inline-block;
 }
-.hublink {
-  font-size: 12px;
-  font-weight: 500;
-  color: var(--blue);
-  text-decoration: none;
-  padding: 6px 10px;
-  border-radius: 8px;
+.chromeGroup {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px;
   border: 1px solid var(--lgrey);
+  border-radius: 10px;
   background: #fff;
-  white-space: nowrap;
 }
-.hublink:hover {
-  border-color: var(--blue);
+.iconBtn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  border: none;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--muted, var(--grey));
+  cursor: pointer;
+  transition: background 0.12s, color 0.12s;
+}
+.iconBtn:hover {
+  background: var(--bg);
+  color: var(--blue);
 }
 
 /* ── Filter bars ─────────────────────────────────────────────────────────── */

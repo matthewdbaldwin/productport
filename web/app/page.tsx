@@ -8,7 +8,9 @@
 // / detail entirely in memory. Every authenticated employee is a viewer.
 import { useEffect, useMemo, useState, useCallback } from 'react';
 import { useModalEsc, useFocusTrap, Tooltip } from '@matthewdbaldwin/microport-ui';
+import { UserCircle } from 'lucide-react';
 import { useRouter } from 'next/navigation';
+import { useTranslations } from 'next-intl';
 import { useAuth } from '@/contexts/AuthContext';
 import { api } from '@/lib/api';
 import { statusOf, orderedAreas, filterProducts } from '@/lib/catalogFilter';
@@ -17,6 +19,8 @@ import { ProductEditModal } from './ProductEditModal';
 import { ImportCsvButton } from './ImportCsvButton';
 import { galleryImageSrc, disableProduct, enableProduct, type ProductInput, type GalleryImage } from '@/lib/products';
 import { useToast } from '@/components/ui/Toast';
+import { AppSwitcher } from '@/components/layout/AppSwitcher';
+import { ProfileModal } from '@/components/layout/ProfileModal';
 import s from './catalog.module.css';
 
 type ClearanceStatus = 'APPROVED' | 'IN_PROGRESS' | 'SUBMITTED' | 'NOT_APPROVED' | 'NONE';
@@ -343,8 +347,10 @@ function DetailModal({ p, onClose, onEdit, onToggleDisabled, toggling }: {
 export default function CatalogPage() {
   const router = useRouter();
   const { user, loading } = useAuth();
+  const tProfile = useTranslations('profile');
   const [products, setProducts] = useState<Product[] | null>(null);
   const [loadError, setLoadError] = useState(false);
+  const [profileOpen, setProfileOpen] = useState(false);
 
   const [fr, setFr] = useState<string | null>(null);
   const [sub, setSub] = useState<string | null>(null);
@@ -471,9 +477,24 @@ export default function CatalogPage() {
               Export CSV
             </a>
           )}
-          <a className={s.hublink} href="https://hub.microport.com">← Hub</a>
+          <span className={s.chromeGroup}>
+            <AppSwitcher />
+            <Tooltip content={tProfile('openProfile')}>
+              <button
+                type="button"
+                {...testId(NS, 'openProfile')}
+                onClick={() => setProfileOpen(true)}
+                aria-label={tProfile('openProfile')}
+                className={s.iconBtn}
+              >
+                <UserCircle size={20} />
+              </button>
+            </Tooltip>
+          </span>
         </div>
       </div>
+
+      <ProfileModal open={profileOpen} onClose={() => setProfileOpen(false)} />
 
       <div className={s.wrap}>
         {loadError ? (

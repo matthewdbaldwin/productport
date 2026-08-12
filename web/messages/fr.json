@@ -13,6 +13,14 @@
   "home": {
     "welcome": "Bienvenue, {name}."
   },
+  "profile": {
+    "title": "Profil",
+    "openProfile": "Profil",
+    "close": "Fermer",
+    "ssoNote": "Votre nom, votre e-mail et votre rôle sont gérés par le hub MicroPort.",
+    "theme": "Thème",
+    "manageAccount": "Gérer votre compte"
+  },
   "bug": {
     "label": "Signaler un bug",
     "titleLabel": "Titre *",
