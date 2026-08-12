@@ -12,6 +12,7 @@
 // header would erase data; the rejection message names the missing columns.
 
 import { csvRow } from '@matthewdbaldwin/microport-contracts/csv';
+import { CheckCircle2, Upload } from 'lucide-react';
 import { useRef, useState } from 'react';
 import s from './catalog.module.css';
 import { importProductsCsv, type ImportResult } from '@/lib/products';
@@ -75,10 +76,10 @@ export function ImportCsvButton({ onDone }: { onDone: () => void | Promise<void>
     <>
       <input ref={ref} type="file" accept=".csv,text/csv" hidden onChange={onFile} {...testId(NS, 'input')} />
       <button type="button" className={s.btn} disabled={busy} {...testId(NS, 'verify')} onClick={() => pick(true)}>
-        {busy ? 'Working…' : 'Verify (dry run)'}
+        <CheckCircle2 size={15} /> {busy ? 'Working…' : 'Verify (dry run)'}
       </button>
       <button type="button" className={s.btn} disabled={busy} {...testId(NS, 'import')} onClick={() => pick(false)}>
-        {busy ? 'Importing…' : 'Import CSV'}
+        <Upload size={15} /> {busy ? 'Importing…' : 'Import CSV'}
       </button>
       {(result || err) && (
         <span

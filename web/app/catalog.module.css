@@ -348,7 +348,11 @@
   cursor: pointer;
   display: inline-flex;
   align-items: center;
+  gap: 6px;
   min-height: 44px; /* tap-target standard */
+}
+.btn svg {
+  flex: none;
 }
 .clearbtn {
   margin-left: auto;

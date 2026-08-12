@@ -8,7 +8,7 @@
 // / detail entirely in memory. Every authenticated employee is a viewer.
 import { useEffect, useMemo, useState, useCallback } from 'react';
 import { useModalEsc, useFocusTrap, Tooltip } from '@matthewdbaldwin/microport-ui';
-import { UserCircle } from 'lucide-react';
+import { UserCircle, Plus, Download } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { useTranslations } from 'next-intl';
 import { useAuth } from '@/contexts/AuthContext';
@@ -469,11 +469,11 @@ export default function CatalogPage() {
           {isAdmin && (
             <span className={s.actionGroup}>
               <button type="button" className={s.btn} {...testId(NS, 'addProduct')} onClick={() => setEditState({ mode: 'create' })}>
-                + Add product
+                <Plus size={15} /> Add product
               </button>
               <ImportCsvButton onDone={loadProducts} />
               <a className={s.btn} href="/api/products/export.csv" {...testId(NS, 'exportCsv')} style={{ textDecoration: 'none' }}>
-                Export CSV
+                <Download size={15} /> Export CSV
               </a>
             </span>
           )}
