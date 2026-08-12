@@ -314,7 +314,7 @@ export function ProductEditModal({ mode, initial, onClose, onSaved, onGalleryCha
                 return (
                   <div key={img.id} style={{ width: 96, opacity: busy ? 0.55 : 1 }}>
                     <div style={{ position: 'relative' }}>
-                      <img src={galleryImageSrc(i.slug as string, img.id)} alt="" style={{ width: 96, height: 96, objectFit: 'cover', borderRadius: 6, border: img.isPrimary ? '2px solid var(--blue)' : '1px solid var(--lgrey)' }} />
+                      <img src={galleryImageSrc(i.slug as string, img.id)} alt="" style={{ width: 96, height: 96, objectFit: 'cover', borderRadius: 6, border: img.isPrimary ? '2px solid var(--catalog-blue)' : '1px solid var(--lgrey)' }} />
                       {img.isPrimary && <span className={s.primaryBadge}>Primary</span>}
                     </div>
                     {/* Small labels, but a 44px-tall hit area (padding) per the tap-target standard. */}
@@ -329,7 +329,7 @@ export function ProductEditModal({ mode, initial, onClose, onSaved, onGalleryCha
                     ) : (
                       <div style={{ display: 'flex', gap: 6, marginTop: 3, fontSize: 11, alignItems: 'center', minHeight: 44 }}>
                         {!img.isPrimary && <button type="button" onClick={() => onSetPrimary(img.id)} disabled={busy} {...testId(NS, `setPrimaryImage-${img.id}`)}
-                          style={{ background: 'none', border: 'none', color: 'var(--blue)', cursor: 'pointer', padding: '11px 4px', minHeight: 44 }}>{busy ? '…' : 'Set primary'}</button>}
+                          style={{ background: 'none', border: 'none', color: 'var(--catalog-blue)', cursor: 'pointer', padding: '11px 4px', minHeight: 44 }}>{busy ? '…' : 'Set primary'}</button>}
                         <button type="button" onClick={() => setConfirmDelImg(img.id)} disabled={busy} aria-label="Delete image" {...testId(NS, `deleteImage-${img.id}`)}
                           style={{ background: 'none', border: 'none', color: 'var(--rd)', cursor: 'pointer', padding: '11px 4px', minHeight: 44, marginLeft: 'auto' }}>Delete</button>
                       </div>
@@ -365,21 +365,21 @@ export function ProductEditModal({ mode, initial, onClose, onSaved, onGalleryCha
                     <tr key={row.region}>
                       <td style={{ padding: '4px 6px', fontWeight: 600 }}>{row.region}</td>
                       <td style={{ padding: '4px 6px' }}>
-                        <select className={s.einput} aria-label={`${row.region} clearance status`} value={row.status} onChange={setCell(idx, 'status')}>
+                        <select className={s.einput} aria-label={`${row.region} clearance status`} value={row.status} onChange={setCell(idx, 'status')} {...testId(NS, `clearance-${row.region}-status`)}>
                           {CLR_STATUSES.map((st) => <option key={st} value={st}>{st}</option>)}
                         </select>
                       </td>
                       <td style={{ padding: '4px 6px' }}>
-                        <input className={s.einput} aria-label={`${row.region} certificate numbers`} value={row.certificateNumbers ?? ''} onChange={setCell(idx, 'certificateNumbers')} placeholder="e.g. CE-100|CE-200" />
+                        <input className={s.einput} aria-label={`${row.region} certificate numbers`} value={row.certificateNumbers ?? ''} onChange={setCell(idx, 'certificateNumbers')} placeholder="e.g. CE-100|CE-200" {...testId(NS, `clearance-${row.region}-certificateNumbers`)} />
                       </td>
                       <td style={{ padding: '4px 6px' }}>
-                        <select className={s.einput} aria-label={`${row.region} qualifier`} value={row.qualifier ?? ''} onChange={setCell(idx, 'qualifier')}>
+                        <select className={s.einput} aria-label={`${row.region} qualifier`} value={row.qualifier ?? ''} onChange={setCell(idx, 'qualifier')} {...testId(NS, `clearance-${row.region}-qualifier`)}>
                           <option value="">— none —</option>
                           {CLEARANCE_QUALIFIERS.map((q) => <option key={q} value={q}>{q}</option>)}
                         </select>
                       </td>
                       <td style={{ padding: '4px 6px' }}>
-                        <input className={s.einput} aria-label={`${row.region} clearance notes`} value={row.notes ?? ''} onChange={setCell(idx, 'notes')} />
+                        <input className={s.einput} aria-label={`${row.region} clearance notes`} value={row.notes ?? ''} onChange={setCell(idx, 'notes')} {...testId(NS, `clearance-${row.region}-notes`)} />
                       </td>
                     </tr>
                   ))}

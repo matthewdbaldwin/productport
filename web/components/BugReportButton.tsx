@@ -239,7 +239,7 @@ function BugReportModal({ onClose }: { onClose: () => void }) {
               {error && <p role="alert" className="text-sm" style={{ color: 'var(--red)' }}>{error}</p>}
               <div className="space-y-1">
                 <label htmlFor="bug-title" className="text-xs font-medium" style={{ color: 'var(--muted)' }}>{t('titleLabel')}</label>
-                <input id="bug-title" className="w-full rounded border px-2.5 py-2 text-sm"
+                <input id="bug-title" className="w-full rounded border px-2.5 py-2 text-sm min-h-11"
                   style={titleInvalid ? { ...inputStyle, borderColor: 'var(--red)' } : inputStyle}
                   aria-invalid={titleInvalid ? true : undefined}
                   value={title} onChange={(e) => { setTitle(e.target.value); setTitleInvalid(false); }} maxLength={200} autoFocus {...testId(NS, 'title')}
@@ -247,7 +247,7 @@ function BugReportModal({ onClose }: { onClose: () => void }) {
               </div>
               <div className="space-y-1">
                 <label htmlFor="bug-detail" className="text-xs font-medium" style={{ color: 'var(--muted)' }}>{t('detailLabel')}</label>
-                <textarea id="bug-detail" className="w-full rounded border px-2.5 py-2 text-sm resize-none"
+                <textarea id="bug-detail" className="w-full rounded border px-2.5 py-2 text-sm resize-none min-h-11"
                   style={detailInvalid ? { ...inputStyle, borderColor: 'var(--red)' } : inputStyle}
                   aria-invalid={detailInvalid ? true : undefined}
                   rows={4} value={detail} onChange={(e) => { setDetail(e.target.value); setDetailInvalid(false); }} maxLength={10000} {...testId(NS, 'detail')}
@@ -255,7 +255,7 @@ function BugReportModal({ onClose }: { onClose: () => void }) {
               </div>
               <div className="space-y-1">
                 <label htmlFor="bug-priority" className="text-xs font-medium" style={{ color: 'var(--muted)' }}>{t('priorityLabel')}</label>
-                <select id="bug-priority" className="w-full rounded border px-2.5 py-2 text-sm" style={inputStyle}
+                <select id="bug-priority" className="w-full rounded border px-2.5 py-2 text-sm min-h-11" style={inputStyle}
                   value={priority} onChange={(e) => setPriority(e.target.value as Priority)} {...testId(NS, 'priority')}>
                   {PRIORITIES.map((p) => <option key={p} value={p}>{t(`priority_${p}`)}</option>)}
                 </select>

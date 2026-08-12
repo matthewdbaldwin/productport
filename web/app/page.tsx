@@ -191,7 +191,7 @@ function DetailModal({ p, onClose, onEdit, onToggleDisabled, toggling }: {
                         type="button"
                         onClick={() => setHeroId(img.id)}
                         aria-label={label}
-                        style={{ padding: 0, border: active ? '2px solid var(--blue)' : '1px solid var(--lgrey)', borderRadius: 6, cursor: 'pointer', background: 'none', lineHeight: 0 }}
+                        style={{ padding: 0, border: active ? '2px solid var(--catalog-blue)' : '1px solid var(--lgrey)', borderRadius: 6, cursor: 'pointer', background: 'none', lineHeight: 0 }}
                       >
                         <img src={galleryImageSrc(p.id, img.id)} alt="" style={{ width: 48, height: 48, objectFit: 'cover', borderRadius: 5 }} />
                       </button>
@@ -250,7 +250,7 @@ function DetailModal({ p, onClose, onEdit, onToggleDisabled, toggling }: {
                   style={{
                     cursor: toggling ? 'default' : 'pointer', minHeight: 44, fontSize: 13, padding: '4px 10px', borderRadius: 6,
                     border: '1px solid var(--lgrey)', background: 'transparent', opacity: toggling ? 0.6 : 1,
-                    color: p.disabledAt ? 'var(--blue)' : 'var(--rd)',
+                    color: p.disabledAt ? 'var(--catalog-blue)' : 'var(--rd)',
                   }}
                 >
                   {toggling ? (p.disabledAt ? 'Enabling…' : 'Disabling…') : p.disabledAt ? 'Enable' : 'Disable'}
@@ -326,7 +326,7 @@ function DetailModal({ p, onClose, onEdit, onToggleDisabled, toggling }: {
                   <tbody>
                     {p.trials.map((t, i) => (
                       <tr key={i}>
-                        <td style={{ fontWeight: 500, color: 'var(--blue)' }}>{t.trial}</td>
+                        <td style={{ fontWeight: 500, color: 'var(--catalog-blue)' }}>{t.trial}</td>
                         <td style={{ color: 'var(--grey)', whiteSpace: 'nowrap' }}>{t.identifier}</td>
                         <td style={{ textAlign: 'center' }}>{t.n}</td>
                         <td>{t.design}</td>
@@ -467,15 +467,15 @@ export default function CatalogPage() {
           </span>
           <span className={s.conf}>For Internal Use Only</span>
           {isAdmin && (
-            <button type="button" className={s.btn} {...testId(NS, 'addProduct')} onClick={() => setEditState({ mode: 'create' })}>
-              + Add product
-            </button>
-          )}
-          {isAdmin && <ImportCsvButton onDone={loadProducts} />}
-          {isAdmin && (
-            <a className={s.btn} href="/api/products/export.csv" {...testId(NS, 'exportCsv')} style={{ textDecoration: 'none' }}>
-              Export CSV
-            </a>
+            <span className={s.actionGroup}>
+              <button type="button" className={s.btn} {...testId(NS, 'addProduct')} onClick={() => setEditState({ mode: 'create' })}>
+                + Add product
+              </button>
+              <ImportCsvButton onDone={loadProducts} />
+              <a className={s.btn} href="/api/products/export.csv" {...testId(NS, 'exportCsv')} style={{ textDecoration: 'none' }}>
+                Export CSV
+              </a>
+            </span>
           )}
           <span className={s.chromeGroup}>
             <AppSwitcher />
