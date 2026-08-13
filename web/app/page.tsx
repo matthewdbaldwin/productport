@@ -57,6 +57,9 @@ interface Product {
 }
 
 const REGIONS = ['CE', 'FDA', 'NMPA', 'PMDA', 'TGA'] as const;
+const REGION_NAMES: Record<(typeof REGIONS)[number], string> = {
+  CE: 'European Union', FDA: 'United States', NMPA: 'China', PMDA: 'Japan', TGA: 'Australia',
+};
 const APP_VERSION = process.env.NEXT_PUBLIC_APP_VERSION || '';
 const NS = 'catalog';
 
@@ -273,7 +276,9 @@ function DetailModal({ p, onClose, onEdit, onToggleDisabled, toggling }: {
                 <div className={s.fieldGroup}>
                   {p.indication && (
                     <>
-                      <div className={s.fieldLabel}>Indication</div>
+                      <Tooltip content="The regulatory-approved condition this device treats.">
+                        <div className={s.fieldLabel}>Indication</div>
+                      </Tooltip>
                       <div className={s.fieldValue}>{p.indication}</div>
                     </>
                   )}
@@ -281,13 +286,17 @@ function DetailModal({ p, onClose, onEdit, onToggleDisabled, toggling }: {
                 <div className={s.fieldGroup}>
                   {p.patientPopulation && (
                     <>
-                      <div className={s.fieldLabel}>Patient population</div>
+                      <Tooltip content="Who the approved indication applies to.">
+                        <div className={s.fieldLabel}>Patient population</div>
+                      </Tooltip>
                       <div className={s.fieldValue}>{p.patientPopulation}</div>
                     </>
                   )}
                   {specs.length > 0 && (
                     <>
-                      <div className={s.fieldLabel}>Specifications</div>
+                      <Tooltip content="Model sizes and key specs, as filed with regulators.">
+                        <div className={s.fieldLabel}>Specifications</div>
+                      </Tooltip>
                       <div className={s.specChips}>
                         {specs.map((sp, i) => <span key={i}><b>{sp.k}:</b> {sp.v}</span>)}
                       </div>
@@ -309,7 +318,9 @@ function DetailModal({ p, onClose, onEdit, onToggleDisabled, toggling }: {
                     const st = statusOf(p, r);
                     return (
                       <tr key={r}>
-                        <td style={{ fontWeight: 500 }}>{r}</td>
+                        <td style={{ fontWeight: 500 }}>
+                          <Tooltip content={REGION_NAMES[r]}><span>{r}</span></Tooltip>
+                        </td>
                         <td><Chip label={STATUS_META[st].label} status={st} /></td>
                       </tr>
                     );
