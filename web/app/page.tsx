@@ -261,42 +261,34 @@ function DetailModal({ p, onClose, onEdit, onToggleDisabled, toggling }: {
         </div>
         <div className={s.detailBody}>
           {hasOverview && (
-            <div className={s.section} {...testId(NS, 'sectionOverview')}>
-              <Tooltip content="A short description of the device and its key differentiating features." block>
-                <h2>Overview</h2>
-              </Tooltip>
+            <div className={s.section}>
+              <h2>Overview</h2>
               {p.overview && <p style={{ fontSize: 14 }}>{p.overview}</p>}
               {feats.length > 0 && <ul className={s.featureList}>{feats.map((f, i) => <li key={i}>{f}</li>)}</ul>}
             </div>
           )}
           {hasDetail && (
-            <div className={s.section} {...testId(NS, 'sectionDetail')}>
+            <div className={s.section}>
               <div className={s.twoColGrid}>
                 <div className={s.fieldGroup}>
                   {p.indication && (
                     <>
-                      <Tooltip content="The approved clinical use case for this device — who it's for and what it treats." block>
-                        <div className={s.fieldLabel}>Indication</div>
-                      </Tooltip>
-                      <div className={s.fieldValue} {...testId(NS, 'indication')}>{p.indication}</div>
+                      <div className={s.fieldLabel}>Indication</div>
+                      <div className={s.fieldValue}>{p.indication}</div>
                     </>
                   )}
                 </div>
                 <div className={s.fieldGroup}>
                   {p.patientPopulation && (
                     <>
-                      <Tooltip content="The patient population this device's indication applies to." block>
-                        <div className={s.fieldLabel}>Patient population</div>
-                      </Tooltip>
-                      <div className={s.fieldValue} {...testId(NS, 'patientPopulation')}>{p.patientPopulation}</div>
+                      <div className={s.fieldLabel}>Patient population</div>
+                      <div className={s.fieldValue}>{p.patientPopulation}</div>
                     </>
                   )}
                   {specs.length > 0 && (
                     <>
-                      <Tooltip content="Model numbers and technical specifications for this device." block>
-                        <div className={s.fieldLabel}>Specifications</div>
-                      </Tooltip>
-                      <div className={s.specChips} {...testId(NS, 'specifications')}>
+                      <div className={s.fieldLabel}>Specifications</div>
+                      <div className={s.specChips}>
                         {specs.map((sp, i) => <span key={i}><b>{sp.k}:</b> {sp.v}</span>)}
                       </div>
                     </>
