@@ -108,7 +108,7 @@ export function ProfileModal({ open, onClose }: Props) {
         <div className="flex items-center justify-between gap-3 px-4 sm:px-6 py-3 border-t shrink-0"
           style={{ borderColor: 'var(--border)', background: 'var(--surface2)' }}>
           <a
-            href="https://hub.microport.com/profile"
+            href="https://hub.microport.com/portal"
             target="_blank"
             rel="noopener noreferrer"
             className="inline-flex items-center gap-1.5 text-sm"

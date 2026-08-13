@@ -147,8 +147,8 @@
   align-items: center;
   flex-wrap: wrap;
   gap: 8px;
-  padding-right: 8px;
-  border-right: 1px solid var(--lgrey);
+  padding-left: 8px;
+  border-left: 1px solid var(--lgrey);
 }
 .chromeGroup {
   display: inline-flex;

@@ -466,17 +466,6 @@ export default function CatalogPage() {
             <span>{products ? `${products.length} products` : 'Loading…'}</span>
           </span>
           <span className={s.conf}>For Internal Use Only</span>
-          {isAdmin && (
-            <span className={s.actionGroup}>
-              <button type="button" className={s.btn} {...testId(NS, 'addProduct')} onClick={() => setEditState({ mode: 'create' })}>
-                <Plus size={15} /> Add product
-              </button>
-              <ImportCsvButton onDone={loadProducts} />
-              <a className={s.btn} href="/api/products/export.csv" {...testId(NS, 'exportCsv')} style={{ textDecoration: 'none' }}>
-                <Download size={15} /> Export CSV
-              </a>
-            </span>
-          )}
           <span className={s.chromeGroup}>
             <AppSwitcher />
             <Tooltip content={tProfile('openProfile')}>
@@ -491,6 +480,17 @@ export default function CatalogPage() {
               </button>
             </Tooltip>
           </span>
+          {isAdmin && (
+            <span className={s.actionGroup}>
+              <button type="button" className={s.btn} {...testId(NS, 'addProduct')} onClick={() => setEditState({ mode: 'create' })}>
+                <Plus size={15} /> Add product
+              </button>
+              <ImportCsvButton onDone={loadProducts} />
+              <a className={s.btn} href="/api/products/export.csv" {...testId(NS, 'exportCsv')} style={{ textDecoration: 'none' }}>
+                <Download size={15} /> Export CSV
+              </a>
+            </span>
+          )}
         </div>
       </div>
 
