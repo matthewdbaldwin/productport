@@ -170,14 +170,14 @@ function DetailModal({ p, onClose, onEdit, onToggleDisabled, toggling }: {
   const hasDetail = !!(p.indication || p.patientPopulation || specs.length);
 
   return (
-    <div className={s.ov} onClick={(e) => { if (toggling) return; if (e.target === e.currentTarget) onClose(); }}>
+    <div className={s.modalOverlay} onClick={(e) => { if (toggling) return; if (e.target === e.currentTarget) onClose(); }}>
       <div ref={trapRef} className={s.modal} role="dialog" aria-modal="true" aria-labelledby="pp-modal-title" style={{ maxHeight: '92vh', overflowY: 'auto' }}>
         <Tooltip content="Close">
-          <button className={s.x} onClick={onClose} disabled={toggling} aria-label="Close">&times;</button>
+          <button className={s.closeButton} onClick={onClose} disabled={toggling} aria-label="Close" {...testId(NS, 'closeDetail')}>&times;</button>
         </Tooltip>
-        <div className={s.mhead}>
+        <div className={s.detailHead}>
           <div>
-            <div className={s.mimg}>
+            <div className={s.heroImage}>
               {heroSrc ? <img src={heroSrc} alt={p.name} /> : <ProductImg p={p} />}
             </div>
             {p.images.length > 1 && (
@@ -201,13 +201,13 @@ function DetailModal({ p, onClose, onEdit, onToggleDisabled, toggling }: {
               </div>
             )}
           </div>
-          <div className={s.mbody}>
-            <div className={s.mft}>{p.therapeuticArea}{p.category ? ` · ${p.category}` : ''}<TierBadge id={p.id} tier={p.tier} scope="detail" /></div>
+          <div className={s.detailInfo}>
+            <div className={s.metaLine}>{p.therapeuticArea}{p.category ? ` · ${p.category}` : ''}<TierBadge id={p.id} tier={p.tier} scope="detail" /></div>
             <h1 id="pp-modal-title">{p.name}</h1>
-            <div className={s.msub}>
+            <div className={s.subtitle}>
               {p.tagline}<br />{p.subsidiary}{p.type ? ` · ${p.type}` : ''}
             </div>
-            <div className={s.chips}><MarketChips p={p} /></div>
+            <div className={s.marketChips}><MarketChips p={p} /></div>
             {p.disabledAt && (
               <div
                 {...testId(NS, 'disabledBadge')}
@@ -235,7 +235,7 @@ function DetailModal({ p, onClose, onEdit, onToggleDisabled, toggling }: {
                 {copied ? '✓ Link copied' : '🔗 Copy link'}
               </button>
               {onEdit && (
-                <button type="button" className={s.ebtn} {...testId(NS, 'editProduct')}
+                <button type="button" className={s.primaryButton} {...testId(NS, 'editProduct')}
                   style={{ fontSize: 13 }} onClick={onEdit}>
                   Edit
                 </button>
@@ -259,26 +259,44 @@ function DetailModal({ p, onClose, onEdit, onToggleDisabled, toggling }: {
             </div>
           </div>
         </div>
-        <div className={s.body}>
+        <div className={s.detailBody}>
           {hasOverview && (
-            <div className={s.sec}>
-              <h2>Overview</h2>
+            <div className={s.section} {...testId(NS, 'sectionOverview')}>
+              <Tooltip content="A short description of the device and its key differentiating features." block>
+                <h2>Overview</h2>
+              </Tooltip>
               {p.overview && <p style={{ fontSize: 14 }}>{p.overview}</p>}
-              {feats.length > 0 && <ul className={s.feat}>{feats.map((f, i) => <li key={i}>{f}</li>)}</ul>}
+              {feats.length > 0 && <ul className={s.featureList}>{feats.map((f, i) => <li key={i}>{f}</li>)}</ul>}
             </div>
           )}
           {hasDetail && (
-            <div className={s.sec}>
-              <div className={s.g2}>
-                <div className={s.kv}>
-                  {p.indication && (<><div className={s.l}>Indication</div><div className={s.v}>{p.indication}</div></>)}
+            <div className={s.section} {...testId(NS, 'sectionDetail')}>
+              <div className={s.twoColGrid}>
+                <div className={s.fieldGroup}>
+                  {p.indication && (
+                    <>
+                      <Tooltip content="The approved clinical use case for this device — who it's for and what it treats." block>
+                        <div className={s.fieldLabel}>Indication</div>
+                      </Tooltip>
+                      <div className={s.fieldValue} {...testId(NS, 'indication')}>{p.indication}</div>
+                    </>
+                  )}
                 </div>
-                <div className={s.kv}>
-                  {p.patientPopulation && (<><div className={s.l}>Patient population</div><div className={s.v}>{p.patientPopulation}</div></>)}
+                <div className={s.fieldGroup}>
+                  {p.patientPopulation && (
+                    <>
+                      <Tooltip content="The patient population this device's indication applies to." block>
+                        <div className={s.fieldLabel}>Patient population</div>
+                      </Tooltip>
+                      <div className={s.fieldValue} {...testId(NS, 'patientPopulation')}>{p.patientPopulation}</div>
+                    </>
+                  )}
                   {specs.length > 0 && (
                     <>
-                      <div className={s.l}>Specifications</div>
-                      <div className={s.spec}>
+                      <Tooltip content="Model numbers and technical specifications for this device." block>
+                        <div className={s.fieldLabel}>Specifications</div>
+                      </Tooltip>
+                      <div className={s.specChips} {...testId(NS, 'specifications')}>
                         {specs.map((sp, i) => <span key={i}><b>{sp.k}:</b> {sp.v}</span>)}
                       </div>
                     </>
@@ -287,13 +305,13 @@ function DetailModal({ p, onClose, onEdit, onToggleDisabled, toggling }: {
               </div>
             </div>
           )}
-          <div className={s.sec}>
+          <div className={s.section}>
             <h2>Regulatory status by market</h2>
             {/* Own horizontal-scroll context: the ancestor .modal is overflow:hidden,
                 so without this a narrow viewport can still clip the table with no
                 way to reach the rest — same pattern as the trials table below. */}
             <div style={{ overflowX: 'auto' }}>
-              <table className={s.tbl} style={{ maxWidth: 360 }}>
+              <table className={s.dataTable} style={{ maxWidth: 360 }}>
                 <tbody>
                   {REGIONS.map((r) => {
                     const st = statusOf(p, r);
@@ -307,16 +325,16 @@ function DetailModal({ p, onClose, onEdit, onToggleDisabled, toggling }: {
                 </tbody>
               </table>
             </div>
-            {p.regNotes && <div className={s.note}>{p.regNotes}</div>}
+            {p.regNotes && <div className={s.regNote}>{p.regNotes}</div>}
           </div>
           {p.trials.length > 0 && (
-            <div className={s.sec}>
+            <div className={s.section}>
               <h2>Key clinical evidence</h2>
               {/* Own horizontal-scroll context: the ancestor .modal is overflow:hidden,
                   so without this a wide trials table clips its Design/Result cells with
                   no way to reach them on a phone. */}
               <div style={{ overflowX: 'auto' }}>
-                <table className={s.tbl} style={{ minWidth: 520 }}>
+                <table className={s.dataTable} style={{ minWidth: 520 }}>
                   <thead>
                     <tr>
                       <th>Trial</th><th>Identifier</th>
@@ -612,7 +630,7 @@ export default function CatalogPage() {
                     </div>
                     <div className={s.ct}>{p.tagline}</div>
                     <div className={s.cs}>{p.subsidiary}{p.category ? ` · ${p.category}` : ''}</div>
-                    <div className={s.chips}><MarketChips p={p} /></div>
+                    <div className={s.marketChips}><MarketChips p={p} /></div>
                   </div>
                 </button>
               ))}

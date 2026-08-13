@@ -259,10 +259,10 @@ export function ProductEditModal({ mode, initial, onClose, onSaved, onGalleryCha
   );
 
   return (
-    <div className={s.ov} onClick={(e) => { if (saving) return; if (e.target === e.currentTarget) requestClose(); }}>
+    <div className={s.modalOverlay} onClick={(e) => { if (saving) return; if (e.target === e.currentTarget) requestClose(); }}>
       <div ref={trapRef} className={s.modal} role="dialog" aria-modal="true" style={{ maxWidth: 720, maxHeight: '92vh', overflowY: 'auto', padding: 24 }}>
         <Tooltip content="Close">
-          <button className={s.x} onClick={requestClose} disabled={saving} aria-label="Close" {...testId(NS, 'close')}>&times;</button>
+          <button className={s.closeButton} onClick={requestClose} disabled={saving} aria-label="Close" {...testId(NS, 'close')}>&times;</button>
         </Tooltip>
         <h2 style={{ margin: '4px 0 14px' }}>{mode === 'create' ? 'Add product' : `Edit ${i.name ?? ''}`}</h2>
 
@@ -337,7 +337,7 @@ export function ProductEditModal({ mode, initial, onClose, onSaved, onGalleryCha
                   </div>
                 );
               })}
-              <label className={s.ebtnGhost} aria-disabled={uploading} {...testId(NS, 'addImage')}
+              <label className={s.ghostButton} aria-disabled={uploading} {...testId(NS, 'addImage')}
                 style={{ cursor: uploading ? 'default' : 'pointer', pointerEvents: uploading ? 'none' : undefined, width: 96, height: 96, display: 'grid', placeItems: 'center', textAlign: 'center', fontSize: 12 }}>
                 {uploading ? 'Uploading…' : '+ Add image'}
                 <input type="file" accept="image/jpeg,image/png,image/webp" onChange={onPickImage} disabled={uploading} style={{ display: 'none' }} {...testId(NS, 'imageFileInput')} />
@@ -410,16 +410,16 @@ export function ProductEditModal({ mode, initial, onClose, onSaved, onGalleryCha
             confirmDel ? (
               <span style={{ display: 'inline-flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
                 <span style={{ fontSize: 13 }}>Delete this product?</span>
-                <button className={s.ebtnDanger} disabled={saving} onClick={del} {...testId(NS, 'confirmDelete')}>Confirm delete</button>
-                <button className={s.ebtnGhost} disabled={saving} onClick={() => setConfirmDel(false)} {...testId(NS, 'cancelDelete')}>No</button>
+                <button className={s.dangerButton} disabled={saving} onClick={del} {...testId(NS, 'confirmDelete')}>Confirm delete</button>
+                <button className={s.ghostButton} disabled={saving} onClick={() => setConfirmDel(false)} {...testId(NS, 'cancelDelete')}>No</button>
               </span>
             ) : (
-              <button className={s.ebtnDanger} disabled={saving} onClick={() => setConfirmDel(true)} {...testId(NS, 'deleteProduct')}>Delete</button>
+              <button className={s.dangerButton} disabled={saving} onClick={() => setConfirmDel(true)} {...testId(NS, 'deleteProduct')}>Delete</button>
             )
           )}
           <span style={{ display: 'inline-flex', gap: 10, marginLeft: 'auto', flexWrap: 'wrap' }}>
-            <button className={s.ebtnGhost} disabled={saving} onClick={requestClose} {...testId(NS, 'cancel')}>Cancel</button>
-            <button className={s.ebtn} disabled={saving} onClick={save} {...testId(NS, 'save')}>{saving ? 'Saving…' : mode === 'create' ? 'Create' : 'Save changes'}</button>
+            <button className={s.ghostButton} disabled={saving} onClick={requestClose} {...testId(NS, 'cancel')}>Cancel</button>
+            <button className={s.primaryButton} disabled={saving} onClick={save} {...testId(NS, 'save')}>{saving ? 'Saving…' : mode === 'create' ? 'Create' : 'Save changes'}</button>
           </span>
         </div>
       </div>

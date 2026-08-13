@@ -478,7 +478,7 @@
   font-size: 11.5px;
   color: var(--grey);
 }
-.chips {
+.marketChips {
   display: flex;
   flex-wrap: wrap;
   gap: 5px;
@@ -504,10 +504,10 @@
 .einput:focus { outline: none; border-color: var(--catalog-blue); box-shadow: 0 0 0 3px rgba(4, 42, 114, 0.12); }
 /* Editor action buttons — inline-flex + 44px min so they meet the tap-target
    standard (feedback_tap_target_standard) on touch. */
-.ebtn { background: var(--catalog-blue); color: #fff; border: none; padding: 9px 18px; border-radius: 6px; font-weight: 600; cursor: pointer; display: inline-flex; align-items: center; justify-content: center; min-height: 44px; }
-.ebtn:disabled { opacity: 0.55; cursor: default; }
-.ebtnGhost { background: transparent; border: 1px solid #d9dce1; padding: 9px 16px; border-radius: 6px; cursor: pointer; display: inline-flex; align-items: center; justify-content: center; min-height: 44px; }
-.ebtnDanger { background: var(--rd); color: #fff; border: none; padding: 8px 14px; border-radius: 6px; cursor: pointer; display: inline-flex; align-items: center; justify-content: center; min-height: 44px; }
+.primaryButton { background: var(--catalog-blue); color: #fff; border: none; padding: 9px 18px; border-radius: 6px; font-weight: 600; cursor: pointer; display: inline-flex; align-items: center; justify-content: center; min-height: 44px; }
+.primaryButton:disabled { opacity: 0.55; cursor: default; }
+.ghostButton { background: transparent; border: 1px solid #d9dce1; padding: 9px 16px; border-radius: 6px; cursor: pointer; display: inline-flex; align-items: center; justify-content: center; min-height: 44px; }
+.dangerButton { background: var(--rd); color: #fff; border: none; padding: 8px 14px; border-radius: 6px; cursor: pointer; display: inline-flex; align-items: center; justify-content: center; min-height: 44px; }
 @media (max-width: 560px) { .egrid { grid-template-columns: 1fr; } }
 
 /* Strategic tier badge (gold/silver/bronze). Colors are set inline from
@@ -525,7 +525,7 @@
 }
 
 /* ── Detail modal ────────────────────────────────────────────────────────── */
-.ov {
+.modalOverlay {
   position: fixed;
   inset: 0;
   background: rgba(8, 12, 28, 0.55);
@@ -544,11 +544,11 @@
   overflow: hidden;
   position: relative;
 }
-.mhead {
+.detailHead {
   display: grid;
   grid-template-columns: 300px 1fr;
 }
-.mimg {
+.heroImage {
   background: #fff;
   border-right: 1px solid var(--lgrey);
   display: flex;
@@ -557,12 +557,12 @@
   padding: 24px;
   min-height: 240px;
 }
-.mimg img {
+.heroImage img {
   max-width: 100%;
   max-height: 240px;
   object-fit: contain;
 }
-.x {
+.closeButton {
   position: absolute;
   top: 18px;
   right: 20px;
@@ -578,14 +578,14 @@
   align-items: center;
   justify-content: center;
 }
-.x:hover {
+.closeButton:hover {
   background: #fff;
   color: var(--catalog-red);
 }
-.mbody {
+.detailInfo {
   padding: 22px 24px;
 }
-.mft {
+.metaLine {
   font-size: 11px;
   font-weight: 600;
   letter-spacing: 0.04em;
@@ -598,19 +598,19 @@
   margin: 5px 0 3px;
   font-weight: 700;
 }
-.msub {
+.subtitle {
   font-size: 13px;
   color: var(--grey);
   margin-bottom: 12px;
 }
-.body {
+.detailBody {
   padding: 6px 24px 26px;
 }
-.sec {
+.section {
   border-top: 1px solid var(--lgrey);
   padding: 16px 0;
 }
-.sec h2 {
+.section h2 {
   font-size: 11.5px;
   font-weight: 600;
   letter-spacing: 0.05em;
@@ -618,18 +618,18 @@
   color: var(--catalog-blue);
   margin: 0 0 11px;
 }
-.feat {
+.featureList {
   margin: 0;
   padding: 0;
   list-style: none;
 }
-.feat li {
+.featureList li {
   position: relative;
   padding-left: 18px;
   margin: 6px 0;
   font-size: 13.5px;
 }
-.feat li::before {
+.featureList li::before {
   content: '';
   position: absolute;
   left: 0;
@@ -639,15 +639,15 @@
   background: var(--catalog-blue);
   border-radius: 50%;
 }
-.g2 {
+.twoColGrid {
   display: grid;
   grid-template-columns: 1fr 1fr;
   gap: 18px;
 }
-.kv .l {
-  /* Matches .sec h2 (Overview / Regulatory / Clinical evidence) so Indication /
-     Patient population / Specifications read as the same kind of label instead
-     of a smaller, grey, tighter-tracked field caption. */
+.fieldGroup .fieldLabel {
+  /* Matches .section h2 (Overview / Regulatory / Clinical evidence) so
+     Indication / Patient population / Specifications read as the same kind
+     of label instead of a smaller, grey, tighter-tracked field caption. */
   font-size: 11.5px;
   font-weight: 600;
   text-transform: uppercase;
@@ -655,32 +655,32 @@
   color: var(--catalog-blue);
   margin-bottom: 4px;
 }
-.kv .v {
+.fieldGroup .fieldValue {
   font-size: 13.5px;
   margin-bottom: 11px;
 }
-.spec {
+.specChips {
   display: flex;
   flex-wrap: wrap;
   gap: 6px;
 }
-.spec b {
+.specChips b {
   font-weight: 600;
   color: var(--catalog-blue);
 }
-.spec span {
+.specChips span {
   background: var(--catalog-bg);
   border: 1px solid var(--lgrey);
   border-radius: 6px;
   font-size: 12px;
   padding: 3px 9px;
 }
-.tbl {
+.dataTable {
   width: 100%;
   border-collapse: collapse;
   font-size: 12.5px;
 }
-.tbl th {
+.dataTable th {
   text-align: left;
   font-size: 10.5px;
   font-weight: 600;
@@ -689,12 +689,12 @@
   padding: 7px 9px;
   border-bottom: 2px solid var(--lgrey);
 }
-.tbl td {
+.dataTable td {
   padding: 8px 9px;
   border-bottom: 1px solid #eef0f3;
   vertical-align: top;
 }
-.note {
+.regNote {
   background: #eaf0fb;
   border-left: 3px solid var(--catalog-blue);
   border-radius: 0 8px 8px 0;
@@ -719,10 +719,10 @@
 }
 
 @media (max-width: 680px) {
-  .mhead {
+  .detailHead {
     grid-template-columns: 1fr;
   }
-  .g2 {
+  .twoColGrid {
     grid-template-columns: 1fr;
   }
 }

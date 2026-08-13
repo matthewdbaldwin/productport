@@ -88,7 +88,7 @@ export function ImportCsvButton({ onDone }: { onDone: () => void | Promise<void>
         >
           {err ? err : summary}
           {result && result.errors.length > 0 && (
-            <button type="button" className={s.ebtnGhost} style={{ padding: '2px 8px', fontSize: 11 }} onClick={downloadErrors} {...testId(NS, 'downloadErrors')}>
+            <button type="button" className={s.ghostButton} style={{ padding: '2px 8px', fontSize: 11 }} onClick={downloadErrors} {...testId(NS, 'downloadErrors')}>
               Download errors
             </button>
           )}
