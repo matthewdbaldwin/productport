@@ -271,13 +271,13 @@ function DetailModal({ p, onClose, onEdit, onToggleDisabled, toggling }: {
             <div className={s.sec}>
               <div className={s.g2}>
                 <div className={s.kv}>
-                  {p.indication && (<><div className="l">Indication</div><div className="v">{p.indication}</div></>)}
+                  {p.indication && (<><div className={s.l}>Indication</div><div className={s.v}>{p.indication}</div></>)}
                 </div>
                 <div className={s.kv}>
-                  {p.patientPopulation && (<><div className="l">Patient population</div><div className="v">{p.patientPopulation}</div></>)}
+                  {p.patientPopulation && (<><div className={s.l}>Patient population</div><div className={s.v}>{p.patientPopulation}</div></>)}
                   {specs.length > 0 && (
                     <>
-                      <div className="l">Specifications</div>
+                      <div className={s.l}>Specifications</div>
                       <div className={s.spec}>
                         {specs.map((sp, i) => <span key={i}><b>{sp.k}:</b> {sp.v}</span>)}
                       </div>
