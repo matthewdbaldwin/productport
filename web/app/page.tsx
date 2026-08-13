@@ -8,7 +8,9 @@
 // / detail entirely in memory. Every authenticated employee is a viewer.
 import { useEffect, useMemo, useState, useCallback } from 'react';
 import { useModalEsc, useFocusTrap, Tooltip } from '@matthewdbaldwin/microport-ui';
+import { UserCircle, Plus, Download } from 'lucide-react';
 import { useRouter } from 'next/navigation';
+import { useTranslations } from 'next-intl';
 import { useAuth } from '@/contexts/AuthContext';
 import { api } from '@/lib/api';
 import { statusOf, orderedAreas, filterProducts } from '@/lib/catalogFilter';
@@ -17,6 +19,8 @@ import { ProductEditModal } from './ProductEditModal';
 import { ImportCsvButton } from './ImportCsvButton';
 import { galleryImageSrc, disableProduct, enableProduct, type ProductInput, type GalleryImage } from '@/lib/products';
 import { useToast } from '@/components/ui/Toast';
+import { AppSwitcher } from '@/components/layout/AppSwitcher';
+import { ProfileModal } from '@/components/layout/ProfileModal';
 import s from './catalog.module.css';
 
 type ClearanceStatus = 'APPROVED' | 'IN_PROGRESS' | 'SUBMITTED' | 'NOT_APPROVED' | 'NONE';
@@ -53,6 +57,9 @@ interface Product {
 }
 
 const REGIONS = ['CE', 'FDA', 'NMPA', 'PMDA', 'TGA'] as const;
+const REGION_NAMES: Record<(typeof REGIONS)[number], string> = {
+  CE: 'European Union', FDA: 'United States', NMPA: 'China', PMDA: 'Japan', TGA: 'Australia',
+};
 const APP_VERSION = process.env.NEXT_PUBLIC_APP_VERSION || '';
 const NS = 'catalog';
 
@@ -166,14 +173,14 @@ function DetailModal({ p, onClose, onEdit, onToggleDisabled, toggling }: {
   const hasDetail = !!(p.indication || p.patientPopulation || specs.length);
 
   return (
-    <div className={s.ov} onClick={(e) => { if (toggling) return; if (e.target === e.currentTarget) onClose(); }}>
+    <div className={s.modalOverlay} onClick={(e) => { if (toggling) return; if (e.target === e.currentTarget) onClose(); }}>
       <div ref={trapRef} className={s.modal} role="dialog" aria-modal="true" aria-labelledby="pp-modal-title" style={{ maxHeight: '92vh', overflowY: 'auto' }}>
         <Tooltip content="Close">
-          <button className={s.x} onClick={onClose} disabled={toggling} aria-label="Close">&times;</button>
+          <button className={s.closeButton} onClick={onClose} disabled={toggling} aria-label="Close" {...testId(NS, 'closeDetail')}>&times;</button>
         </Tooltip>
-        <div className={s.mhead}>
+        <div className={s.detailHead}>
           <div>
-            <div className={s.mimg}>
+            <div className={s.heroImage}>
               {heroSrc ? <img src={heroSrc} alt={p.name} /> : <ProductImg p={p} />}
             </div>
             {p.images.length > 1 && (
@@ -187,7 +194,7 @@ function DetailModal({ p, onClose, onEdit, onToggleDisabled, toggling }: {
                         type="button"
                         onClick={() => setHeroId(img.id)}
                         aria-label={label}
-                        style={{ padding: 0, border: active ? '2px solid var(--blue)' : '1px solid var(--lgrey)', borderRadius: 6, cursor: 'pointer', background: 'none', lineHeight: 0 }}
+                        style={{ padding: 0, border: active ? '2px solid var(--catalog-blue)' : '1px solid var(--lgrey)', borderRadius: 6, cursor: 'pointer', background: 'none', lineHeight: 0 }}
                       >
                         <img src={galleryImageSrc(p.id, img.id)} alt="" style={{ width: 48, height: 48, objectFit: 'cover', borderRadius: 5 }} />
                       </button>
@@ -197,13 +204,13 @@ function DetailModal({ p, onClose, onEdit, onToggleDisabled, toggling }: {
               </div>
             )}
           </div>
-          <div className={s.mbody}>
-            <div className={s.mft}>{p.therapeuticArea}{p.category ? ` · ${p.category}` : ''}<TierBadge id={p.id} tier={p.tier} scope="detail" /></div>
+          <div className={s.detailInfo}>
+            <div className={s.metaLine}>{p.therapeuticArea}{p.category ? ` · ${p.category}` : ''}<TierBadge id={p.id} tier={p.tier} scope="detail" /></div>
             <h1 id="pp-modal-title">{p.name}</h1>
-            <div className={s.msub}>
+            <div className={s.subtitle}>
               {p.tagline}<br />{p.subsidiary}{p.type ? ` · ${p.type}` : ''}
             </div>
-            <div className={s.chips}><MarketChips p={p} /></div>
+            <div className={s.marketChips}><MarketChips p={p} /></div>
             {p.disabledAt && (
               <div
                 {...testId(NS, 'disabledBadge')}
@@ -231,7 +238,7 @@ function DetailModal({ p, onClose, onEdit, onToggleDisabled, toggling }: {
                 {copied ? '✓ Link copied' : '🔗 Copy link'}
               </button>
               {onEdit && (
-                <button type="button" className={s.ebtn} {...testId(NS, 'editProduct')}
+                <button type="button" className={s.primaryButton} {...testId(NS, 'editProduct')}
                   style={{ fontSize: 13 }} onClick={onEdit}>
                   Edit
                 </button>
@@ -246,7 +253,7 @@ function DetailModal({ p, onClose, onEdit, onToggleDisabled, toggling }: {
                   style={{
                     cursor: toggling ? 'default' : 'pointer', minHeight: 44, fontSize: 13, padding: '4px 10px', borderRadius: 6,
                     border: '1px solid var(--lgrey)', background: 'transparent', opacity: toggling ? 0.6 : 1,
-                    color: p.disabledAt ? 'var(--blue)' : 'var(--rd)',
+                    color: p.disabledAt ? 'var(--catalog-blue)' : 'var(--rd)',
                   }}
                 >
                   {toggling ? (p.disabledAt ? 'Enabling…' : 'Disabling…') : p.disabledAt ? 'Enable' : 'Disable'}
@@ -255,26 +262,42 @@ function DetailModal({ p, onClose, onEdit, onToggleDisabled, toggling }: {
             </div>
           </div>
         </div>
-        <div className={s.body}>
+        <div className={s.detailBody}>
           {hasOverview && (
-            <div className={s.sec}>
+            <div className={s.section}>
               <h2>Overview</h2>
               {p.overview && <p style={{ fontSize: 14 }}>{p.overview}</p>}
-              {feats.length > 0 && <ul className={s.feat}>{feats.map((f, i) => <li key={i}>{f}</li>)}</ul>}
+              {feats.length > 0 && <ul className={s.featureList}>{feats.map((f, i) => <li key={i}>{f}</li>)}</ul>}
             </div>
           )}
           {hasDetail && (
-            <div className={s.sec}>
-              <div className={s.g2}>
-                <div className={s.kv}>
-                  {p.indication && (<><div className="l">Indication</div><div className="v">{p.indication}</div></>)}
+            <div className={s.section}>
+              <div className={s.twoColGrid}>
+                <div className={s.fieldGroup}>
+                  {p.indication && (
+                    <>
+                      <Tooltip content="The regulatory-approved condition this device treats.">
+                        <div className={s.fieldLabel}>Indication</div>
+                      </Tooltip>
+                      <div className={s.fieldValue}>{p.indication}</div>
+                    </>
+                  )}
                 </div>
-                <div className={s.kv}>
-                  {p.patientPopulation && (<><div className="l">Patient population</div><div className="v">{p.patientPopulation}</div></>)}
+                <div className={s.fieldGroup}>
+                  {p.patientPopulation && (
+                    <>
+                      <Tooltip content="Who the approved indication applies to.">
+                        <div className={s.fieldLabel}>Patient population</div>
+                      </Tooltip>
+                      <div className={s.fieldValue}>{p.patientPopulation}</div>
+                    </>
+                  )}
                   {specs.length > 0 && (
                     <>
-                      <div className="l">Specifications</div>
-                      <div className={s.spec}>
+                      <Tooltip content="Model sizes and key specs, as filed with regulators.">
+                        <div className={s.fieldLabel}>Specifications</div>
+                      </Tooltip>
+                      <div className={s.specChips}>
                         {specs.map((sp, i) => <span key={i}><b>{sp.k}:</b> {sp.v}</span>)}
                       </div>
                     </>
@@ -283,19 +306,21 @@ function DetailModal({ p, onClose, onEdit, onToggleDisabled, toggling }: {
               </div>
             </div>
           )}
-          <div className={s.sec}>
+          <div className={s.section}>
             <h2>Regulatory status by market</h2>
             {/* Own horizontal-scroll context: the ancestor .modal is overflow:hidden,
                 so without this a narrow viewport can still clip the table with no
                 way to reach the rest — same pattern as the trials table below. */}
             <div style={{ overflowX: 'auto' }}>
-              <table className={s.tbl} style={{ maxWidth: 360 }}>
+              <table className={s.dataTable} style={{ maxWidth: 360 }}>
                 <tbody>
                   {REGIONS.map((r) => {
                     const st = statusOf(p, r);
                     return (
                       <tr key={r}>
-                        <td style={{ fontWeight: 500 }}>{r}</td>
+                        <td style={{ fontWeight: 500 }}>
+                          <Tooltip content={REGION_NAMES[r]}><span>{r}</span></Tooltip>
+                        </td>
                         <td><Chip label={STATUS_META[st].label} status={st} /></td>
                       </tr>
                     );
@@ -303,16 +328,16 @@ function DetailModal({ p, onClose, onEdit, onToggleDisabled, toggling }: {
                 </tbody>
               </table>
             </div>
-            {p.regNotes && <div className={s.note}>{p.regNotes}</div>}
+            {p.regNotes && <div className={s.regNote}>{p.regNotes}</div>}
           </div>
           {p.trials.length > 0 && (
-            <div className={s.sec}>
+            <div className={s.section}>
               <h2>Key clinical evidence</h2>
               {/* Own horizontal-scroll context: the ancestor .modal is overflow:hidden,
                   so without this a wide trials table clips its Design/Result cells with
                   no way to reach them on a phone. */}
               <div style={{ overflowX: 'auto' }}>
-                <table className={s.tbl} style={{ minWidth: 520 }}>
+                <table className={s.dataTable} style={{ minWidth: 520 }}>
                   <thead>
                     <tr>
                       <th>Trial</th><th>Identifier</th>
@@ -322,7 +347,7 @@ function DetailModal({ p, onClose, onEdit, onToggleDisabled, toggling }: {
                   <tbody>
                     {p.trials.map((t, i) => (
                       <tr key={i}>
-                        <td style={{ fontWeight: 500, color: 'var(--blue)' }}>{t.trial}</td>
+                        <td style={{ fontWeight: 500, color: 'var(--catalog-blue)' }}>{t.trial}</td>
                         <td style={{ color: 'var(--grey)', whiteSpace: 'nowrap' }}>{t.identifier}</td>
                         <td style={{ textAlign: 'center' }}>{t.n}</td>
                         <td>{t.design}</td>
@@ -343,8 +368,10 @@ function DetailModal({ p, onClose, onEdit, onToggleDisabled, toggling }: {
 export default function CatalogPage() {
   const router = useRouter();
   const { user, loading } = useAuth();
+  const tProfile = useTranslations('profile');
   const [products, setProducts] = useState<Product[] | null>(null);
   const [loadError, setLoadError] = useState(false);
+  const [profileOpen, setProfileOpen] = useState(false);
 
   const [fr, setFr] = useState<string | null>(null);
   const [sub, setSub] = useState<string | null>(null);
@@ -460,20 +487,35 @@ export default function CatalogPage() {
             <span>{products ? `${products.length} products` : 'Loading…'}</span>
           </span>
           <span className={s.conf}>For Internal Use Only</span>
+          <span className={s.chromeGroup}>
+            <AppSwitcher />
+            <Tooltip content={tProfile('openProfile')}>
+              <button
+                type="button"
+                {...testId(NS, 'openProfile')}
+                onClick={() => setProfileOpen(true)}
+                aria-label={tProfile('openProfile')}
+                className={s.iconBtn}
+              >
+                <UserCircle size={20} />
+              </button>
+            </Tooltip>
+          </span>
           {isAdmin && (
-            <button type="button" className={s.btn} {...testId(NS, 'addProduct')} onClick={() => setEditState({ mode: 'create' })}>
-              + Add product
-            </button>
+            <span className={s.actionGroup}>
+              <button type="button" className={s.btn} {...testId(NS, 'addProduct')} onClick={() => setEditState({ mode: 'create' })}>
+                <Plus size={15} /> Add product
+              </button>
+              <ImportCsvButton onDone={loadProducts} />
+              <a className={s.btn} href="/api/products/export.csv" {...testId(NS, 'exportCsv')} style={{ textDecoration: 'none' }}>
+                <Download size={15} /> Export CSV
+              </a>
+            </span>
           )}
-          {isAdmin && <ImportCsvButton onDone={loadProducts} />}
-          {isAdmin && (
-            <a className={s.btn} href="/api/products/export.csv" {...testId(NS, 'exportCsv')} style={{ textDecoration: 'none' }}>
-              Export CSV
-            </a>
-          )}
-          <a className={s.hublink} href="https://hub.microport.com">← Hub</a>
         </div>
       </div>
+
+      <ProfileModal open={profileOpen} onClose={() => setProfileOpen(false)} />
 
       <div className={s.wrap}>
         {loadError ? (
@@ -591,7 +633,7 @@ export default function CatalogPage() {
                     </div>
                     <div className={s.ct}>{p.tagline}</div>
                     <div className={s.cs}>{p.subsidiary}{p.category ? ` · ${p.category}` : ''}</div>
-                    <div className={s.chips}><MarketChips p={p} /></div>
+                    <div className={s.marketChips}><MarketChips p={p} /></div>
                   </div>
                 </button>
               ))}

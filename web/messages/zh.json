@@ -13,6 +13,14 @@
   "home": {
     "welcome": "欢迎，{name}。"
   },
+  "profile": {
+    "title": "个人资料",
+    "openProfile": "个人资料",
+    "close": "关闭",
+    "ssoNote": "您的姓名、邮箱和角色由 MicroPort 中心统一管理。",
+    "theme": "主题",
+    "manageAccount": "管理您的账户"
+  },
   "bug": {
     "label": "报告问题",
     "titleLabel": "标题 *",

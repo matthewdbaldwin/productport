@@ -4,12 +4,12 @@
    module so the generic class names don't collide with the platform shell.
    The brand vars live on .page so everything below inherits them. */
 .page {
-  --blue: #042a72;
-  --red: #cd011d;
-  --navy: #12182c;
+  --catalog-blue: #042a72;
+  --catalog-red: #cd011d;
+  --catalog-text: #12182c;
   --grey: #909191;
   --lgrey: #e0e0e0;
-  --bg: #f4f5f8;
+  --catalog-bg: #f4f5f8;
   --ok: #1b6b3a;
   --okb: #e7f4ec;
   --am: #8a5a08;
@@ -21,8 +21,8 @@
 
   min-height: 100vh;
   min-height: 100dvh;
-  background: var(--bg);
-  color: var(--navy);
+  background: var(--catalog-bg);
+  color: var(--catalog-text);
   font-family: 'Fira Sans', system-ui, sans-serif;
   line-height: 1.5;
 }
@@ -33,7 +33,7 @@
 /* ── Top bar ─────────────────────────────────────────────────────────────── */
 .top {
   background: #fff;
-  border-top: 3px solid var(--red);
+  border-top: 3px solid var(--catalog-red);
   border-bottom: 1px solid var(--lgrey);
   position: sticky;
   top: 0;
@@ -86,12 +86,12 @@
   padding: 0 12px 0 34px;
   font-family: inherit;
   font-size: 13.5px;
-  color: var(--navy);
+  color: var(--catalog-text);
   background: #fff;
 }
 .sw input:focus {
   outline: none;
-  border-color: var(--red);
+  border-color: var(--catalog-red);
   box-shadow: 0 0 0 3px rgba(205, 1, 29, 0.12);
 }
 .sw svg {
@@ -142,19 +142,39 @@
   background: var(--ok);
   display: inline-block;
 }
-.hublink {
-  font-size: 12px;
-  font-weight: 500;
-  color: var(--blue);
-  text-decoration: none;
-  padding: 6px 10px;
-  border-radius: 8px;
-  border: 1px solid var(--lgrey);
-  background: #fff;
-  white-space: nowrap;
+.actionGroup {
+  display: inline-flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+  padding-left: 8px;
+  border-left: 1px solid var(--lgrey);
 }
-.hublink:hover {
-  border-color: var(--blue);
+.chromeGroup {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px;
+  border: 1px solid var(--lgrey);
+  border-radius: 10px;
+  background: #fff;
+}
+.iconBtn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  border: none;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--muted, var(--grey));
+  cursor: pointer;
+  transition: background 0.12s, color 0.12s;
+}
+.iconBtn:hover {
+  background: var(--catalog-bg);
+  color: var(--catalog-blue);
 }
 
 /* ── Filter bars ─────────────────────────────────────────────────────────── */
@@ -183,7 +203,7 @@
   border-radius: 18px;
   border: 1px solid var(--lgrey);
   background: #fff;
-  color: var(--navy);
+  color: var(--catalog-text);
   cursor: pointer;
   user-select: none;
   font-family: inherit;
@@ -192,23 +212,23 @@
   transition: border-color 0.12s, color 0.12s, transform 0.12s;
 }
 .pillOn {
-  background: var(--blue);
+  background: var(--catalog-blue);
   color: #fff;
-  border-color: var(--blue);
+  border-color: var(--catalog-blue);
 }
 .primaryBadge {
   position: absolute;
   top: 3px;
   left: 3px;
-  background: var(--blue);
+  background: var(--catalog-blue);
   color: #fff;
   font-size: 10px;
   padding: 1px 5px;
   border-radius: 4px;
 }
 .pill:not(.pillOn):hover {
-  border-color: var(--red);
-  color: var(--red);
+  border-color: var(--catalog-red);
+  color: var(--catalog-red);
   transform: translateY(-1px);
 }
 /* The 44px tap-target standard (feedback_tap_target_standard) applies on TOUCH;
@@ -267,13 +287,13 @@
   font-family: inherit;
   font-size: 13px;
   font-weight: 500;
-  color: var(--navy);
+  color: var(--catalog-text);
   text-align: left;
   padding: 6px 12px;
   min-height: 44px; /* tap-target standard */
 }
 .accHead:hover {
-  color: var(--blue);
+  color: var(--catalog-blue);
   background: #f7f8fb;
 }
 .accChev {
@@ -304,13 +324,13 @@
   padding: 0 10px;
   font-family: inherit;
   font-size: 13px;
-  color: var(--navy);
+  color: var(--catalog-text);
   background: #fff;
   max-width: 320px;
 }
 .sel:focus {
   outline: none;
-  border-color: var(--red);
+  border-color: var(--catalog-red);
 }
 /* Top-bar / low-repeat action buttons keep an UNCONDITIONAL 44px min-height.
    Do NOT copy this onto .pill: the filter pills repeat in dense rows and
@@ -328,7 +348,11 @@
   cursor: pointer;
   display: inline-flex;
   align-items: center;
+  gap: 6px;
   min-height: 44px; /* tap-target standard */
+}
+.btn svg {
+  flex: none;
 }
 .clearbtn {
   margin-left: auto;
@@ -389,7 +413,7 @@
   font-family: inherit;
 }
 .card:hover {
-  border-color: var(--red);
+  border-color: var(--catalog-red);
   box-shadow: 0 8px 22px rgba(205, 1, 29, 0.16);
   transform: translateY(-2px);
 }
@@ -437,12 +461,12 @@
   font-weight: 600;
   letter-spacing: 0.04em;
   text-transform: uppercase;
-  color: var(--blue);
+  color: var(--catalog-blue);
 }
 .cn {
   font-size: 16px;
   font-weight: 600;
-  color: var(--blue);
+  color: var(--catalog-blue);
   margin: 3px 0 2px;
 }
 .ct {
@@ -454,7 +478,7 @@
   font-size: 11.5px;
   color: var(--grey);
 }
-.chips {
+.marketChips {
   display: flex;
   flex-wrap: wrap;
   gap: 5px;
@@ -470,19 +494,20 @@
 /* ── Admin editor form (ProductEditModal) ────────────────────────────────── */
 .egrid { display: grid; grid-template-columns: 1fr 1fr; gap: 0 14px; }
 .efield { display: flex; flex-direction: column; gap: 3px; margin-bottom: 9px; font-size: 12px; font-weight: 600; }
-.efield > span { color: var(--blue); }
+.efield > span { color: var(--catalog-blue); }
 .einput {
   font: inherit; font-weight: 400; font-size: 13px;
   padding: 7px 9px; border: 1px solid #d9dce1; border-radius: 6px;
   width: 100%; box-sizing: border-box; background: #fff;
+  min-height: 44px; /* tap-target standard */
 }
-.einput:focus { outline: none; border-color: var(--blue); }
+.einput:focus { outline: none; border-color: var(--catalog-blue); box-shadow: 0 0 0 3px rgba(4, 42, 114, 0.12); }
 /* Editor action buttons — inline-flex + 44px min so they meet the tap-target
    standard (feedback_tap_target_standard) on touch. */
-.ebtn { background: var(--blue); color: #fff; border: none; padding: 9px 18px; border-radius: 6px; font-weight: 600; cursor: pointer; display: inline-flex; align-items: center; justify-content: center; min-height: 44px; }
-.ebtn:disabled { opacity: 0.55; cursor: default; }
-.ebtnGhost { background: transparent; border: 1px solid #d9dce1; padding: 9px 16px; border-radius: 6px; cursor: pointer; display: inline-flex; align-items: center; justify-content: center; min-height: 44px; }
-.ebtnDanger { background: var(--rd); color: #fff; border: none; padding: 8px 14px; border-radius: 6px; cursor: pointer; display: inline-flex; align-items: center; justify-content: center; min-height: 44px; }
+.primaryButton { background: var(--catalog-blue); color: #fff; border: none; padding: 9px 18px; border-radius: 6px; font-weight: 600; cursor: pointer; display: inline-flex; align-items: center; justify-content: center; min-height: 44px; }
+.primaryButton:disabled { opacity: 0.55; cursor: default; }
+.ghostButton { background: transparent; border: 1px solid #d9dce1; padding: 9px 16px; border-radius: 6px; cursor: pointer; display: inline-flex; align-items: center; justify-content: center; min-height: 44px; }
+.dangerButton { background: var(--rd); color: #fff; border: none; padding: 8px 14px; border-radius: 6px; cursor: pointer; display: inline-flex; align-items: center; justify-content: center; min-height: 44px; }
 @media (max-width: 560px) { .egrid { grid-template-columns: 1fr; } }
 
 /* Strategic tier badge (gold/silver/bronze). Colors are set inline from
@@ -500,7 +525,7 @@
 }
 
 /* ── Detail modal ────────────────────────────────────────────────────────── */
-.ov {
+.modalOverlay {
   position: fixed;
   inset: 0;
   background: rgba(8, 12, 28, 0.55);
@@ -519,11 +544,11 @@
   overflow: hidden;
   position: relative;
 }
-.mhead {
+.detailHead {
   display: grid;
   grid-template-columns: 300px 1fr;
 }
-.mimg {
+.heroImage {
   background: #fff;
   border-right: 1px solid var(--lgrey);
   display: flex;
@@ -532,12 +557,12 @@
   padding: 24px;
   min-height: 240px;
 }
-.mimg img {
+.heroImage img {
   max-width: 100%;
   max-height: 240px;
   object-fit: contain;
 }
-.x {
+.closeButton {
   position: absolute;
   top: 18px;
   right: 20px;
@@ -553,106 +578,109 @@
   align-items: center;
   justify-content: center;
 }
-.x:hover {
+.closeButton:hover {
   background: #fff;
-  color: var(--red);
+  color: var(--catalog-red);
 }
-.mbody {
+.detailInfo {
   padding: 22px 24px;
 }
-.mft {
+.metaLine {
   font-size: 11px;
   font-weight: 600;
   letter-spacing: 0.04em;
   text-transform: uppercase;
-  color: var(--blue);
+  color: var(--catalog-blue);
 }
 .modal h1 {
   font-size: 26px;
-  color: var(--blue);
+  color: var(--catalog-blue);
   margin: 5px 0 3px;
   font-weight: 700;
 }
-.msub {
+.subtitle {
   font-size: 13px;
   color: var(--grey);
   margin-bottom: 12px;
 }
-.body {
+.detailBody {
   padding: 6px 24px 26px;
 }
-.sec {
+.section {
   border-top: 1px solid var(--lgrey);
   padding: 16px 0;
 }
-.sec h2 {
+.section h2 {
   font-size: 11.5px;
   font-weight: 600;
   letter-spacing: 0.05em;
   text-transform: uppercase;
-  color: var(--blue);
+  color: var(--catalog-blue);
   margin: 0 0 11px;
 }
-.feat {
+.featureList {
   margin: 0;
   padding: 0;
   list-style: none;
 }
-.feat li {
+.featureList li {
   position: relative;
   padding-left: 18px;
   margin: 6px 0;
   font-size: 13.5px;
 }
-.feat li::before {
+.featureList li::before {
   content: '';
   position: absolute;
   left: 0;
   top: 8px;
   width: 6px;
   height: 6px;
-  background: var(--blue);
+  background: var(--catalog-blue);
   border-radius: 50%;
 }
-.g2 {
+.twoColGrid {
   display: grid;
   grid-template-columns: 1fr 1fr;
   gap: 18px;
 }
-.kv .l {
-  font-size: 11px;
+.fieldGroup .fieldLabel {
+  /* Matches .section h2 (Overview / Regulatory / Clinical evidence) so
+     Indication / Patient population / Specifications read as the same kind
+     of label instead of a smaller, grey, tighter-tracked field caption. */
+  font-size: 11.5px;
   font-weight: 600;
   text-transform: uppercase;
-  letter-spacing: 0.03em;
-  color: var(--grey);
-  margin-bottom: 2px;
+  letter-spacing: 0.05em;
+  color: var(--catalog-blue);
+  margin-bottom: 4px;
 }
-.kv .v {
+.fieldGroup .fieldValue {
   font-size: 13.5px;
   margin-bottom: 11px;
 }
-.spec {
+.specChips {
   display: flex;
   flex-wrap: wrap;
   gap: 6px;
 }
-.spec b {
+.specChips b {
   font-weight: 600;
-  color: var(--blue);
+  color: var(--catalog-blue);
 }
-.spec span {
-  background: var(--bg);
+.specChips span {
+  background: var(--catalog-bg);
   border: 1px solid var(--lgrey);
   border-radius: 6px;
   font-size: 12px;
   padding: 3px 9px;
 }
-.tbl {
+.dataTable {
   width: 100%;
   border-collapse: collapse;
   font-size: 12.5px;
 }
-.tbl th {
+.dataTable th {
   text-align: left;
   font-size: 10.5px;
   font-weight: 600;
@@ -661,14 +689,14 @@
   padding: 7px 9px;
   border-bottom: 2px solid var(--lgrey);
 }
-.tbl td {
+.dataTable td {
   padding: 8px 9px;
   border-bottom: 1px solid #eef0f3;
   vertical-align: top;
 }
-.note {
+.regNote {
   background: #eaf0fb;
-  border-left: 3px solid var(--blue);
+  border-left: 3px solid var(--catalog-blue);
   border-radius: 0 8px 8px 0;
   padding: 10px 13px;
   font-size: 12px;
@@ -691,10 +719,10 @@
 }
 
 @media (max-width: 680px) {
-  .mhead {
+  .detailHead {
     grid-template-columns: 1fr;
   }
-  .g2 {
+  .twoColGrid {
     grid-template-columns: 1fr;
   }
 }
