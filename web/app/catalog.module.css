@@ -645,12 +645,15 @@
   gap: 18px;
 }
 .kv .l {
-  font-size: 11px;
+  /* Matches .sec h2 (Overview / Regulatory / Clinical evidence) so Indication /
+     Patient population / Specifications read as the same kind of label instead
+     of a smaller, grey, tighter-tracked field caption. */
+  font-size: 11.5px;
   font-weight: 600;
   text-transform: uppercase;
-  letter-spacing: 0.03em;
-  color: var(--grey);
-  margin-bottom: 2px;
+  letter-spacing: 0.05em;
+  color: var(--catalog-blue);
+  margin-bottom: 4px;
 }
 .kv .v {
   font-size: 13.5px;
