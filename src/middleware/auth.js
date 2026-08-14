@@ -8,14 +8,15 @@
 'use strict';
 const db = require('../lib/db');
 const logger = require('../lib/logger');
-const { createVerifier } = require('@matthewdbaldwin/microport-auth');
+const { createVerifier, createWithFreshAccessToken } = require('@matthewdbaldwin/microport-auth');
 // contracts exports `mapRole`; alias to mapContractRole to match the fleet.
 const { SsoClaims, mapRole: mapContractRole } = require('@matthewdbaldwin/microport-contracts');
 const { resolveRole, preserveLocalElevation } = require('../lib/resolveRole');
 // COOKIE_NAME now lives in lib/cookies.js (the shared createCookieHelpers
 // adapter) so the auth-route login flow and this verifier read the same name
 // off one definition. Value unchanged ('productport_token').
-const { COOKIE_NAME } = require('../lib/cookies');
+const { COOKIE_NAME, REFRESH_COOKIE_NAME, setSessionCookie, setRefreshCookie, clearRefreshCookie } = require('../lib/cookies');
+const { refreshFromHub } = require('../lib/refreshClient');
 
 const AUDIENCE = ['productport', 'microport-apps'];
 
@@ -48,6 +49,33 @@ const verify = createVerifier({
   claimsMode:   process.env.SSO_CLAIMS_MODE || 'enforce',
 });
 
+// Opportunistic near-expiry refresh, mounted ahead of every requireAuth
+// call (app.js). ProductPort's existing `verify` already has the exact
+// call shape createWithFreshAccessToken needs — verify(token, {audience,
+// ignoreExpiration}) — so it passes straight through, no adapter needed.
+const withFreshAccessToken = createWithFreshAccessToken({
+  verify,
+  audience:     AUDIENCE,
+  isEnabled:    () => process.env.PRODUCTPORT_REFRESH_ENABLED === 'true',
+  thresholdSec: 120,
+  getRefreshToken: (req) => req.cookies?.[REFRESH_COOKIE_NAME] || null,
+  getAccessToken:  (req) => req.cookies?.[COOKIE_NAME] || null, // cookie-only; no Bearer path
+  refresh: (rawRefresh, req) => refreshFromHub(rawRefresh, req.log),
+  onRefreshed: (req, res, pair) => {
+    const refreshRemainMs = Date.parse(pair.refreshTokenExpiresAt) - Date.now();
+    setSessionCookie(res, pair.accessToken,
+      Number.isFinite(refreshRemainMs) && refreshRemainMs > 0 ? refreshRemainMs : undefined);
+    setRefreshCookie(res, pair.refreshToken);
+    // Same-request visibility: requireAuth reads req.cookies[COOKIE_NAME] as
+    // its ONLY token source (no candidate list, unlike salesport), so a
+    // direct mutation is sufficient — no extra req field or header rewrite
+    // needed. A Set-Cookie response header can't retroactively change what
+    // THIS request's own req.cookies object holds.
+    req.cookies[COOKIE_NAME] = pair.accessToken;
+  },
+  onRefreshFailed: (_req, res) => clearRefreshCookie(res),
+});
+
 async function requireAuth(req, res, next) {
   // Post-Phase-4: cookie is the source. Never `if (!token) return` short-circuit
   // that skips the cookie. feedback_phase4_cookie_vs_bearer_drift.
@@ -62,18 +90,6 @@ async function requireAuth(req, res, next) {
   }
 
   try {
-    // jti-bearing tokens get a server-side session check (revocation).
-    if (payload.jti) {
-      const session = await db.session.findUnique({
-        where: { jti: payload.jti },
-        select: { id: true, revokedAt: true, expiresAt: true },
-      });
-      if (!session)             return res.status(401).json({ error: 'Session no longer valid. Please log in again.', code: 'SESSION_NOT_FOUND' });
-      if (session.revokedAt)    return res.status(401).json({ error: 'Session has been revoked. Please log in again.', code: 'SESSION_REVOKED' });
-      if (session.expiresAt < new Date()) return res.status(401).json({ error: 'Session expired. Please log in again.', code: 'SESSION_EXPIRED' });
-      req.sessionId = session.id;
-    }
-
     // ProductPort is a UNIVERSAL app — every authenticated employee gets at
     // least `viewer` (it's the platform's source of truth for product info).
     // An explicit `app_roles.productport` grant elevates (and is what surfaces
@@ -141,4 +157,4 @@ function requireProductAdmin(req, res, next) {
   return res.status(403).json({ error: 'Forbidden — ProductPort admin only' });
 }
 
-module.exports = { requireAuth, requireRole, requireProductAdmin, isProductAdmin, COOKIE_NAME, AUDIENCE };
+module.exports = { requireAuth, requireRole, requireProductAdmin, isProductAdmin, COOKIE_NAME, AUDIENCE, withFreshAccessToken };

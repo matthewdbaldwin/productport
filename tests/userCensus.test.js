@@ -48,21 +48,26 @@ jest.mock('../src/lib/db', () => {
 // Full app boots pino-http + a logger + the auth middleware module; mock all
 // three so no real logger/transport/JWT-verifier construction runs.
 //
-// DEVIATION from the brief: the brief's auth mock was { requireAuth, COOKIE_NAME }
-// only. src/routes/products.js (mounted by app.js at module-load time, alongside
-// the census route) ALSO destructures `requireProductAdmin` from
-// '../middleware/auth' and registers it as Express route middleware
-// (`router.post('/', requireProductAdmin, ...)` etc.) — Express validates that
-// every argument to router.post/get/etc. is a function AT REGISTRATION TIME, so
-// an undefined requireProductAdmin throws synchronously the moment app.js
-// requires routes/products.js, before any test runs. Adding a pass-through
-// requireProductAdmin to the mock (the same shape as requireAuth) fixes this;
-// the census route itself never touches requireProductAdmin.
+// PATTERN (seen twice, not just once): the brief's auth mock was { requireAuth, COOKIE_NAME }
+// only. BUT src/routes/products.js (mounted by app.js at module-load time, alongside
+// the census route) ALSO destructures `requireProductAdmin` from '../middleware/auth'
+// and registers it as Express route middleware (`router.post('/', requireProductAdmin, ...)`
+// etc.) — Express validates that every argument to router.post/get/etc. is a function
+// AT REGISTRATION TIME, so an undefined requireProductAdmin throws synchronously the moment
+// app.js requires routes/products.js, before any test runs. Adding a pass-through
+// requireProductAdmin to the mock (the same shape as requireAuth) fixes this.
+//
+// SECOND INSTANCE: app.js (line 75) ALSO calls `app.use('/api', withFreshAccessToken);`
+// at module-load time. An undefined withFreshAccessToken triggers the same synchronous
+// Router.use() error. Adding withFreshAccessToken to the mock (same pass-through shape)
+// fixes this. The census route itself never touches requireProductAdmin or withFreshAccessToken;
+// they are added to the mock purely to satisfy Express's registration-time validation.
 jest.mock('pino-http', () => () => (_req, _res, next) => next());
 jest.mock('../src/lib/logger', () => ({ info: jest.fn(), warn: jest.fn(), error: jest.fn(), child: jest.fn().mockReturnThis() }));
 jest.mock('../src/middleware/auth', () => ({
   requireAuth: (_req, _res, next) => next(),
   requireProductAdmin: (_req, _res, next) => next(),
+  withFreshAccessToken: (_req, _res, next) => next(),
   COOKIE_NAME: 'pp_session',
 }));
 
