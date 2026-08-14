@@ -79,7 +79,7 @@ router.post('/sso/exchange', async (req, res, next) => {
     const payload = await upstream.json().catch(() => ({}));
 
     if (upstream.ok && payload.token) {
-      if (payload.refreshToken) {
+      if (refreshEnabled && payload.refreshToken) {
         const refreshRemainMs = Date.parse(payload.refreshTokenExpiresAt) - Date.now();
         setSessionCookie(res, payload.token,
           Number.isFinite(refreshRemainMs) && refreshRemainMs > 0 ? refreshRemainMs : undefined);

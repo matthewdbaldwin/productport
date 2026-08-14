@@ -210,6 +210,9 @@ describe('withFreshAccessToken', () => {
 });
 
 describe('requireAuth — jti/local-session lookup removed', () => {
+  const ORIGINAL_FLAG = process.env.PRODUCTPORT_REFRESH_ENABLED;
+  afterEach(() => { process.env.PRODUCTPORT_REFRESH_ENABLED = ORIGINAL_FLAG; });
+
   test('a jti-bearing token with NO matching db.session row still authenticates by email (the regression this removal guards)', async () => {
     jest.resetModules();
     const mockFindUnique = jest.fn().mockResolvedValue(null); // no existing local user
@@ -291,7 +294,5 @@ describe('requireAuth — jti/local-session lookup removed', () => {
     expect(res.status).not.toHaveBeenCalled();
     expect(authNext).toHaveBeenCalledTimes(1);
     expect(req.user.email).toBe('jane@microport.com');
-
-    delete process.env.PRODUCTPORT_REFRESH_ENABLED;
   });
 });

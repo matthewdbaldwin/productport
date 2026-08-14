@@ -13,16 +13,13 @@
 // jwtTtlSec(). Fixed by routing through this shared adapter instead.
 //
 // REFRESH COOKIE — REFRESH_COOKIE_NAME / setRefreshCookie / clearRefreshCookie
-// are exported for shape parity with the other satellites' lib/cookies.js, but
-// are NOT called anywhere in this app yet. ProductPort's SSO exchange
-// (src/routes/auth.js) never requests the (access, refresh) pair from the IdP
-// (no `X-Satellite-Refresh` header, and SHORT_LIVED_SSO_TOKENS is a global IdP
-// flag we don't control) — the IdP's handoff/exchange only mints a refresh
-// token when a satellite opts in, so there is currently no server-side refresh
-// token for this app to carry in a cookie at all. Wiring an actual refresh flow
-// (feature flag + a local refreshClient.js + opportunistic-refresh middleware,
-// mirroring clinicport's B1 Phase 4a.1) is a separate, larger change — out of
-// scope for this remediation. See src/routes/auth.js for the fuller note.
+// ARE now wired, gated behind PRODUCTPORT_REFRESH_ENABLED (mirroring clinicport's
+// B1 Phase 4a.1 opt-in): src/routes/auth.js sets the refresh cookie on
+// POST /sso/exchange (when the flag is on and the IdP returns an (access,
+// refresh) pair) and clears it on POST /logout; src/middleware/auth.js's
+// withFreshAccessToken reads it back and rotates the pair opportunistically.
+// When the flag is false, none of that runs and behavior is unchanged from
+// before this flow existed — see src/routes/auth.js for the fuller note.
 'use strict';
 const { createCookieHelpers } = require('@matthewdbaldwin/microport-auth');
 const { jwtTtlSec } = require('./jwtTtl');

@@ -119,4 +119,51 @@ describe('POST /api/auth/sso/exchange — refresh-pair opt-in', () => {
     expect(res.body.refreshToken).toBeUndefined();
     expect(res.body.refreshTokenExpiresAt).toBeUndefined();
   });
+
+  test('flag on + upstream 2xx but no token field (still includes a refreshToken) → the raw refresh token is stripped from the response body', async () => {
+    process.env.PRODUCTPORT_REFRESH_ENABLED = 'true';
+    global.fetch = jest.fn().mockResolvedValue({
+      ok: true, status: 200,
+      json: async () => ({
+        refreshToken: 'raw-refresh-should-never-leak',
+        refreshTokenExpiresAt: new Date(Date.now() + 90 * 24 * 60 * 60 * 1000).toISOString(),
+      }),
+    });
+
+    const res = await request(makeApp())
+      .post('/api/auth/sso/exchange')
+      .send({ code: 'x'.repeat(40) });
+
+    expect(res.status).toBe(200);
+    const setCookies = res.headers['set-cookie'] || [];
+    expect(setCookies.some(c => c.startsWith('productport_refresh='))).toBe(false);
+    expect(res.body.refreshToken).toBeUndefined();
+    expect(res.body.refreshTokenExpiresAt).toBeUndefined();
+  });
+
+  test('flag off but the IdP returns a full pair anyway → the local flag is a real kill switch (no refresh cookie, no opt-in header, pair stripped)', async () => {
+    process.env.PRODUCTPORT_REFRESH_ENABLED = 'false';
+    global.fetch = jest.fn().mockResolvedValue({
+      ok: true, status: 200,
+      json: async () => ({
+        token: 'access-tok',
+        role: 'viewer',
+        refreshToken: 'raw-refresh-xyz',
+        refreshTokenExpiresAt: new Date(Date.now() + 90 * 24 * 60 * 60 * 1000).toISOString(),
+      }),
+    });
+
+    const res = await request(makeApp())
+      .post('/api/auth/sso/exchange')
+      .send({ code: 'x'.repeat(40) });
+
+    expect(res.status).toBe(200);
+    const [, opts] = global.fetch.mock.calls[0];
+    expect(opts.headers['X-Satellite-Refresh']).toBeUndefined();
+    const setCookies = res.headers['set-cookie'] || [];
+    expect(setCookies.some(c => c.startsWith('productport_refresh='))).toBe(false);
+    expect(res.body.refreshToken).toBeUndefined();
+    expect(res.body.refreshTokenExpiresAt).toBeUndefined();
+    expect(res.body.token).toBe('access-tok');
+  });
 });

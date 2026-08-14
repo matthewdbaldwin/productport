@@ -76,14 +76,21 @@ receives carries no `jti` (confirmed: salesport's `signToken`, the legacy-path
 signer, never stamps one), so `payload.jti` is always falsy and the branch never
 runs.
 
-The refresh flow changes that. Hub's short-lived access token is minted by
-`signAccessToken`, which **always** stamps a `jti` (`salesport/src/middleware/auth.js:818-821`,
+The refresh flow changes that — for productport's *current* IdP path.
+ProductPort's exchange target is SalesPort (`IDP_API` defaults to
+`SALESPORT_API_URL` until the Slice-4h IdP flip to HubPort — see
+`src/routes/auth.js`), and SalesPort's own short-lived access token is minted
+by `signAccessToken`, which **always** stamps a `jti` (`salesport/src/middleware/auth.js:818-821`,
 unconditional, used whenever `X-Satellite-Refresh: 1` triggers the pair path).
 The instant productport opts in, every access token it receives — the initial
 one from `/sso/exchange` and every subsequent refreshed one — carries a `jti`
 with no local `Session` row behind it. Without a fix, `requireAuth` would 401
 `SESSION_NOT_FOUND` on the very first authenticated request after refresh flips
-on: the feature would actively break auth, not just sit inert.
+on: the feature would actively break auth, not just sit inert. **This jti-always-
+stamped behavior is specific to SalesPort's signer, not a property of "the IdP"
+in general** — HubPort's own docs describe having removed jti embedding from its
+token signer, so a future IdP flip to HubPort would need this assumption
+re-verified rather than carried over.
 
 **Fix (in scope for this plan, Component 2 below):** remove the jti-based local
 session lookup from productport's `requireAuth`. ProductPort was never given a
@@ -96,19 +103,24 @@ hub's own refresh-token family-revoke, and productport's existing fast-revocatio
 receiver (`src/routes/ssoLifecycle.js`) — both untouched by this plan and both
 already confirmed live.
 
-**⚠ Fleet-wide follow-up, NOT fixed by this plan, recorded for separate triage.**
+**⚠ Fleet-wide follow-up, NOT fixed by this plan, recorded for separate triage
+(scoped narrower than earlier drafts of this note — see below).**
 Reading clinicport's and execport's own `/sso/exchange` handlers found neither
 creates a local `Session` row for hub-issued tokens either — their jti/session
 block exists solely for their own `/login` route's locally-minted tokens. Grep
 found no live `CLINICPORT_REFRESH_ENABLED=true` in either repo's checked-in
 config (task-defs aren't in the repo, so this isn't a full answer), but if that
-flag is ever `true` in a real environment where hub also stamps `jti` into
-short-lived tokens, clinicport (and structurally execport, if its own refresh
-flag were ever flipped the same way) would hit the identical `SESSION_NOT_FOUND`
-storm on every request past the first refresh. This needs a fleet-wide check
-(confirm the live flag states, confirm whether either has actually been
-exercised with refresh-flow tokens in anger) — out of scope for productport's
-plan, tracked in the rollout memory checkpoint as its own thread.
+flag is ever `true` in a real environment **where their IdP path is also
+SalesPort** (whose signer always stamps `jti`, per above), clinicport (and
+structurally execport, if its own refresh flag were ever flipped the same way)
+would hit the identical `SESSION_NOT_FOUND` storm on every request past the
+first refresh. This is a SalesPort-as-IdP-path hazard specifically, not a
+universal one — a satellite whose refresh path already points at HubPort would
+not be exposed, since HubPort's signer does not stamp `jti`. This needs a
+fleet-wide check (confirm the live flag states, confirm which IdP each
+satellite's refresh path actually targets, confirm whether either has actually
+been exercised with refresh-flow tokens in anger) — out of scope for
+productport's plan, tracked in the rollout memory checkpoint as its own thread.
 
 ## Architecture
 
@@ -339,7 +351,15 @@ separate, and **every prod env change waits for Matt's explicit go** (⛔).
    groups for `SESSION_NOT_FOUND`/`REFRESH_`/pino `$.level >= 40`.
 5. **Rollback:** `PRODUCTPORT_REFRESH_ENABLED=false` → peek off + exchange stops
    requesting pairs; existing pair sessions die at access-token exp and re-SSO.
-   Env-only, no redeploy of code.
+   Env-only, no redeploy of code. This is a genuine satellite-side kill switch
+   (with the whole-branch-review fix to `/sso/exchange`'s pair-consuming
+   condition, ProductPort ignores a refresh pair even if the upstream IdP is
+   separately configured to send one) — but it only controls the satellite
+   side. Whether HubPort *offers* a pair at all is gated separately,
+   server-side, by HubPort's own `SSO_REFRESH_SATELLITES` allowlist config
+   (not by the `X-Satellite-Refresh` header alone), so a full end-to-end
+   rollout also requires a corresponding HubPort-side allowlist change —
+   out of scope for this plan/repo.
 
 ## Out of scope
 
