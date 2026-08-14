@@ -84,14 +84,20 @@ router.post('/sso/exchange', async (req, res, next) => {
         setSessionCookie(res, payload.token,
           Number.isFinite(refreshRemainMs) && refreshRemainMs > 0 ? refreshRemainMs : undefined);
         setRefreshCookie(res, payload.refreshToken);
-        delete payload.refreshToken;
-        delete payload.refreshTokenExpiresAt;
       } else {
         setSessionCookie(res, payload.token);
       }
     } else {
       logger.warn({ status: upstream.status, code: payload && payload.code }, '[sso] handoff exchange denied');
     }
+
+    // Strip unconditionally — regardless of which branch above ran — so a
+    // malformed/edge IdP response (refreshToken present alongside a missing
+    // token or a non-2xx status) can never ship the raw refresh token to the
+    // browser. The refresh cookie (set above, only when a pair was minted)
+    // is its only legitimate carrier.
+    delete payload.refreshToken;
+    delete payload.refreshTokenExpiresAt;
 
     return res.status(upstream.status).json(payload);
   } catch (err) { next(err); }

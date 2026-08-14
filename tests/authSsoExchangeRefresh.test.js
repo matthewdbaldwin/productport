@@ -97,4 +97,26 @@ describe('POST /api/auth/sso/exchange — refresh-pair opt-in', () => {
     expect(setCookies.some(c => c.startsWith('productport_refresh='))).toBe(false);
     expect(res.body).toEqual({ token: 'access-tok', role: 'viewer' });
   });
+
+  test('flag on + IdP denies the exchange but still includes a refreshToken → the raw refresh token is stripped from the (non-2xx) response body', async () => {
+    process.env.PRODUCTPORT_REFRESH_ENABLED = 'true';
+    global.fetch = jest.fn().mockResolvedValue({
+      ok: false, status: 401,
+      json: async () => ({
+        code: 'INVALID_CODE',
+        refreshToken: 'raw-refresh-should-never-leak',
+        refreshTokenExpiresAt: new Date(Date.now() + 90 * 24 * 60 * 60 * 1000).toISOString(),
+      }),
+    });
+
+    const res = await request(makeApp())
+      .post('/api/auth/sso/exchange')
+      .send({ code: 'x'.repeat(40) });
+
+    expect(res.status).toBe(401);
+    const setCookies = res.headers['set-cookie'] || [];
+    expect(setCookies.some(c => c.startsWith('productport_refresh='))).toBe(false);
+    expect(res.body.refreshToken).toBeUndefined();
+    expect(res.body.refreshTokenExpiresAt).toBeUndefined();
+  });
 });
