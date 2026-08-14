@@ -19,7 +19,8 @@
 const express = require('express');
 const logger = require('../lib/logger');
 const { requireAuth } = require('../middleware/auth');
-const { setSessionCookie, clearSessionCookie } = require('../lib/cookies');
+const { setSessionCookie, clearSessionCookie, REFRESH_COOKIE_NAME, setRefreshCookie, clearRefreshCookie } = require('../lib/cookies');
+const { revokeUpstreamRefresh } = require('../lib/refreshClient');
 const db = require('../lib/db');
 
 const router = express.Router();
@@ -52,21 +53,24 @@ router.get('/sso/start', (req, res) => {
 // the payload verbatim so the web frontend can stash the token + apply theme
 // during the transition.
 //
-// NO REFRESH COOKIE: unlike clinicport's B1 Phase 4a.1 opt-in, this exchange
-// does not send `X-Satellite-Refresh: 1`, so the IdP's handoff/exchange mints
-// only the legacy single access token here — `payload.refreshToken` is never
-// populated for this app. There is therefore no refresh token to carry in a
-// cookie today; see src/lib/cookies.js's file header for what a real opt-in
-// would need (feature flag + refreshClient.js + opportunistic-refresh
-// middleware) and why it's out of scope for this pass.
+// REFRESH OPT-IN: when PRODUCTPORT_REFRESH_ENABLED is true, sends
+// X-Satellite-Refresh: 1 so the IdP mints an (access, refresh) pair instead
+// of the legacy single 8h token (mirrors clinicport's B1 Phase 4a.1 opt-in).
+// When a pair comes back, the refresh cookie is set and the raw refresh
+// token/expiry are stripped from the forwarded JSON body before it reaches
+// the browser — the cookie is its only carrier; it has no business in JS.
 router.post('/sso/exchange', async (req, res, next) => {
   try {
     if (!IDP_API) return res.status(503).json({ error: 'SSO not configured on this instance.' });
     const { code } = req.body || {};
 
+    const refreshEnabled = process.env.PRODUCTPORT_REFRESH_ENABLED === 'true';
+    const upstreamHeaders = { 'Content-Type': 'application/json', 'X-Correlation-Id': req.id };
+    if (refreshEnabled) upstreamHeaders['X-Satellite-Refresh'] = '1';
+
     const upstream = await fetch(`${IDP_API.replace(/\/$/, '')}/api/auth/handoff/exchange`, {
       method:  'POST',
-      headers: { 'Content-Type': 'application/json', 'X-Correlation-Id': req.id },
+      headers: upstreamHeaders,
       body:    JSON.stringify({ code }),
       // Bound the IdP call — this is the login critical path; a hung hub must
       // fail the exchange fast (→ error handler), never hang the request.
@@ -74,14 +78,27 @@ router.post('/sso/exchange', async (req, res, next) => {
     });
     const payload = await upstream.json().catch(() => ({}));
 
-    if (upstream.ok && payload.token) setSessionCookie(res, payload.token);
-    else logger.warn({ status: upstream.status, code: payload && payload.code }, '[sso] handoff exchange denied');
+    if (upstream.ok && payload.token) {
+      if (payload.refreshToken) {
+        const refreshRemainMs = Date.parse(payload.refreshTokenExpiresAt) - Date.now();
+        setSessionCookie(res, payload.token,
+          Number.isFinite(refreshRemainMs) && refreshRemainMs > 0 ? refreshRemainMs : undefined);
+        setRefreshCookie(res, payload.refreshToken);
+        delete payload.refreshToken;
+        delete payload.refreshTokenExpiresAt;
+      } else {
+        setSessionCookie(res, payload.token);
+      }
+    } else {
+      logger.warn({ status: upstream.status, code: payload && payload.code }, '[sso] handoff exchange denied');
+    }
 
     return res.status(upstream.status).json(payload);
   } catch (err) { next(err); }
 });
 
-// POST /api/auth/logout — clear the cookie + revoke the local Session row.
+// POST /api/auth/logout — clear the cookie + revoke the local Session row +
+// best-effort revoke the upstream refresh token (if any).
 router.post('/logout', requireAuth, async (req, res, next) => {
   try {
     // Revoke the Session row server-side (a cleared cookie alone lets a stolen
@@ -90,7 +107,12 @@ router.post('/logout', requireAuth, async (req, res, next) => {
     if (req.sessionId) {
       await db.session.update({ where: { id: req.sessionId }, data: { revokedAt: new Date() } });
     }
+    // Upstream refresh-token revoke is fire-and-forget: a captured refresh
+    // token must not outlive logout, but an IdP outage must not block it.
+    const rawRefresh = req.cookies?.[REFRESH_COOKIE_NAME];
+    if (rawRefresh) revokeUpstreamRefresh(rawRefresh, req.log, req.id).catch(() => {});
     clearSessionCookie(res);
+    clearRefreshCookie(res);
     res.json({ ok: true });
   } catch (err) { next(err); }
 });
