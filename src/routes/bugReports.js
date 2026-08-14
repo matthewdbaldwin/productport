@@ -13,6 +13,16 @@
 // MULTIPART when a file is attached AND the target is multipart-capable (the hub,
 // signalled by BUGREPORT_FORWARD_URL). Pointed at SalesPort's JSON-only receiver
 // (the pre-cutover default), a file is dropped (warn) and the text leg is sent.
+//
+// WAF fallback (2026-08-14): the hub's /cross-app receiver never returns a bare
+// 403 itself (401 = bad signature, 422 = bad payload) — a 403 here is the shared
+// ALB WAF, not app code, and it has been observed false-positiving on the
+// multipart/binary screenshot body specifically (16 blocked filings from one
+// user in 13 minutes, 2026-08-14, report + screenshot both silently dropped —
+// see project_waf_count_vs_block_mismatch_2026-08-14). A 403 on the multipart
+// leg now gets ONE same-eventId retry as JSON-only (screenshot dropped), same
+// as the legacy-receiver leg above — turns a silent total loss into "report
+// filed, screenshot missing."
 'use strict';
 const express = require('express');
 const crypto  = require('crypto');
@@ -150,13 +160,30 @@ router.post('/', requireAuth, fileLimiter, uploadScreenshot, assertFileSignature
     // A transient blip (receiver 5xx mid-deploy, or a connection reset) used to
     // drop the filing; forwardWithRetry retries once. Safe because the payload
     // carries an eventId the receiver dedups. Timeout still 504s (no retry).
-    const upstream = await forwardWithRetry(`${base.replace(/\/$/, '')}/api/bug-reports/cross-app`, { headers, makeBody, logger });
-    const data = await upstream.json().catch(() => ({}));
+    let upstream = await forwardWithRetry(`${base.replace(/\/$/, '')}/api/bug-reports/cross-app`, { headers, makeBody, logger });
+    let data = await upstream.json().catch(() => ({}));
+    let sentMultipart = forwardMultipart;
+
+    // WAF fallback — see the file-header comment. A bare 403 on the multipart
+    // leg is the shared ALB WAF, not the hub app; retry once, same eventId,
+    // as JSON without the screenshot.
+    if (!upstream.ok && upstream.status === 403 && forwardMultipart) {
+      logger.warn({ eventId: payload.eventId }, '[bug-reports] multipart forward WAF-rejected — retrying JSON-only without screenshot');
+      const jsonHeaders = { 'Content-Type': 'application/json', 'X-Correlation-Id': correlationId };
+      if (secret) jsonHeaders['x-bugreport-signature'] = signWebhookBody(secret, payloadStr);
+      upstream = await forwardWithRetry(`${base.replace(/\/$/, '')}/api/bug-reports/cross-app`, { headers: jsonHeaders, makeBody: () => payloadStr, logger });
+      data = await upstream.json().catch(() => ({}));
+      sentMultipart = false;
+    }
+
     if (!upstream.ok) {
       logger.warn({ status: upstream.status, data }, '[bug-reports] cross-app forward rejected');
       return res.status(502).json({ error: data?.error || 'SalesPort rejected the report.' });
     }
-    logger.info({ bugReportId: data?.id, by: req.user.id, multipart: forwardMultipart }, '[bug-reports] forwarded to central queue');
+    logger.info(
+      { bugReportId: data?.id, by: req.user.id, multipart: sentMultipart, screenshotDropped: forwardMultipart && !sentMultipart },
+      '[bug-reports] forwarded to central queue',
+    );
     return res.status(201).json(data);
   } catch (err) {
     if (err.name === 'AbortError' || err.name === 'TimeoutError') {
