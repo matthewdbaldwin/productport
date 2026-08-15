@@ -22,6 +22,7 @@ const { requireAuth } = require('../middleware/auth');
 const { setSessionCookie, clearSessionCookie, REFRESH_COOKIE_NAME, setRefreshCookie, clearRefreshCookie } = require('../lib/cookies');
 const { revokeUpstreamRefresh } = require('../lib/refreshClient');
 const db = require('../lib/db');
+const { buildAppLauncherApps } = require('@matthewdbaldwin/microport-contracts');
 
 const router = express.Router();
 const WEB          = process.env.WEB_ORIGIN || '';
@@ -193,23 +194,16 @@ router.get('/role-catalog', (_req, res) => {
   });
 });
 
-// GET /api/auth/app-launcher — public list of sibling apps this deployment can
-// link to (only those whose *_WEB_URL env is set). Surfaced in the AppSwitcher.
+// GET /api/auth/app-launcher — public list of sibling MicroPort apps this
+// deployment can link to (only those whose *_WEB_URL env is set). Surfaced in
+// the AppSwitcher. URLs are safe to reveal publicly. The host app (productport)
+// is excluded from its own list. The directory + filter/map logic is now
+// shared via microport-contracts (SATELLITE_DIRECTORY / buildAppLauncherApps)
+// instead of a hand-copied array — every satellite used to hand-copy this
+// array locally, and it drifted silently twice in prod on 2026-08-14 (this
+// repo, productport, was one of the two, missing 4 entries).
 router.get('/app-launcher', (_req, res) => {
-  const HOST_APP = 'productport';
-  const defs = [
-    { id: 'salesport',  label: 'SalesPort',  tagline: 'CRM & sales',                  envVar: 'SALESPORT_WEB_URL'  },
-    { id: 'opsport',    label: 'OpsPort',    tagline: 'Operations & inventory',       envVar: 'OPSPORT_WEB_URL'    },
-    { id: 'reviewport', label: 'ReviewPort', tagline: 'Medical / legal / regulatory', envVar: 'REVIEWPORT_WEB_URL' },
-    { id: 'clinicport', label: 'ClinicPort', tagline: 'Clinical contacts',            envVar: 'CLINICPORT_WEB_URL' },
-    { id: 'execport',   label: 'ExecPort',   tagline: 'Exec analytics',               envVar: 'EXECPORT_WEB_URL'   },
-    { id: 'productport', label: 'ProductPort', tagline: 'Product catalog',            envVar: 'PRODUCTPORT_WEB_URL' },
-    { id: 'engageport', label: 'EngagePort', tagline: 'Physician engagement',         envVar: 'ENGAGEPORT_WEB_URL' },
-  ];
-  const apps = defs
-    .filter((d) => d.id !== HOST_APP)
-    .map((d) => ({ id: d.id, label: d.label, tagline: d.tagline, url: process.env[d.envVar] || null }))
-    .filter((a) => a.url);
+  const apps = buildAppLauncherApps('productport', (entry) => process.env[entry.envVar]);
   // The "Company portal" target in the app switcher lives on the hub host, not
   // the SalesPort CRM host. Echo PORTAL_WEB_URL so the switcher stops deriving
   // it from the SalesPort tile (→ CRM/portal). Null when unset → the switcher
