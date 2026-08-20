@@ -9,15 +9,17 @@
 // ProductPort is a universal/JIT app, so the local effect of an event is narrow —
 // see src/lib/lifecycleAction.js for the policy. Every event is logged to
 // UserLifecycleEvent (audit + idempotency), then the account-active flag is
-// updated if the policy says so. Data-level errors return 2xx so salesport's
+// updated if the policy says so — or, since the fleet create-on-grant decision
+// (2026-08-19), the row is CREATED when a grant/reactivate arrives for an email
+// with no local row and the event's role maps. Data-level errors return 2xx so salesport's
 // outbox stops retrying (feedback_data_level_errors_must_return_2xx); only a
 // failed audit-row write 5xx's so the delivery is retried.
 'use strict';
 const router = require('express').Router();
 const { createLifecycleGuard } = require('@matthewdbaldwin/microport-auth');
-const { LifecycleEvent, LifecycleStateResponse } = require('@matthewdbaldwin/microport-contracts');
+const { LifecycleEvent, LifecycleStateResponse, mapRole } = require('@matthewdbaldwin/microport-contracts');
 const logger = require('../lib/logger');
-const { decideUserUpdate, stateResponse } = require('../lib/lifecycleAction');
+const { decideUserUpdate, stateResponse, placeholderName } = require('../lib/lifecycleAction');
 // db is required lazily inside handlers so this module loads for the pure-logic
 // tests without the generated Prisma client present.
 
@@ -116,9 +118,21 @@ router.post('/event', lifecycleGuard, async (req, res) => {
       where: { email: normEmail },
       select: { id: true, active: true },
     });
-    const decision = decideUserUpdate(kind, existing);
+    const decision = decideUserUpdate(kind, existing, {
+      newRole,
+      mapRole: (wire) => mapRole('productport', wire),
+    });
     if (decision.data) {
       await db.user.update({ where: { id: existing.id }, data: decision.data });
+    } else if (decision.create) {
+      // Create-on-grant (fleet decision 2026-08-19): mirror the JIT-create
+      // shape in middleware/auth.js (email + name + role; active defaults
+      // true, locale keeps the schema default). The event carries no name —
+      // placeholder from the email local-part; sync-on-login backfills the
+      // real name + re-resolves the role from the SSO claim at first login.
+      await db.user.create({
+        data: { email: normEmail, name: placeholderName(normEmail), role: decision.create.role },
+      });
     } else if (decision.skip) {
       logger.warn({ correlationId, kind, email: normEmail }, '[sso-lifecycle] unknown event kind — audit row stashed');
     }
@@ -126,7 +140,11 @@ router.post('/event', lifecycleGuard, async (req, res) => {
       where: { id: eventRow.id },
       data: { processedAt: new Date(), error: decision.skip ? 'unknown_kind' : null },
     });
-    return res.json({ ok: true, eventId: eventRow.id, ...(decision.data ? { applied: true } : {}) });
+    return res.json({
+      ok: true, eventId: eventRow.id,
+      ...(decision.data || decision.create ? { applied: true } : {}),
+      ...(decision.create ? { created: true } : {}),
+    });
   } catch (err) {
     // Reset processedAt back to null: the claim above already marked this row
     // processed, but processing itself failed, so a genuine retry must be able

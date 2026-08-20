@@ -38,6 +38,7 @@ jest.mock('../src/lib/db', () => ({
   user: {
     findUnique: jest.fn(async () => (mockStore.user ? { id: mockStore.user.id, active: mockStore.user.active, role: mockStore.user.role } : null)),
     update: jest.fn(async ({ data }) => { Object.assign(mockStore.user, data); return mockStore.user; }),
+    create: jest.fn(async ({ data }) => { mockStore.user = { id: 99, active: true, ...data }; return mockStore.user; }),
   },
 }));
 
@@ -131,6 +132,73 @@ describe('POST /api/sso/lifecycle/event', () => {
     const res = await post(app, '/api/sso/lifecycle/event', evt({ email: 'ghost@test.local' }));
     expect(res.status).toBe(200);
     expect(res.body.ok).toBe(true);
+  });
+});
+
+// Fleet decision (HubPort grant authority, 2026-08-19): a grant/reactivate for
+// an email with NO local row must CREATE it — mirroring the JIT-create shape in
+// middleware/auth.js (email + name + role; the event carries no name, so the
+// placeholder is the email local-part — sync-on-login backfills the real name
+// at first login). An unmappable role never creates; disable/revoke stay no-ops.
+describe('POST /api/sso/lifecycle/event — create-on-grant (no local row)', () => {
+  beforeEach(() => { mockStore.events.clear(); mockStore.user = null; jest.clearAllMocks(); });
+
+  test('grant for an unknown email with a mappable role → creates the local row', async () => {
+    const app = makeApp();
+    const res = await post(app, '/api/sso/lifecycle/event',
+      evt({ kind: 'grant', email: 'new.hire@test.local', newRole: 'product_admin' }));
+
+    expect(res.status).toBe(200);
+    expect(res.body.applied).toBe(true);
+    expect(res.body.created).toBe(true);
+    expect(db.user.create).toHaveBeenCalledWith({
+      data: { email: 'new.hire@test.local', name: 'new.hire', role: 'product_admin' },
+    });
+    expect(db.user.update).not.toHaveBeenCalled();
+  });
+
+  test('reactivate for an unknown email with a mappable role → creates too (same fleet path)', async () => {
+    const app = makeApp();
+    const res = await post(app, '/api/sso/lifecycle/event',
+      evt({ kind: 'reactivate', email: 'Back.Again@test.local', newRole: 'viewer' }));
+
+    expect(res.status).toBe(200);
+    expect(res.body.created).toBe(true);
+    // Email is normalized (lowercased) before both the lookup and the create.
+    expect(db.user.create).toHaveBeenCalledWith({
+      data: { email: 'back.again@test.local', name: 'back.again', role: 'viewer' },
+    });
+  });
+
+  test('grant with an unmappable role for an unknown email → 200 noop, never creates', async () => {
+    const app = makeApp();
+    const res = await post(app, '/api/sso/lifecycle/event',
+      evt({ kind: 'grant', email: 'ghost@test.local', newRole: 'not-a-real-role' }));
+
+    expect(res.status).toBe(200);
+    expect(res.body.ok).toBe(true);
+    expect(res.body.created).toBeUndefined();
+    expect(db.user.create).not.toHaveBeenCalled();
+  });
+
+  test('disable for an unknown email stays a no-op — never creates', async () => {
+    const app = makeApp();
+    const res = await post(app, '/api/sso/lifecycle/event',
+      evt({ kind: 'disable', email: 'ghost@test.local' }));
+
+    expect(res.status).toBe(200);
+    expect(db.user.create).not.toHaveBeenCalled();
+    expect(db.user.update).not.toHaveBeenCalled();
+  });
+
+  test('grant on an EXISTING active user does not create a duplicate', async () => {
+    mockStore.user = { id: 7, email: 'gone@test.local', active: true, role: 'viewer' };
+    const app = makeApp();
+    const res = await post(app, '/api/sso/lifecycle/event',
+      evt({ kind: 'grant', email: 'gone@test.local', newRole: 'product_admin' }));
+
+    expect(res.status).toBe(200);
+    expect(db.user.create).not.toHaveBeenCalled();
   });
 });
 
