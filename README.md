@@ -1,6 +1,6 @@
 # ProductPort
 
-Welcome to **ProductPort** — the product-catalog satellite and the system of record for MicroPort's product descriptive data, regulatory-clearance matrix, and clinical-evidence library. Every authenticated employee can browse the catalog (ProductPort is a universal-viewer app: SSO grants `viewer` to everyone, and an explicit grant elevates to `product` / `product_admin` and surfaces the tile in the AppSwitcher). Product, market-access, and regulatory teams use it as the single source of truth for what a product is, where it is cleared, and the trials behind it.
+Welcome to **ProductPort** — the product-catalog satellite and the system of record for MicroPort's product descriptive data, regulatory-clearance matrix, and clinical-evidence library. Every authenticated employee can browse the catalog (ProductPort is a universal-viewer app: SSO grants `viewer` to everyone, an explicit `product_admin` grant unlocks editing, and any explicit grant surfaces the tile in the AppSwitcher — see [Roles](#roles) for the fine print on `product`). Product, market-access, and regulatory teams use it as the single source of truth for what a product is, where it is cleared, and the trials behind it.
 
 For the full platform overview — how this satellite relates to the other six and to the shared `microport-ui` library — see [Plato](https://github.com/matthewdbaldwin/salesport/blob/main/docs/PLATO.md).
 
@@ -9,9 +9,20 @@ For the full platform overview — how this satellite relates to the other six a
 - **Product catalog** — descriptive fields, taglines, indications, specs, and imagery per product, organised by subsidiary and therapeutic area
 - **Regulatory-clearance matrix** — per-region clearance status (CE / FDA / NMPA / PMDA) with notes
 - **Clinical-evidence library** — trials linked to each product (identifier, design, N, result)
-- **Universal SSO viewer** — every employee sees the catalog; role grants (`product`, `product_admin`) unlock editing and the regulatory/taxonomy surfaces
+- **Universal SSO viewer** — every employee sees the catalog; a `product_admin` grant unlocks editing and the regulatory/taxonomy surfaces (`product` is reserved and gates nothing yet — see [Roles](#roles))
 - **Canonical deep-links** — every product has a stable, shareable URL (`?product=<slug>`) so the hub and other satellites can link straight to it
 - **In-memory catalog** — the whole (small) catalog loads once; search, filter, and detail are all client-side for instant interaction
+
+## Roles
+
+Roles and account status are managed in HubPort (Employees page); ProductPort has no local user-management surface by design. What each role actually does today:
+
+| Role | How it's assigned | What it does today |
+|---|---|---|
+| `viewer` | Automatic — every authenticated employee | Read-only catalog. No grant needed, so it is never offered in the grant picker. |
+| `product` | HubPort grant | ⚠ **Reserved for upcoming product-management features; currently equivalent to `viewer`.** No route guard differentiates it — `requireProductAdmin` is the only write gate — so granting it changes nothing except surfacing the ProductPort tile in the grantee's app-switcher. It stays grantable so the planned two-tier editor (descriptive fields + trials + images) can land without a re-grant wave, and it is deliberately de-advertised from `GET /api/auth/role-catalog` until that gate ships. |
+| `product_admin` | HubPort grant | Full editor: catalog writes, CSV import/export, regulatory-clearance matrix, taxonomy, product disable/enable. |
+| `superuser` | Local elevation only — never SSO-granted | `product_admin` powers; preserved across logins by `preserveLocalElevation` so the JIT sync never demotes it. |
 
 ## Where it lives
 
@@ -66,7 +77,7 @@ Auth goes through SalesPort SSO — a local instance needs `SALESPORT_JWT_PUBLIC
 
 ## SSO lifecycle
 
-ProductPort is SSO/JIT: on every login the auth middleware re-resolves the user's role from the SSO claim and upserts the local `User` row. The inbound receiver (`POST /api/sso/lifecycle/event`, HMAC-verified via `createLifecycleGuard`) validates events against `microport-contracts` `LifecycleEvent` and acts on the account flag — `disable` deactivates the user (so an offboarded account loses access before its token expires), `reactivate` re-enables it. Role `grant` / `revoke` need no state written here; they take effect on the next login. A sibling `POST /api/sso/lifecycle/state` answers SalesPort's hourly reconciliation probe. Every event is logged to `UserLifecycleEvent` (audit + `X-Lifecycle-Event-Id` dedup).
+ProductPort is SSO/JIT: on every login the auth middleware re-resolves the user's role from the SSO claim and upserts the local `User` row. The inbound receiver (`POST /api/sso/lifecycle/event`, HMAC-verified via `createLifecycleGuard`) validates events against `microport-contracts` `LifecycleEvent` and acts on the account flag — `disable` deactivates the user (so an offboarded account loses access before its token expires), `reactivate` re-enables it. A `grant`/`reactivate` for an email with **no local row creates it** (fleet create-on-grant decision, 2026-08-19) when the event's role maps — placeholder name from the email local-part; the real name and role re-sync from the SSO claim at first login. For existing rows, `grant` / `revoke` write no role here; the role takes effect on the next login. A sibling `POST /api/sso/lifecycle/state` answers SalesPort's hourly reconciliation probe. Every event is logged to `UserLifecycleEvent` (audit + `X-Lifecycle-Event-Id` dedup).
 
 ## Ship discipline
 
