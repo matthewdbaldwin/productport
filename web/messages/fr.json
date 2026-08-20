@@ -1,8 +1,8 @@
 {
   "auth": {
-    "redirecting": "Redirection vers SalesPort…",
+    "redirecting": "Redirection vers le Portail de l'entreprise…",
     "signInWithSalesPort": "Se connecter avec le Portail de l'entreprise",
-    "noAccess": "Vous n'avez pas accès à ProductPort. Demandez à votre administrateur de vous accorder l'accès dans SalesPort.",
+    "noAccess": "Vous n'avez pas accès à ProductPort. Demandez à votre administrateur de vous accorder l'accès dans le Portail de l'entreprise.",
     "signInFailed": "La connexion n'a pas pu aboutir. Veuillez réessayer ou contacter votre administrateur.",
     "tryAgain": "Réessayer",
     "callbackCompleting": "Finalisation de la connexion…",

@@ -1,8 +1,8 @@
 {
   "auth": {
-    "redirecting": "正在跳转到 SalesPort…",
+    "redirecting": "正在跳转到公司门户…",
     "signInWithSalesPort": "使用公司门户登录",
-    "noAccess": "您没有 ProductPort 的访问权限。请联系管理员在 SalesPort 中授予访问权限。",
+    "noAccess": "您没有 ProductPort 的访问权限。请联系管理员在公司门户中授予访问权限。",
     "signInFailed": "登录未能完成。请重试，或联系您的管理员。",
     "tryAgain": "重试",
     "callbackCompleting": "正在完成登录…",
