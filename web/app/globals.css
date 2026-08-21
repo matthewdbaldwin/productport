@@ -154,6 +154,17 @@ body {
 [data-theme] {
   --fg: var(--text);
   --danger: var(--red, #ff144b);
+
+  /* SOLID destructive fill — a red that stays AA under WHITE text. Deliberately
+     NOT var(--red)/--danger: the per-theme palette red is tuned to be legible AS
+     TEXT on that theme's surface, which pulls it bright, and bright red under
+     white text measures 3.85:1 (#ff144b) / 3.41:1 (#ff4060) against the 4.5:1
+     floor. The frozen --status-danger is the opposite trade — 4.83:1 under white
+     — so fills use it and text keeps --danger. Repointing --danger itself would
+     regress the dark themes, where #dc2626 as TEXT drops to 4.02 (night) / 3.35
+     (graphite). Two roles, two tokens; don't collapse them. (2026-08-21.) */
+  --danger-fill:    var(--status-danger, #dc2626);
+  --danger-fill-fg: #ffffff;
 }
 
 /* reduced-motion kill-switch MUST cap iteration-count or infinite animations strobe.
@@ -186,7 +197,7 @@ body {
     @apply inline-flex items-center justify-center rounded-sm font-medium
            px-2.5 py-1 text-xs text-white transition-colors
            disabled:opacity-50 disabled:cursor-not-allowed;
-    background-color: var(--danger);
+    background-color: var(--danger-fill);
     background-clip: padding-box;
     border: 6px solid transparent;
     min-width: 44px;
