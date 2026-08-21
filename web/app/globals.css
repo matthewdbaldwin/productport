@@ -205,6 +205,23 @@ body {
     margin: -6px;
   }
   .btn-close:hover {
-    opacity: 0.88;
+    /* Darken rather than fade — opacity blends fill AND glyph toward the
+       surface, which drops white-on-red below AA exactly while hovered. */
+    background-color: color-mix(in srgb, var(--danger-fill) 88%, #000);
   }
+
+  /* Neutral dismiss — closing a panel/toast/modal is navigation, not
+     destruction. Added 2026-08-21: productport defined only .btn-close (solid
+     destructive red) and had ZERO own uses of it, so microport-ui's Toast and
+     HelpButton — both neutral dismissals — were its only consumers and rendered
+     as destructive controls. Mirrors hubport's definition. */
+  .btn-icon-close {
+    @apply inline-flex items-center justify-center rounded-md transition-colors
+           disabled:opacity-60 disabled:cursor-not-allowed;
+    color: var(--muted);
+    min-width: 44px;
+    min-height: 44px;
+    margin: -10px;
+  }
+  .btn-icon-close:hover { color: var(--text); background: var(--surface2); }
 }
