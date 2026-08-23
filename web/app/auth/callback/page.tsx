@@ -29,7 +29,7 @@ export default function Page() {
         // previous device's theme until AuthContext's /api/auth/me resolves.
         try { if (data) reconcileThemeWithUser(data.user?.theme ?? null); } catch { /* storage blocked */ }
       }}
-      onSuccess={() => router.replace('/')}
+      onSuccess={(next) => router.replace(next || '/')}
       onBack={() => router.push('/')}
       messages={{
         completing:     t('callbackCompleting'),
