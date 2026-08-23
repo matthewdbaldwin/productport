@@ -13,7 +13,7 @@
   },
   "dependencies": {
     "@matthewdbaldwin/microport-contracts": "^0.12.1",
-    "@matthewdbaldwin/microport-ui": "^0.43.1",
+    "@matthewdbaldwin/microport-ui": "^0.43.2",
     "@sentry/nextjs": "^10.63.0",
     "next": "^16.2.6",
     "next-intl": "^4.12.0",
