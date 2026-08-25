@@ -32,8 +32,16 @@ export async function api<T = unknown>(path: string, init: RequestInit = {}): Pr
   });
 
   if (res.status === 401 && path.includes('/auth/me')) {
-    // Only the identity probe triggers a redirect to login.
-    if (typeof window !== 'undefined') window.location.href = '/login';
+    // Only the identity probe triggers a redirect to login — and only when
+    // we aren't already there. Without the pathname check, a 401 while
+    // already on /login reassigns window.location.href to the SAME URL.
+    // Chrome/Firefox silently no-op that, but iOS Safari performs a genuine
+    // reload — which remounts AuthContext, re-fires the one-shot /auth/me
+    // probe, 401s again, and repeats. A ~300ms flash-reload loop that never
+    // reaches the sign-in button, confirmed live in prod 2026-08-25.
+    if (typeof window !== 'undefined' && window.location.pathname !== '/login') {
+      window.location.href = '/login';
+    }
   }
 
   const text = await res.text();
