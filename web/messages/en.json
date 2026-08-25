@@ -4,6 +4,7 @@
     "signInWithSalesPort": "Sign in with Company Portal",
     "noAccess": "You don't have access to ProductPort. Ask your admin to grant access in the Company Portal.",
     "signInFailed": "Sign-in couldn't complete. Please try again, or contact your admin.",
+    "cookiesBlocked": "Sign-in needs cookies, and your browser is blocking them. On iPhone, turn off Settings → Safari → “Block All Cookies” (or leave Private Browsing), then try again.",
     "tryAgain": "Try again",
     "callbackCompleting": "Completing sign-in…",
     "callbackBack": "Back to sign-in",

@@ -19,12 +19,12 @@ import { Suspense, useEffect, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useTranslations } from 'next-intl';
 import { useAuth } from '@/contexts/AuthContext';
-import { tripsLoop as trips, clearLoop as clear } from '@/lib/ssoLoopGuard';
+import { loopVerdict as verdict, clearLoop as clear } from '@/lib/ssoLoopGuard';
 
 const SSO_HREF = '/api/auth/sso/start';
 const LOOP_KEY = 'productport_sso_attempts';
 
-const tripsLoop = () => trips(LOOP_KEY);
+const loopVerdict = () => verdict(LOOP_KEY);
 const clearLoop = () => clear(LOOP_KEY);
 
 function LoginInner() {
@@ -40,14 +40,20 @@ function LoginInner() {
     if (user) { clearLoop(); router.replace('/'); return; }
     // eslint-disable-next-line react-hooks/set-state-in-effect -- deliberate SSO-deny dead-end
     if (ssoErr) { setBlocked(ssoErr); return; }        // explicit deny → dead-end
-    if (tripsLoop()) { setBlocked('loop'); return; }   // runaway → dead-end
+    const v = loopVerdict();                           // runaway / blocked storage → dead-end
+    if (v !== 'ok') { setBlocked(v); return; }
     window.location.href = SSO_HREF;
   }, [loading, user, ssoErr, router]);
 
   if (loading || user) return null;
 
   if (blocked) {
-    const msg = blocked === 'no_role' ? t('noAccess') : t('signInFailed');
+    // 'storage' = the browser refuses sessionStorage, which in practice means
+    // cookies too (Safari "Block All Cookies") — sign-in can never stick, but
+    // the USER can fix it, so name the setting instead of "contact your admin".
+    const msg = blocked === 'no_role' ? t('noAccess')
+      : blocked === 'storage' ? t('cookiesBlocked')
+      : t('signInFailed');
     return (
       <main className="min-h-screen min-h-dvh flex items-center justify-center p-8">
         <div className="w-full max-w-sm space-y-4 text-center">

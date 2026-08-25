@@ -4,6 +4,7 @@
     "signInWithSalesPort": "Se connecter avec le Portail de l'entreprise",
     "noAccess": "Vous n'avez pas accès à ProductPort. Demandez à votre administrateur de vous accorder l'accès dans le Portail de l'entreprise.",
     "signInFailed": "La connexion n'a pas pu aboutir. Veuillez réessayer ou contacter votre administrateur.",
+    "cookiesBlocked": "La connexion nécessite les cookies, mais votre navigateur les bloque. Sur iPhone, désactivez Réglages → Safari → « Bloquer tous les cookies » (ou quittez la navigation privée), puis réessayez.",
     "tryAgain": "Réessayer",
     "callbackCompleting": "Finalisation de la connexion…",
     "callbackBack": "Retour à la connexion",

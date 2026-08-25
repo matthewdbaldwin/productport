@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
-import { tripsLoop, clearLoop, LOOP_MAX, LOOP_WINDOW_MS } from './ssoLoopGuard';
+import { tripsLoop, clearLoop, loopVerdict, LOOP_MAX, LOOP_WINDOW_MS } from './ssoLoopGuard';
 
 const KEY = 'productport_sso_attempts';
 
@@ -106,5 +106,50 @@ describe('tripsLoop — storage unavailable (the Safari login-loop case)', () =>
   it('clearLoop swallows the throw so the manual button still renders', () => {
     install(throwingStorage());
     expect(() => clearLoop(KEY)).not.toThrow();
+  });
+});
+
+describe('loopVerdict — distinguishes WHY the brake tripped', () => {
+  // The dead-end screen's remediation differs by cause: a counted loop means
+  // "the SSO round-trip keeps failing" (generic retry/contact-admin copy),
+  // while blocked storage means the browser is refusing cookies/site data
+  // (Safari "Block all cookies") and the user can self-serve by changing a
+  // setting. tripsLoop() collapses both to `true`; loopVerdict() keeps them
+  // apart so the login page can show the right message.
+  it('returns ok, then loop, as attempts accumulate in working storage', () => {
+    install(workingStorage());
+    const t0 = 1_000_000;
+    for (let i = 0; i < LOOP_MAX; i++) {
+      expect(loopVerdict(KEY, t0 + i * 100)).toBe('ok');
+    }
+    expect(loopVerdict(KEY, t0 + LOOP_MAX * 100)).toBe('loop');
+  });
+
+  it('returns storage when sessionStorage access throws (Safari "Block all cookies")', () => {
+    install(throwingStorage());
+    expect(loopVerdict(KEY, 1_000_000)).toBe('storage');
+  });
+
+  it('returns storage when reads work but the write is refused', () => {
+    install(readOnlyStorage());
+    expect(loopVerdict(KEY, 1_000_000)).toBe('storage');
+  });
+
+  it('agrees with tripsLoop call-for-call (two keys advanced identically)', () => {
+    install(workingStorage());
+    const t0 = 2_000_000;
+    for (let i = 0; i <= LOOP_MAX + 2; i++) {
+      const verdict = loopVerdict(KEY, t0 + i * 100);
+      const tripped = tripsLoop(`${KEY}_twin`, t0 + i * 100);
+      expect(verdict !== 'ok').toBe(tripped);
+    }
+  });
+
+  it('clearLoop resets the verdict back to ok', () => {
+    install(workingStorage());
+    const t0 = 3_000_000;
+    for (let i = 0; i <= LOOP_MAX; i++) loopVerdict(KEY, t0 + i);
+    clearLoop(KEY);
+    expect(loopVerdict(KEY, t0 + 10)).toBe('ok');
   });
 });
