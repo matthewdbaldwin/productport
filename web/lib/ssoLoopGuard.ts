@@ -30,20 +30,31 @@ export const LOOP_WINDOW_MS = 12_000;
 export const LOOP_MAX = 2; // a 3rd redirect inside the window is a loop
 
 /**
- * Record a redirect attempt and report whether we are in a runaway loop.
- * Returns TRUE (brake on → dead-end to the manual button) when storage is
+ * WHY the brake tripped — the two causes want different dead-end copy:
+ *  - 'loop'    → the SSO round-trip itself keeps failing (generic retry /
+ *                contact-admin message).
+ *  - 'storage' → the browser refuses sessionStorage, which in practice means
+ *                it refuses cookies too (Safari "Block all cookies" / locked-
+ *                down private modes) — the user can SELF-SERVE by changing a
+ *                setting, so tell them that instead of "contact your admin".
+ */
+export type LoopVerdict = 'ok' | 'loop' | 'storage';
+
+/**
+ * Record a redirect attempt and report whether we are in a runaway loop —
+ * and, when we are, why. Returns 'storage' (brake on) when storage is
  * unavailable, because an uncountable loop must be assumed to be a loop.
  *
  * @param key  per-app sessionStorage key, e.g. 'productport_sso_attempts'
  * @param now  injectable clock for tests
  */
-export function tripsLoop(key: string, now: number = Date.now()): boolean {
+export function loopVerdict(key: string, now: number = Date.now()): LoopVerdict {
   let store: Storage;
   try {
     store = window.sessionStorage;
     store.getItem(key); // Safari throws HERE when storage is blocked.
   } catch {
-    return true; // cannot count → fail CLOSED
+    return 'storage'; // cannot count → fail CLOSED
   }
 
   // A corrupt/hand-edited value is NOT a storage failure: treat it as an empty
@@ -61,10 +72,15 @@ export function tripsLoop(key: string, now: number = Date.now()): boolean {
   try {
     store.setItem(key, JSON.stringify(recent));
   } catch {
-    return true; // quota/blocked on write → also uncountable → fail CLOSED
+    return 'storage'; // quota/blocked on write → also uncountable → fail CLOSED
   }
 
-  return recent.length > LOOP_MAX;
+  return recent.length > LOOP_MAX ? 'loop' : 'ok';
+}
+
+/** Boolean view of loopVerdict — kept for call sites that only need on/off. */
+export function tripsLoop(key: string, now: number = Date.now()): boolean {
+  return loopVerdict(key, now) !== 'ok';
 }
 
 /** Reset the counter — the manual "Try again" path re-enters SSO once. */

@@ -4,6 +4,7 @@
     "signInWithSalesPort": "使用公司门户登录",
     "noAccess": "您没有 ProductPort 的访问权限。请联系管理员在公司门户中授予访问权限。",
     "signInFailed": "登录未能完成。请重试，或联系您的管理员。",
+    "cookiesBlocked": "登录需要启用 Cookie，但您的浏览器正在阻止 Cookie。如果您使用 iPhone，请关闭“设置 → Safari → 阻止所有 Cookie”（或退出无痕浏览），然后重试。",
     "tryAgain": "重试",
     "callbackCompleting": "正在完成登录…",
     "callbackBack": "返回登录",
