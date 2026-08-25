@@ -39,7 +39,20 @@ export async function api<T = unknown>(path: string, init: RequestInit = {}): Pr
     // reload — which remounts AuthContext, re-fires the one-shot /auth/me
     // probe, 401s again, and repeats. A ~300ms flash-reload loop that never
     // reaches the sign-in button, confirmed live in prod 2026-08-25.
-    if (typeof window !== 'undefined' && window.location.pathname !== '/login') {
+    //
+    // /auth/* (the SSO callback) is exempt for a different reason: the
+    // root-layout AuthProvider probes /auth/me the instant /auth/callback
+    // loads — BEFORE the callback page's POST /sso/exchange has set the
+    // cookie — so this 401 is EXPECTED there. Navigating away races the
+    // in-flight exchange; on a slow device the navigation wins every round,
+    // the cookie never lands, and the /login loop brake dead-ends a user
+    // whose hub session is perfectly valid (one iPhone, 2026-08-25). The
+    // callback page owns its own error UX; leave it alone.
+    if (
+      typeof window !== 'undefined' &&
+      window.location.pathname !== '/login' &&
+      !window.location.pathname.startsWith('/auth/')
+    ) {
       window.location.href = '/login';
     }
   }

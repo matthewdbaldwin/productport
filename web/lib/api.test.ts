@@ -49,6 +49,21 @@ describe('api() — the /auth/me 401 redirect', () => {
     expect(hrefSets).toEqual([]);
   });
 
+  it('does NOT redirect when the 401 arrives on /auth/callback (exchange in flight)', async () => {
+    // The root-layout AuthProvider probes /auth/me the instant /auth/callback
+    // loads — before POST /sso/exchange has set the cookie — so this 401 is
+    // expected. Navigating to /login here races the in-flight exchange: on a
+    // slow device the navigation wins every round, the cookie never lands, and
+    // the /login loop brake dead-ends a user whose hub session is valid
+    // (confirmed on one iPhone, 2026-08-25).
+    const hrefSets = installLocation('/auth/callback');
+    vi.stubGlobal('fetch', mockFetch(401, { error: 'unauthenticated' }));
+
+    await expect(api('/api/auth/me')).rejects.toBeInstanceOf(ApiError);
+
+    expect(hrefSets).toEqual([]);
+  });
+
   it('still redirects to /login when the 401 arrives on some OTHER page', async () => {
     const hrefSets = installLocation('/');
     vi.stubGlobal('fetch', mockFetch(401, { error: 'unauthenticated' }));
