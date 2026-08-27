@@ -71,7 +71,11 @@ router.get('/products/:slug', requireReviewportKey, async (req, res, next) => {
         countryClearances: { where: { country: 'GB' }, select: { status: true } },
       },
     });
-    if (!product) return res.status(404).json({ error: 'Product not found.' });
+    if (!product) {
+      // A miss is still a read — slug probing leaves a trail (no product to hang it on).
+      await audit(null, { kind: 'detail', slug: req.params.slug, found: false });
+      return res.status(404).json({ error: 'Product not found.' });
+    }
     const { id, modelNumbers, clearances, countryClearances } = product;
     const picker = Object.fromEntries(Object.keys(PICKER_SELECT).map((k) => [k, product[k]]));
     const normalised = normalizeModelNumbers(modelNumbers);
@@ -79,8 +83,9 @@ router.get('/products/:slug', requireReviewportKey, async (req, res, next) => {
     res.json({
       ...picker,
       modelNumbers: normalised ? normalised.split('|') : [],
-      clearances: clearances.map(({ region, status }) => ({ region, status })),
-      gbClearanceStatus: countryClearances.find((c) => !c.country || c.country === 'GB')?.status ?? null,
+      clearances,
+      // countryClearances is selected with where: { country: 'GB' } — at most one row.
+      gbClearanceStatus: countryClearances[0]?.status ?? null,
     });
   } catch (err) {
     logger.warn({ err: err.message, slug: req.params.slug }, '[reviewport] product detail failed');

@@ -162,13 +162,20 @@ describe('GET /api/reviewport/products/:slug — detail', () => {
     { ...full, id: 'p3', slug: 'toumai-off', disabledAt: new Date('2026-01-01') },
     { ...full, id: 'p4', slug: 'toumai-gone', deletedAt: new Date('2026-01-01') },
   ];
-  function prismaLike({ where }) {
+  // Applies the top-level where AND the nested countryClearances where, the
+  // way Prisma would, so the GB read is asserted by effect not by shape.
+  function prismaLike({ where, select }) {
     const r = rows.find((x) =>
       x.slug === where.slug &&
       (where.deletedAt === undefined || x.deletedAt === where.deletedAt) &&
       (where.disabledAt === undefined || x.disabledAt === where.disabledAt) &&
       (!where.status || x.status !== where.status.not));
-    return Promise.resolve(r || null);
+    if (!r) return Promise.resolve(null);
+    const ccWhere = select?.countryClearances?.where;
+    const countryClearances = ccWhere
+      ? r.countryClearances.filter((c) => c.country === ccWhere.country).map(({ status }) => ({ status }))
+      : r.countryClearances;
+    return Promise.resolve({ ...r, countryClearances });
   }
 
   test('returns picker fields plus modelNumbers, every clearance and the GB country-clearance status', async () => {
@@ -184,11 +191,17 @@ describe('GET /api/reviewport/products/:slug — detail', () => {
     });
   });
 
-  test('gbClearanceStatus is null when no GB country-clearance row exists', async () => {
-    db.product.findFirst.mockResolvedValue({ ...full, countryClearances: [{ country: 'BR', status: 'NONE' }], modelNumbers: null });
+  test('gbClearanceStatus is null when no GB country-clearance row exists (a BR row does not leak in)', async () => {
+    db.product.findFirst.mockImplementation((args) => prismaLike(args).then((r) => r && ({ ...r, countryClearances: [], modelNumbers: null })));
     const res = await auth(request(makeApp()).get('/api/reviewport/products/toumai-pro'));
     expect(res.body.gbClearanceStatus).toBeNull();
     expect(res.body.modelNumbers).toEqual([]);
+  });
+
+  test('a non-APPROVED GB row is reported as its status, not as cleared', async () => {
+    db.product.findFirst.mockImplementation((args) => prismaLike(args).then((r) => r && ({ ...r, countryClearances: [{ status: 'SUBMITTED' }] })));
+    const res = await auth(request(makeApp()).get('/api/reviewport/products/toumai-pro'));
+    expect(res.body.gbClearanceStatus).toBe('SUBMITTED');
   });
 
   test.each(['nope', 'toumai-draft', 'toumai-off', 'toumai-gone'])('404s for %s', async (slug) => {
@@ -206,9 +219,12 @@ describe('GET /api/reviewport/products/:slug — detail', () => {
     expect(JSON.parse(data.newValue)).toEqual({ kind: 'detail', slug: 'toumai-pro' });
   });
 
-  test('a 404 is not audited', async () => {
+  test('a miss is audited too (slug probing leaves a trail), with no product to hang it on', async () => {
     db.product.findFirst.mockResolvedValue(null);
     await auth(request(makeApp()).get('/api/reviewport/products/nope'));
-    expect(db.productAudit.create).not.toHaveBeenCalled();
+    expect(db.productAudit.create).toHaveBeenCalledTimes(1);
+    const { data } = db.productAudit.create.mock.calls[0][0];
+    expect(data.productId).toBeNull();
+    expect(JSON.parse(data.newValue)).toEqual({ kind: 'detail', slug: 'nope', found: false });
   });
 });
