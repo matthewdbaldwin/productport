@@ -104,6 +104,7 @@ app.use('/api/bug-reports', require('./routes/bugReports'));
 // human cookie session; GET-only, so the /api csrfGuard mounted above is a
 // no-op here (safe methods bypass it).
 app.use('/api/opsport', require('./routes/opsport'));
+app.use('/api/reviewport', require('./routes/reviewport'));
 
 // Error handler LAST — 5xx → generic body (no leak), 4xx surface their message,
 // err.status/.code honored. From microport-auth.

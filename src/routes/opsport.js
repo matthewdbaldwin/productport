@@ -7,25 +7,13 @@
 // requireReviewportKey (src/routes/lots.js there).
 'use strict';
 const router = require('express').Router();
-const crypto = require('crypto');
 const db = require('../lib/db');
 const logger = require('../lib/logger');
 const { regionForCountry } = require('../lib/countryClearanceWrite');
+const { requireApiKey } = require('../middleware/apiKey');
 
-function requireOpsportKey(req, res, next) {
-  const key = process.env.OPSPORT_API_KEY;
-  if (!key) return res.status(503).json({ error: 'OpsPort integration not configured.' });
-  const header = req.headers.authorization || '';
-  const provided = header.startsWith('Bearer ') ? header.slice(7) : null;
-  if (
-    !provided ||
-    provided.length !== key.length ||
-    !crypto.timingSafeEqual(Buffer.from(provided), Buffer.from(key))
-  ) {
-    return res.status(401).json({ error: 'Invalid API key.' });
-  }
-  next();
-}
+// Shared with the ReviewPort seam (src/middleware/apiKey.js); keyed by OPSPORT_API_KEY.
+const requireOpsportKey = requireApiKey('OPSPORT_API_KEY', 'OpsPort');
 
 // GET /api/opsport/products?q= — catalog search for OpsPort's product picker.
 router.get('/products', requireOpsportKey, async (req, res, next) => {

@@ -69,6 +69,8 @@ Auth goes through SalesPort SSO — a local instance needs `SALESPORT_JWT_PUBLIC
 | `SALESPORT_LIFECYCLE_SECRET` | HMAC secret for inbound SalesPort → ProductPort SSO-lifecycle webhooks (`/api/sso/lifecycle`) |
 | `ALLOW_UNSIGNED_LIFECYCLE` | Dev-only: skip lifecycle HMAC when no secret is provisioned (guard fails closed otherwise) |
 | `WEBHOOK_SECRET_PRODUCTPORT_SALESPORT` | HMAC secret for outbound ProductPort → SalesPort events (e.g. bug reports) |
+| `OPSPORT_API_KEY` | Static bearer key for the inbound OpsPort seam (`GET /api/opsport/*`: catalog search + live clearance reads) |
+| `REVIEWPORT_API_KEY` | Static bearer key for the inbound ReviewPort seam (`GET /api/reviewport/*`: product search + detail for ReviewPort's "Add from ProductPort" picker; read-only, same guard as OpsPort, separate key) |
 | `WEB_ORIGIN` | Own public web origin (CORS + canonical links) |
 | `PORT` | API listen port (`4006` locally) |
 | `NODE_AUTH_TOKEN` | GitHub Packages PAT — required to install `@matthewdbaldwin/*` |
