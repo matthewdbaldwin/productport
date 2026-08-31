@@ -24,6 +24,9 @@ const csrfGuard = createCsrfGuard({
     // default bootstrap prefixes (/api/webhooks/, /api/sso/lifecycle), so it
     // must be listed explicitly.
     '/api/internal/user-census',
+    // HubPort fleet conformance sweep pull (hubport#84) — server-to-server,
+    // HMAC-only (no cookie auth, no browser Origin/X-Requested-With).
+    '/api/internal/digest-grants',
   ],
   allowedOrigins: () => {
     const list = (process.env.WEB_ORIGIN || '').split(',').map((s) => s.trim()).filter(Boolean);
