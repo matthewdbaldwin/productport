@@ -22,6 +22,8 @@ const { publicKey } = crypto.generateKeyPairSync('rsa', { modulusLength: 2048 })
 process.env.SALESPORT_JWT_PUBLIC_KEY = Buffer.from(publicKey.export({ type: 'spki', format: 'pem' })).toString('base64');
 process.env.SALESPORT_JWT_ISSUER = 'https://sales-dev.microport.com';
 process.env.SSO_CLAIMS_MODE = 'off';
+// Slice 5a: routes/auth.js now reads IDP_API_URL at MODULE LOAD (throws if unset).
+process.env.IDP_API_URL = 'https://idp.example.com';
 
 const express = require('express');
 const request = require('supertest');

@@ -87,6 +87,12 @@ app.use('/api/sso/lifecycle', require('./routes/ssoLifecycle'));
 // treatment.
 app.use('/api/internal/user-census', require('./routes/userCensus'));
 
+// HubPort fleet conformance sweep pull (hubport#84 §9-§11, read-only, HMAC-
+// signed, dedicated secret — see src/routes/digestGrants.js). Mounted
+// alongside the census route above: same signature-authed ingress section,
+// same csrf bootstrap-bypass treatment.
+app.use('/api/internal/digest-grants', require('./routes/digestGrants'));
+
 // ── Auth (login/SSO callback/logout) — its own internal gating ───────────────
 app.use('/api/auth', require('./routes/auth'));
 
@@ -104,6 +110,7 @@ app.use('/api/bug-reports', require('./routes/bugReports'));
 // human cookie session; GET-only, so the /api csrfGuard mounted above is a
 // no-op here (safe methods bypass it).
 app.use('/api/opsport', require('./routes/opsport'));
+app.use('/api/reviewport', require('./routes/reviewport'));
 
 // Error handler LAST — 5xx → generic body (no leak), 4xx surface their message,
 // err.status/.code honored. From microport-auth.

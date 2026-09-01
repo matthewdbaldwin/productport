@@ -1,6 +1,6 @@
 {
   "name": "productport-api",
-  "version": "0.10.3",
+  "version": "0.10.4",
   "private": true,
   "description": "ProductPort API — a MicroPort satellite.",
   "main": "src/server.js",
@@ -17,7 +17,7 @@
     "@aws-sdk/client-s3": "^3.1078.0",
     "@aws-sdk/s3-request-presigner": "^3.1078.0",
     "@matthewdbaldwin/microport-auth": "^0.16.3",
-    "@matthewdbaldwin/microport-contracts": "^0.18.0",
+    "@matthewdbaldwin/microport-contracts": "^0.20.0",
     "@prisma/adapter-pg": "^7.8.0",
     "@prisma/client": "^7.8.0",
     "cookie-parser": "^1.4.6",

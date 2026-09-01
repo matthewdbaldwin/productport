@@ -4,15 +4,32 @@
 // X-Satellite-Token + X-Satellite-Id), the null-on-any-failure contract,
 // and the revoke path.
 //
-// IDP_*-first WITH a SALESPORT_* fallback — matches this app's own
-// existing /sso/exchange resolver (`IDP_API_URL || SALESPORT_API_URL`).
-// Both unset = no refresh client target; refreshFromHub simply returns
-// null (the shared lib's own contract when apiUrl()/sharedSecret() are
-// falsy) and next() proceeds with no upstream call.
+// Slice 5a (2026-08-31): SalesPort's IdP endpoints are deleted, so the old
+// `IDP_API_URL || SALESPORT_API_URL` fallback (matching this app's own
+// /sso/exchange resolver — see routes/auth.js) could only ever resolve to
+// routes that no longer exist. apiUrl() is now IDP_API_URL-only and
+// fail-fast: unset now means refreshFromHub/revokeUpstreamRefresh REJECT
+// instead of gracefully returning null (the shared lib's apiUrl() call sits
+// outside its own try/catch, so this propagates as a thrown error).
+// sharedSecret stays IDP_*-first with the SALESPORT_* fallback, unaffected
+// by this slice.
 const { createRefreshClient } = require('@matthewdbaldwin/microport-auth');
 
 const client = createRefreshClient({
-  apiUrl:       () => process.env.IDP_API_URL || process.env.SALESPORT_API_URL,
+  // Slice 5a (2026-08-31): SalesPort's IdP endpoints are deleted, so the old
+  // `|| process.env.SALESPORT_API_URL` fallback could only ever resolve to
+  // routes that no longer exist. Required and fail-fast instead.
+  //
+  // ⚠ SALESPORT_API_URL itself is NOT retired and must stay set fleet-wide —
+  // it is an overloaded variable that also addresses SalesPort's ordinary
+  // business API (ExecPort's analytics proxy and SSE stream, FinPort's
+  // reconciliation, and the bug-report relay in four apps). Only this
+  // identity-exchange expression stops reading it.
+  apiUrl: () => {
+    const url = process.env.IDP_API_URL;
+    if (!url) throw new Error('IDP_API_URL is required (SalesPort IdP fallback retired in SSO slice 5a)');
+    return url;
+  },
   sharedSecret: () => process.env.IDP_REFRESH_SHARED_SECRET || process.env.SALESPORT_REFRESH_SHARED_SECRET,
   satelliteId:  'productport',
 });

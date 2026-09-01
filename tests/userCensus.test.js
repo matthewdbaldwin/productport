@@ -19,6 +19,9 @@
 process.env.NODE_ENV = 'test';
 const SECRET = 'census-shared-secret-test';
 process.env.HUBPORT_CENSUS_SECRET = SECRET;
+// Slice 5a: routes/auth.js (pulled in transitively via src/app) now reads
+// IDP_API_URL at MODULE LOAD (throws if unset).
+process.env.IDP_API_URL = 'https://idp.example.com';
 
 // ── Mock Prisma — a smart user.findMany over a fixed seed that honours the
 // orderBy(email)/cursor/skip/take shape the route emits. ProductPort has no
