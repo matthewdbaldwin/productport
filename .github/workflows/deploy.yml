@@ -77,7 +77,11 @@ jobs:
           BRANCH:   ${{ github.ref_name }}
           SHA:      ${{ inputs.sha }}
         run: |
-          if ! printf '%s' "$SHA" | grep -Eq '^[0-9a-f]{40}$'; then
+          # bash's =~ anchors ^/$ to the WHOLE string. `grep -Eq` anchors them
+          # per LINE and succeeds if ANY line matches, so a multi-line input
+          # ("<40-hex>\n<junk>") sailed past this check, leaving the ancestry
+          # check below as the only real guard. Caught pre-ship, 2026-09-01.
+          if ! [[ "$SHA" =~ ^[0-9a-f]{40}$ ]]; then
             echo "REFUSED: sha input must be a full 40-character lowercase commit id." >&2
             echo "         Got: '$SHA'. Branch and tag names are rejected on purpose —" >&2
             echo "         a mutable ref can be repointed between this check and checkout." >&2
