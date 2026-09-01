@@ -27,7 +27,6 @@ const { buildAppLauncherApps } = require('@matthewdbaldwin/microport-contracts')
 const router = express.Router();
 const WEB          = process.env.WEB_ORIGIN || '';
 const SALESPORT_WEB = process.env.SALESPORT_WEB_URL || process.env.SALESPORT_API_URL || '';
-const SALESPORT_API = process.env.SALESPORT_API_URL || '';
 // Login funnels through the hub/portal host (PORTAL_WEB_URL), falling back to
 // the CRM host if the split var isn't set yet. The SalesPort-CRM launcher tile
 // keeps using SALESPORT_WEB_URL separately.
@@ -35,9 +34,19 @@ const PORTAL_WEB = process.env.PORTAL_WEB_URL || SALESPORT_WEB;
 // Handoff-code EXCHANGE target — the IdP backend that minted the code. Split out
 // from SALESPORT_API_URL (which also feeds CSP connectSrc + the bug-report relay)
 // so the SSO exchange can be repointed at HubPort during the Slice-4h IdP flip
-// WITHOUT disturbing those other consumers. Defaults to SALESPORT_API_URL while
-// SalesPort is still the IdP; at flip time set IDP_API_URL alongside PORTAL_WEB_URL.
-const IDP_API = process.env.IDP_API_URL || SALESPORT_API;
+// WITHOUT disturbing those other consumers.
+// Slice 5a (2026-08-31): SalesPort's IdP endpoints are deleted, so the old
+// `|| SALESPORT_API_URL` fallback (via the since-removed local SALESPORT_API
+// const) could only ever resolve to routes that no longer exist. Required and
+// fail-fast instead — evaluated once, at module load, since this whole route
+// module is required once at boot.
+//
+// ⚠ SALESPORT_API_URL itself is NOT retired and must stay set fleet-wide — it
+// still feeds this app's CSP connectSrc and the bug-report relay (see
+// SALESPORT_WEB above and bugReports.js). Only this identity-exchange
+// expression stops reading it.
+const IDP_API = process.env.IDP_API_URL;
+if (!IDP_API) throw new Error('IDP_API_URL is required (SalesPort IdP fallback retired in SSO slice 5a)');
 
 // GET /api/auth/sso/start — browser entry point; redirect to SalesPort login.
 router.get('/sso/start', (req, res) => {

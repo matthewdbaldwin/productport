@@ -39,6 +39,11 @@ const request = require('supertest');
 const db = require('../src/lib/db');
 const logger = require('../src/lib/logger');
 
+// Slice 5a: routes/auth.js now reads IDP_API_URL at MODULE LOAD (throws if
+// unset), and makeApp() below requires it before beforeEach's process.env
+// reset runs — so it must be set here too, ahead of that first require.
+process.env.IDP_API_URL = 'https://idp.example.com';
+
 function makeApp() {
   const a = express();
   a.use(cookieParser());

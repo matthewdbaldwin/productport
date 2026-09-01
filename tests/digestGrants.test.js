@@ -14,6 +14,9 @@
 process.env.NODE_ENV = 'test';
 const SECRET = 'digest-shared-secret-test';
 process.env.HUBPORT_DIGEST_SECRET = SECRET;
+// Slice 5a: routes/auth.js (pulled in transitively via src/app) now reads
+// IDP_API_URL at MODULE LOAD (throws if unset).
+process.env.IDP_API_URL = 'https://idp.example.com';
 
 jest.mock('../src/lib/db', () => ({
   user: { findMany: jest.fn() },
