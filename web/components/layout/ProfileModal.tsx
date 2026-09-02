@@ -10,6 +10,11 @@
 // changes. Portaled to <body> so it escapes catalog.module.css's `.page`
 // scope (which locally shadows --blue/--red/--bg/etc. for the brand-matched
 // catalog surface) and picks up the real platform theme tokens.
+//
+// Sign-out lives here (hubport#113, 2026-09-02): the fleet decision (hubport#101)
+// puts the sign-out control in the profile area everywhere. ProductPort has no
+// sidebar, so this is its only sign-out. profile/SignOutSection delegates to
+// AuthContext.logout, which awaits the server logout before routing to /login.
 import { useEffect } from 'react';
 import { createPortal } from 'react-dom';
 import { X, UserCircle, ExternalLink } from 'lucide-react';
@@ -17,6 +22,7 @@ import { useTranslations } from 'next-intl';
 import { Tooltip, useModalEsc, useFocusTrap } from '@matthewdbaldwin/microport-ui';
 import { useAuth } from '@/contexts/AuthContext';
 import { ThemePicker } from '@/components/ui/ThemePicker';
+import { SignOutSection } from '@/components/profile/SignOutSection';
 import { testId } from '@/lib/i18nIds';
 
 const NS = 'profileModal';
@@ -101,6 +107,11 @@ export function ProfileModal({ open, onClose }: Props) {
           <div className="pt-4 border-t" style={{ borderColor: 'var(--border)' }}>
             <p className="text-sm font-medium mb-3" style={{ color: 'var(--fg)' }}>{t('theme')}</p>
             <ThemePicker className="max-w-sm" />
+          </div>
+
+          {/* Sign out — hubport#113: fleet-wide sign-out, the profile area is its only home */}
+          <div className="pt-4 border-t" style={{ borderColor: 'var(--border)' }}>
+            <SignOutSection />
           </div>
         </div>
 
