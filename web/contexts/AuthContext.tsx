@@ -17,6 +17,7 @@ import { createContext, useCallback, useContext, useEffect, useMemo, useState, t
 import { useRouter } from 'next/navigation';
 import { api } from '@/lib/api';
 import { logout as authLogout } from '@/lib/auth';
+import { setSentryUser, clearSentryUser } from '@/lib/sentryUser';
 
 export interface AuthUser {
   id: number;
@@ -40,13 +41,23 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     let alive = true;
     api<AuthUser>('/api/auth/me')
-      .then((user) => { if (alive) setState({ user, loading: false }); })
-      .catch(() => { if (alive) setState({ user: null, loading: false }); });
+      .then((user) => {
+        if (!alive) return;
+        // Sentry "Users Impacted" — opaque id only, never a personal field (#119).
+        setSentryUser(user?.id);
+        setState({ user, loading: false });
+      })
+      .catch(() => {
+        if (!alive) return;
+        clearSentryUser();
+        setState({ user: null, loading: false });
+      });
     return () => { alive = false; };
   }, []);
 
   const logout = useCallback(async () => {
     try { await authLogout(); } catch { /* never throws by contract; local sign-out completes regardless */ }
+    clearSentryUser();
     setState({ user: null, loading: false });
     router.push('/login');
   }, [router]);
