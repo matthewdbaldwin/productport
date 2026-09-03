@@ -84,21 +84,30 @@ function censorHeaders(headers, safeList) {
 const SAFE_REQ = new Set(SAFE_REQUEST_HEADERS);
 const SAFE_RES = new Set(SAFE_RESPONSE_HEADERS);
 
-// Takes pino as a parameter, but this is NOT a dependency-injection seam and
-// this module is NOT require()-able without pino: the only call site is the
-// eager `buildSerializers(require('pino'))` in the exports below, which runs at
-// module load, and buildSerializers itself is not exported — so no caller can
-// pass a different pino in. A real seam is being designed separately; until it
-// lands, read the parameter as a local alias, not as optional-pino support.
-function buildSerializers(pino) {
+// These receive an ALREADY-SERIALIZED object, not a raw req/res. pino-http wraps
+// whatever it is given in wrapRequestSerializer/wrapResponseSerializer
+// (pino-http/logger.js:33-34), which run pino-std-serializers first and pass us
+// the result. So the only job here is to censor `headers` on the object handed
+// in — do not call pino.stdSerializers again.
+//
+// Running it a second time is how this module shipped on 2026-08-01, and it cost
+// real data for a month: the second pass looks for `headersSent` and
+// `getHeaders` on a plain object that has neither, so every response logged as
+// `"res":{"statusCode":null}` with no headers at all, and every request lost
+// `remoteAddress`/`remotePort`. Confirmed against a live /ecs/opsport-api line
+// on 2026-09-02. Nothing ever failed — a status code that is always null breaks
+// no test and fires no alarm, it just quietly stops answering questions.
+//
+// No pino parameter any more, because there is nothing left to call on it. It
+// was never an injection seam either: buildSerializers is not exported and the
+// only call site passed require('pino').
+function buildSerializers() {
   return {
-    req(req) {
-      const s = pino.stdSerializers.req(req);
+    req(s) {
       s.headers = censorHeaders(s.headers, SAFE_REQ);
       return s;
     },
-    res(res) {
-      const s = pino.stdSerializers.res(res);
+    res(s) {
       s.headers = censorHeaders(s.headers, SAFE_RES);
       return s;
     },
@@ -126,7 +135,7 @@ module.exports = {
     ],
     censor: CENSOR,
   },
-  serializers: buildSerializers(require('pino')),
+  serializers: buildSerializers(),
   // exported for tests / reuse
   SAFE_REQUEST_HEADERS, SAFE_RESPONSE_HEADERS, censorHeaders, CENSOR,
 };
