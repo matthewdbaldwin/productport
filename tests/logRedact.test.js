@@ -103,6 +103,38 @@ describe('log redaction — allowlist behaviour', () => {
   it('redacts set-cookie on the response', async () => {
     const text = await roundtrip({});
     expect(text).not.toContain(SENTINEL);
+    // Positive control, and it is load-bearing. Without it this test passed for
+    // a reason that had nothing to do with redaction: the res serializer was
+    // emitting NO response headers at all, so "the sentinel is absent" was true
+    // by vacuity. Assert a header we deliberately keep, so the absence above
+    // means "redacted" rather than "nothing was logged".
+    expect(text).toContain('content-type');
+  });
+
+  // pino-http wraps a custom serializer in wrapResponseSerializer/
+  // wrapRequestSerializer (pino-http/logger.js:33-34), which run the std
+  // serializer FIRST and hand us the result. Calling pino.stdSerializers.res()
+  // on that already-serialized object a second time re-reads fields that only
+  // exist on the raw ServerResponse — headersSent, getHeaders — finds none, and
+  // returns statusCode: null with the headers gone.
+  //
+  // That shipped to prod on 2026-08-01 and every access log line in the fleet
+  // has read "res":{"statusCode":null} since. Verified against a real
+  // /ecs/opsport-api line on 2026-09-02. Nothing failed, which is exactly why it
+  // lasted: no alarm keys on a field that is always null.
+  it('keeps res.statusCode — the field every alarm and log sweep reads', async () => {
+    const text = await roundtrip({});
+    expect(text).toContain('"statusCode":200');
+    expect(text).not.toContain('"statusCode":null');
+  });
+
+  it('keeps req.remoteAddress — the peer address, when there is no x-forwarded-for', async () => {
+    // Second casualty of the same double-serialization: stdSerializers.req
+    // computes remoteAddress from req.info/req.socket, neither of which survives
+    // the first pass. A request arriving without x-forwarded-for left nothing to
+    // attribute it to.
+    const text = await roundtrip({});
+    expect(text).toContain('remoteAddress');
   });
 });
 
