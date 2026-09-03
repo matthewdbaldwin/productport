@@ -5,9 +5,12 @@ on:
     branches: [develop, main]
   pull_request:
 
-# Deploy is GATED on this workflow: deploy.yml triggers on `workflow_run` of "CI"
-# and only proceeds when conclusion == 'success', so a red CI blocks the prod ECS
-# rollout. feedback_deploy_does_not_gate_on_ci.
+# NOT gated on this workflow any more. deploy.yml runs on `workflow_dispatch`
+# (flipped 2026-09-01) and does not check this workflow's conclusion — a manual
+# GHA dispatch does NOT check CI. The actual gate now lives outside GitHub
+# entirely: prod deploys go through `deploy-local` on the devbox, which queries
+# `gh run list --workflow ci.yml --commit <full-sha>` itself and refuses to
+# proceed unless that commit's CI run is green. feedback_deploy_does_not_gate_on_ci.
 
 jobs:
   api:
