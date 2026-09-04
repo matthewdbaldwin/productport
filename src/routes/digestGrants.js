@@ -12,6 +12,7 @@
 const path = require('path');
 const express = require('express');
 const { createLifecycleGuard } = require('@matthewdbaldwin/microport-auth');
+const logger = require('../lib/logger');
 const { digestRecord, DIGEST_VERSION } = require('@matthewdbaldwin/microport-contracts/digest');
 const { GRANT_ADAPTERS } = require('@matthewdbaldwin/microport-contracts/digestAdapters');
 // microport-contracts@0.20.0's package.json is NOT listed in its own "exports"
@@ -31,6 +32,7 @@ const digestGuard = createLifecycleGuard({
   secret: process.env.HUBPORT_DIGEST_SECRET || null,
   signatureHeader: 'x-hubport-signature',
   allowUnsigned: process.env.ALLOW_UNSIGNED_LIFECYCLE === 'true', // dev only
+  logger,
 });
 
 const MAX_TAKE = 500;
