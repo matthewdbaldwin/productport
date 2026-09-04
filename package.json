@@ -1,6 +1,6 @@
 {
   "name": "productport-api",
-  "version": "0.10.7",
+  "version": "0.10.8",
   "private": true,
   "description": "ProductPort API — a MicroPort satellite.",
   "main": "src/server.js",
