@@ -21,6 +21,7 @@
 
 const express = require('express');
 const { createLifecycleGuard } = require('@matthewdbaldwin/microport-auth');
+const logger = require('../lib/logger');
 const prisma = require('../lib/db');
 
 const router = express.Router();
@@ -31,6 +32,7 @@ const censusGuard = createLifecycleGuard({
   secret: process.env.HUBPORT_CENSUS_SECRET || null,
   signatureHeader: 'x-hubport-signature',
   allowUnsigned: process.env.ALLOW_UNSIGNED_LIFECYCLE === 'true', // dev only
+  logger,
 });
 
 const MAX_TAKE = 500;

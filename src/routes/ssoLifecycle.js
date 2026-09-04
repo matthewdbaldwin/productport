@@ -34,6 +34,7 @@ const lifecycleGuard = createLifecycleGuard({
   additionalEmitters: [
     { secret: process.env.HUBPORT_LIFECYCLE_SECRET || null, signatureHeader: 'x-hubport-signature' },
   ],
+  logger,
 });
 
 router.post('/event', lifecycleGuard, async (req, res) => {
