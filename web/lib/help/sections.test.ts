@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import fs from 'node:fs';
 import path from 'node:path';
-import { HELP_SECTIONS, HELP_SLUGS, lookupHelpItem, canSeeHelpItem } from './sections';
+import { HELP_SECTIONS, HELP_SLUGS, lookupHelpItem, canSeeHelpItem, visibleSectionsFor } from './sections';
 
 const WEB = path.resolve(__dirname, '../..');
 
@@ -42,5 +42,22 @@ describe('HELP_SECTIONS registry', () => {
   it('hides csv-import from a viewer', () => {
     const entry = lookupHelpItem('csv-import')!;
     expect(canSeeHelpItem({ role: 'viewer' }, entry.item)).toBe(false);
+  });
+
+  // Mirrors app/page.tsx's isAdmin gate, which admits isSuperuser === true
+  // regardless of role string; the help gate must not be stricter than the app.
+  it('lets a superuser-flagged viewer see role-gated items, in both the item gate and the nav', () => {
+    const entry = lookupHelpItem('product-edit')!;
+    expect(canSeeHelpItem({ role: 'viewer', isSuperuser: true }, entry.item)).toBe(true);
+    expect(canSeeHelpItem({ role: 'viewer', isSuperuser: false }, entry.item)).toBe(false);
+
+    const superuserNav = visibleSectionsFor({ role: 'viewer', isSuperuser: true });
+    expect(superuserNav.map(s => s.id)).toContain('admin');
+    expect(superuserNav.flatMap(s => s.items).map(i => i.slug)).toContain('product-edit');
+    // The nav hands back the registry's own items, roles intact.
+    expect(superuserNav.find(s => s.id === 'admin')!.items[0].roles).toEqual(['product_admin', 'superuser']);
+
+    expect(visibleSectionsFor({ role: 'viewer' }).map(s => s.id)).not.toContain('admin');
+    expect(visibleSectionsFor(null)).toEqual([]);
   });
 });

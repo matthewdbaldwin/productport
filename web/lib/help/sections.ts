@@ -13,7 +13,7 @@
 // Next.js route. `product-create` and `product-edit` legitimately share
 // ProductEditModal.tsx — help-audit.js's uniqueness check is relaxed for
 // this field for that reason (see Task 9).
-import { canSee, visibleLiveSectionsFor } from '@matthewdbaldwin/microport-ui/help/logic';
+import { canSee } from '@matthewdbaldwin/microport-ui/help/logic';
 
 export interface HelpItem {
   slug:       string;
@@ -77,10 +77,26 @@ export interface HelpGateUser {
   isSuperuser?: boolean;
 }
 
-export function canSeeHelpItem(user: HelpGateUser | null | undefined, item: HelpItem): boolean {
-  return canSee(user, item);
+// The app's real admin gate (app/page.tsx `isAdmin`) admits `isSuperuser ===
+// true` whatever the role string says, but microport-ui's canSee only matches
+// `roles` against `user.role`. Mirror the app: a superuser flag satisfies any
+// `roles` restriction, so strip it before delegating. Status and everything
+// else still go through canSee unchanged.
+function asGatedFor(item: HelpItem, user: HelpGateUser): HelpItem {
+  return user.isSuperuser === true && item.roles ? { ...item, roles: undefined } : item;
 }
 
+export function canSeeHelpItem(user: HelpGateUser | null | undefined, item: HelpItem): boolean {
+  if (!user) return false;
+  return canSee(user, asGatedFor(item, user));
+}
+
+// Same shape visibleLiveSectionsFor(HELP_SECTIONS, user) returned, but built
+// on canSeeHelpItem so the superuser rule above applies to /help's nav too.
+// Items are the registry's own objects (roles intact), not the gated copies.
 export function visibleSectionsFor(user: HelpGateUser | null | undefined): HelpSection[] {
-  return visibleLiveSectionsFor(HELP_SECTIONS, user) as HelpSection[];
+  if (!user) return [];
+  return HELP_SECTIONS
+    .map(section => ({ ...section, items: section.items.filter(i => i.status === 'live' && canSeeHelpItem(user, i)) }))
+    .filter(section => section.items.length > 0);
 }
