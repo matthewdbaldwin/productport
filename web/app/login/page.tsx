@@ -13,9 +13,12 @@
 //      >N redirects inside a short window trips the brake. It fails CLOSED when
 //      storage is unavailable, which is the Safari "Block all cookies" case
 //      that loops; see lib/ssoLoopGuard.test.ts.
-// The manual "Try again" clears the counter and re-enters SSO once.
+// The manual "Try again" clears the counter and re-enters SSO once. The
+// dead-end also links to /help/login, the one help article the /help layout
+// serves to signed-out visitors.
 
 import { Suspense, useEffect, useState } from 'react';
+import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useTranslations } from 'next-intl';
 import { useAuth } from '@/contexts/AuthContext';
@@ -23,6 +26,7 @@ import { loopVerdict as verdict, clearLoop as clear } from '@/lib/ssoLoopGuard';
 
 const SSO_HREF = '/api/auth/sso/start';
 const LOOP_KEY = 'productport_sso_attempts';
+const SIGN_IN_HELP_HREF = '/help/login';
 
 const loopVerdict = () => verdict(LOOP_KEY);
 const clearLoop = () => clear(LOOP_KEY);
@@ -31,6 +35,7 @@ function LoginInner() {
   const router = useRouter();
   const params = useSearchParams();
   const t = useTranslations('auth');
+  const tHelp = useTranslations('help');
   const { user, loading } = useAuth();
   const ssoErr = params.get('sso_err');
   const [blocked, setBlocked] = useState<string | null>(ssoErr);
@@ -66,6 +71,9 @@ function LoginInner() {
           >
             {t('tryAgain')}
           </button>
+          <Link href={SIGN_IN_HELP_HREF} className="block text-sm hover:underline" style={{ color: 'var(--muted2)' }}>
+            {tHelp('signInHelpLink')}
+          </Link>
         </div>
       </main>
     );

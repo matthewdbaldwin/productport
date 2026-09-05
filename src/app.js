@@ -36,6 +36,15 @@ app.use(helmet({
   },
 }));
 
+// CORS — in production WEB_ORIGIN must be set; never fall back to wildcard.
+// Mirrors the salesport/execport/opsport/clinicport hard startup guard so a
+// misconfigured deploy is caught at boot rather than silently running with
+// `origin: true`, which reflects ANY origin back with credentials: true.
+if (process.env.NODE_ENV === 'production' && !process.env.WEB_ORIGIN) {
+  logger.error('WEB_ORIGIN env var is required in production — refusing to start with open CORS');
+  process.exit(1);
+}
+
 const corsOrigins = (process.env.WEB_ORIGIN || '').split(',').map((s) => s.trim()).filter(Boolean);
 app.use(cors({ origin: corsOrigins.length ? corsOrigins : true, credentials: true }));
 
@@ -111,6 +120,11 @@ app.use('/api/bug-reports', require('./routes/bugReports'));
 // no-op here (safe methods bypass it).
 app.use('/api/opsport', require('./routes/opsport'));
 app.use('/api/reviewport', require('./routes/reviewport'));
+
+// Help Library search-miss analytics. Any authed user's zero-literal-
+// result query gets logged so future content revisions target observed
+// gaps. role/userId are server-derived from req.user inside the router.
+app.use('/api/help', requireAuth, require('./routes/help'));
 
 // Error handler LAST — 5xx → generic body (no leak), 4xx surface their message,
 // err.status/.code honored. From microport-auth.

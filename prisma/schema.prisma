@@ -41,6 +41,7 @@ model User {
   updatedAt   DateTime  @updatedAt
   sessions    Session[]
   audits      ProductAudit[]
+  helpSearchMisses HelpSearchMiss[]
 
   @@map("User")
 }
@@ -273,4 +274,27 @@ model WebhookOutbox {
 
   @@index([deliveredAt])
   @@map("webhook_outbox")
+}
+
+// Help-search-miss analytics (Help Library, Task 5). Every zero-literal-
+// result search fires one row, so future content revisions target
+// OBSERVED gaps instead of guesses. Mechanical port of Project 1's
+// HelpSearchMiss shape (project_prd_help_library_search_comprehensiveness_
+// 2026-08-08). userId uses onDelete: SetNull — a search-miss row is
+// analytics, not owned content that should vanish with its user (this
+// repo has no local BugReport model to mirror; bug reports forward
+// synchronously to SalesPort instead).
+model HelpSearchMiss {
+  id              Int      @id @default(autoincrement())
+  query           String
+  locale          String
+  role            String
+  wasFuzzyRescued Boolean  @default(false)
+  userId          Int?
+  user            User?    @relation(fields: [userId], references: [id], onDelete: SetNull)
+  createdAt       DateTime @default(now())
+
+  @@index([createdAt])
+  @@index([query])
+  @@map("help_search_misses")
 }

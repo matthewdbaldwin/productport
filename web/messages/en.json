@@ -56,5 +56,20 @@
     "errorDetail": "A description is required.",
     "errorScreenshotTooLarge": "Screenshot must be 2 MB or smaller.",
     "errorSend": "Could not send your report. Please try again."
+  },
+  "help": {
+    "libraryTitle": "Help Library",
+    "backToApp": "Back to ProductPort",
+    "searchPlaceholder": "Search help…",
+    "noArticles": "No help articles are available yet.",
+    "helpLabel": "Help",
+    "resultCount": "{count, plural, one {# result} other {# results}}",
+    "noResultsFor": "No results for \"{query}\".",
+    "didYouMean": "Did you mean…",
+    "sectionCatalog": "Catalog",
+    "sectionAdmin": "Product administration",
+    "sectionAccount": "Account",
+    "exportCsvTooltip": "Downloads the current catalog as a CSV, in the same column format Import CSV expects.",
+    "signInHelpLink": "Help with signing in"
   }
 }

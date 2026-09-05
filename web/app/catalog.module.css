@@ -18,6 +18,10 @@
   --blb: #e6f1fb;
   --rd: #9a2a2a;
   --rdb: #f7e9e9;
+  /* Muted foreground for icons on the fixed-white top-bar chrome. This is the
+     light/day themes' own --muted (5.93:1 on #fff); --grey (#909191) is only
+     3.16:1, too faint for a 4.5:1 icon floor. See .chromeGroup below. */
+  --catalog-muted: #5b6478;
 
   min-height: 100vh;
   min-height: 100dvh;
@@ -168,13 +172,38 @@
   border: none;
   border-radius: 8px;
   background: transparent;
-  color: var(--muted, var(--grey));
+  color: var(--catalog-muted); /* not var(--muted): the live theme's muted is 2.4–3.2:1 on this white bar under the dark themes */
   cursor: pointer;
   transition: background 0.12s, color 0.12s;
 }
 .iconBtn:hover {
   background: var(--catalog-bg);
   color: var(--catalog-blue);
+}
+/* The chrome group is a fixed-white surface inside a themeable document (the
+   catalog is the documented fixed-light exemption), but the two shared toggles
+   inside it — HelpDropdown ("Help" + chevron) and AppSwitcher (grid icon) —
+   paint themselves INLINE from the live theme's --text/--muted, and the
+   switcher's mouseenter sets an inline background of --surface2. Every theme
+   tunes those tokens for its own dark or light surface, so under Lair, Night,
+   Ocean and Graphite --text is near-white (1.00–1.22:1 on #fff: the Help label
+   vanishes) and --muted is 2.43–3.16:1. Re-pinning the tokens ON THE TOGGLE
+   ELEMENT to the catalog's light palette fixes it without !important: an inline
+   `color: var(--text)` resolves against the element's own custom property.
+   Scoped to the direct toggle only — each dropdown menu is the toggle's
+   sibling, not its descendant, so it keeps the live theme's --surface/--text
+   exactly as the app-switcher menu and ProfileModal already do on this page.
+   Measured in headless Chromium against microport-ui themes.css, 2026-09-04:
+   label 17.61:1, icons 5.93:1, hover 12.2:1 in all nine themes. */
+.chromeGroup > div > button[aria-haspopup] {
+  --text: var(--catalog-text);
+  --muted: var(--catalog-muted);
+  --surface2: var(--catalog-bg);
+}
+.chromeGroup > div > button[aria-haspopup]:hover {
+  background: var(--catalog-bg);
+  --text: var(--catalog-blue);
+  --muted: var(--catalog-blue);
 }
 
 /* ── Filter bars ─────────────────────────────────────────────────────────── */

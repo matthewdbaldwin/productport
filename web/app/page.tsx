@@ -8,6 +8,7 @@
 // / detail entirely in memory. Every authenticated employee is a viewer.
 import { useEffect, useMemo, useState, useCallback } from 'react';
 import { useModalEsc, useFocusTrap, Tooltip } from '@matthewdbaldwin/microport-ui';
+import { HelpButton, type HelpContent } from '@matthewdbaldwin/microport-ui/help';
 import { UserCircle, Plus, Download } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { useTranslations } from 'next-intl';
@@ -15,10 +16,13 @@ import { useAuth } from '@/contexts/AuthContext';
 import { api } from '@/lib/api';
 import { statusOf, orderedAreas, filterProducts } from '@/lib/catalogFilter';
 import { testId } from '@/lib/i18nIds';
+import { DEFAULT_LOCALE } from '@/lib/locales';
+import { getHelpContent } from '@/lib/help/content';
 import { ProductEditModal } from './ProductEditModal';
 import { ImportCsvButton } from './ImportCsvButton';
 import { galleryImageSrc, disableProduct, enableProduct, type ProductInput, type GalleryImage } from '@/lib/products';
 import { useToast } from '@/components/ui/Toast';
+import { HelpLauncher } from '@/components/help/HelpLauncher';
 import { AppSwitcher } from '@/components/layout/AppSwitcher';
 import { ProfileModal } from '@/components/layout/ProfileModal';
 import s from './catalog.module.css';
@@ -145,6 +149,17 @@ function DetailModal({ p, onClose, onEdit, onToggleDisabled, toggling }: {
 }) {
   const [copied, setCopied] = useState(false);
   const [heroId, setHeroId] = useState<string | null>(null); // gallery thumb → swap the hero
+  // Contextual help for the detail view (Help Library). The overlay below is
+  // z-index 50 and covers the top bar's HelpLauncher (z-index 20), so while a
+  // product is open this is the only help affordance the user can reach. The
+  // popover shows the product-detail article's intro + section headings and
+  // links through to the full article. Locale-aware like ProductEditModal's
+  // popovers; useAuth() outside a provider yields user:null → English.
+  const { user } = useAuth();
+  const helpArticle = getHelpContent('product-detail', user?.locale ?? DEFAULT_LOCALE);
+  const helpContent: HelpContent | null = helpArticle
+    ? { summary: helpArticle.intro, bullets: helpArticle.sections.map((sec) => sec.heading) }
+    : null;
   useModalEsc(onClose, !toggling);
   const trapRef = useFocusTrap<HTMLDivElement>();
   const heroSrc = heroId ? galleryImageSrc(p.id, heroId) : fullSrc(p);
@@ -259,6 +274,11 @@ function DetailModal({ p, onClose, onEdit, onToggleDisabled, toggling }: {
                   {toggling ? (p.disabledAt ? 'Enabling…' : 'Disabling…') : p.disabledAt ? 'Enable' : 'Disable'}
                 </button>
               )}
+              {helpArticle && helpContent && (
+                <span {...testId(NS, 'detailHelp')} style={{ display: 'inline-flex', marginLeft: 'auto' }}>
+                  <HelpButton content={helpContent} title={helpArticle.title} helpHref="/help/product-detail" inline />
+                </span>
+              )}
             </div>
           </div>
         </div>
@@ -369,6 +389,7 @@ export default function CatalogPage() {
   const router = useRouter();
   const { user, loading } = useAuth();
   const tProfile = useTranslations('profile');
+  const tHelp = useTranslations('help');
   const [products, setProducts] = useState<Product[] | null>(null);
   const [loadError, setLoadError] = useState(false);
   const [profileOpen, setProfileOpen] = useState(false);
@@ -488,6 +509,7 @@ export default function CatalogPage() {
           </span>
           <span className={s.conf}>For Internal Use Only</span>
           <span className={s.chromeGroup}>
+            <HelpLauncher />
             <AppSwitcher />
             <Tooltip content={tProfile('openProfile')}>
               <button
@@ -507,9 +529,11 @@ export default function CatalogPage() {
                 <Plus size={15} /> Add product
               </button>
               <ImportCsvButton onDone={loadProducts} />
-              <a className={s.btn} href="/api/products/export.csv" {...testId(NS, 'exportCsv')} style={{ textDecoration: 'none' }}>
-                <Download size={15} /> Export CSV
-              </a>
+              <Tooltip content={tHelp('exportCsvTooltip')}>
+                <a className={s.btn} href="/api/products/export.csv" {...testId(NS, 'exportCsv')} style={{ textDecoration: 'none' }}>
+                  <Download size={15} /> Export CSV
+                </a>
+              </Tooltip>
             </span>
           )}
         </div>
