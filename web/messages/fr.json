@@ -65,6 +65,10 @@
     "helpLabel": "Aide",
     "resultCount": "{count, plural, one {# résultat} other {# résultats}}",
     "noResultsFor": "Aucun résultat pour « {query} ».",
-    "didYouMean": "Vouliez-vous dire…"
+    "didYouMean": "Vouliez-vous dire…",
+    "sectionCatalog": "Catalogue",
+    "sectionAdmin": "Administration des produits",
+    "sectionAccount": "Compte",
+    "exportCsvTooltip": "Télécharge le catalogue actuel au format CSV, avec les mêmes colonnes que celles attendues par Import CSV."
   }
 }

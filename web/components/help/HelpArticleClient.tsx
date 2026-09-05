@@ -15,10 +15,16 @@
 // is a plain port the generated component invokes AFTER its early
 // `return null`, so it must not call a hook — it reads the namespace from the
 // bundled message files by locale instead.
+//
+// Section titles: HelpArticleView derives its breadcrumb's middle crumb from
+// the `sections` port (`sections.find(…)?.title`), and that port is a static
+// array, not a per-render function — so one client is built per locale over
+// localizedSections(locale) and the exported component picks the right one
+// from the same useAuth() locale the inner useLocale port reads.
 import Link from 'next/link';
 import { useAuth } from '@/contexts/AuthContext';
 import { DEFAULT_LOCALE } from '@/lib/locales';
-import { HELP_SECTIONS } from '@/lib/help/sections';
+import { localizedSections } from '@/lib/help/sectionTitles';
 import { getHelpContent, normalizeLocale, type HelpLocale } from '@/lib/help/content';
 import { createHelpArticleClient, type HelpViewStrings } from '@matthewdbaldwin/microport-ui/help';
 import en from '@/messages/en.json';
@@ -31,11 +37,29 @@ function helpViewStrings(locale: string): Partial<HelpViewStrings> {
   return { help: HELP_CHROME[normalizeLocale(locale)].helpLabel };
 }
 
-export const HelpArticleClient = createHelpArticleClient({
-  useUser: () => useAuth().user,
-  useLocale: () => useAuth().user?.locale ?? DEFAULT_LOCALE,
-  getContent: (slug, locale) => getHelpContent(slug, locale),
-  getStrings: helpViewStrings,
-  sections: HELP_SECTIONS,
-  linkComponent: Link,
-});
+// Full codes, so localizedSections normalises them the same way getHelpContent
+// does (a bare 'zh' would fall back to en — see searchDocs.ts).
+const CLIENT_LOCALE: Record<HelpLocale, string> = { en: 'en-US', zh: 'zh-CN', fr: 'fr-FR' };
+
+function makeClient(locale: HelpLocale) {
+  return createHelpArticleClient({
+    useUser: () => useAuth().user,
+    useLocale: () => useAuth().user?.locale ?? DEFAULT_LOCALE,
+    getContent: (slug, l) => getHelpContent(slug, l),
+    getStrings: helpViewStrings,
+    sections: localizedSections(CLIENT_LOCALE[locale]),
+    linkComponent: Link,
+  });
+}
+
+const CLIENTS: Record<HelpLocale, ReturnType<typeof makeClient>> = {
+  en: makeClient('en'),
+  zh: makeClient('zh'),
+  fr: makeClient('fr'),
+};
+
+export function HelpArticleClient({ slug }: { slug: string }) {
+  const { user } = useAuth();
+  const Client = CLIENTS[normalizeLocale(user?.locale ?? DEFAULT_LOCALE)];
+  return <Client slug={slug} />;
+}

@@ -65,6 +65,10 @@
     "helpLabel": "帮助",
     "resultCount": "{count, plural, one {# 条结果} other {# 条结果}}",
     "noResultsFor": "未找到“{query}”的相关结果。",
-    "didYouMean": "您是不是要找…"
+    "didYouMean": "您是不是要找…",
+    "sectionCatalog": "目录",
+    "sectionAdmin": "产品管理",
+    "sectionAccount": "账户",
+    "exportCsvTooltip": "将当前目录下载为 CSV，列格式与“Import CSV”所需的格式相同。"
   }
 }

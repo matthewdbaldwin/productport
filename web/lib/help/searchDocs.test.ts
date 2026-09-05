@@ -3,6 +3,7 @@ import { describe, it, expect } from 'vitest';
 import { buildSearchDocs } from './searchDocs';
 import { GALLERY_POPOVER, CLEARANCE_POPOVER, getPopoverTitle } from './popovers';
 import { HELP_CONTENT_SLUGS, getHelpContent } from './content';
+import { getSectionTitle } from './sectionTitles';
 
 describe('buildSearchDocs', () => {
   it('includes one article-kind doc per content slug, plus 2 popover-kind docs', () => {
@@ -58,5 +59,18 @@ describe('buildSearchDocs', () => {
     expect(zh.find(d => d.slug === 'product-edit-gallery-popover')!.title).toBe(getPopoverTitle('gallery', 'zh-CN'));
     // The localized title must differ from English, or the locale was silently dropped.
     expect(zh.find(d => d.slug === 'catalog-browse')!.title).not.toBe(getHelpContent('catalog-browse', 'en-US')!.title);
+  });
+
+  it('section titles follow the locale too, for articles and popovers alike', () => {
+    const en = buildSearchDocs('en-US');
+    const zh = buildSearchDocs('zh-CN');
+    const fr = buildSearchDocs('fr-FR');
+    expect(en.find(d => d.slug === 'catalog-browse')!.sectionTitle).toBe(getSectionTitle('catalog', 'en-US'));
+    expect(zh.find(d => d.slug === 'catalog-browse')!.sectionTitle).toBe(getSectionTitle('catalog', 'zh-CN'));
+    expect(fr.find(d => d.slug === 'product-create')!.sectionTitle).toBe(getSectionTitle('admin', 'fr-FR'));
+    // Popovers file under the admin section, in the same locale as the articles.
+    expect(en.find(d => d.slug === 'product-edit-gallery-popover')!.sectionTitle).toBe('Product administration');
+    expect(zh.find(d => d.slug === 'product-edit-gallery-popover')!.sectionTitle).toBe(getSectionTitle('admin', 'zh-CN'));
+    expect(zh.find(d => d.slug === 'product-edit-gallery-popover')!.sectionTitle).not.toBe('Product administration');
   });
 });

@@ -9,7 +9,8 @@
 // chunk — and the miss is recorded (HelpSearchMiss, POST /api/help) ~600ms
 // after typing settles. Chrome strings come from the `help` namespace; the
 // item labels reuse each article's localized title (the registry labels are
-// English-only).
+// English-only) and the section headings come from getSectionTitle, resolved
+// against the same user locale as the corpus so card heading and rows agree.
 import Link from 'next/link';
 import { useEffect, useMemo, useState } from 'react';
 import { useTranslations } from 'next-intl';
@@ -19,6 +20,7 @@ import type { HelpFuzzySearchResult } from '@matthewdbaldwin/microport-ui/help/f
 import { useAuth } from '@/contexts/AuthContext';
 import { DEFAULT_LOCALE } from '@/lib/locales';
 import { visibleSectionsFor } from '@/lib/help/sections';
+import { getSectionTitle } from '@/lib/help/sectionTitles';
 import { getHelpContent } from '@/lib/help/content';
 import { buildSearchDocs } from '@/lib/help/searchDocs';
 import { recordHelpSearchMiss } from '@/lib/help/searchMiss';
@@ -150,7 +152,7 @@ export default function HelpIndexPage() {
                   >
                     <Icon size={18} />
                   </span>
-                  <h2 className="min-w-0 flex-1 text-base font-semibold" style={{ color: 'var(--text)' }}>{section.title}</h2>
+                  <h2 className="min-w-0 flex-1 text-base font-semibold" style={{ color: 'var(--text)' }}>{getSectionTitle(section.id, locale)}</h2>
                   <span
                     className="rounded-full px-2 py-0.5 text-xs"
                     style={{ background: 'color-mix(in srgb, var(--muted) 14%, transparent)', color: 'var(--muted)' }}
@@ -167,6 +169,7 @@ export default function HelpIndexPage() {
                         style={{ color: 'var(--text)' }}
                       >
                         <ChevronRight size={14} className="shrink-0 transition-transform group-hover:translate-x-0.5" style={{ color: 'var(--accent)' }} />
+                        {/* `?? item.label` is unreachable in practice: getHelpContent falls back to en, and help-audit Check 2 blocks any live slug with no en module. Kept only to satisfy the nullable type. */}
                         <span className="min-w-0">{getHelpContent(item.slug, locale)?.title ?? item.label}</span>
                       </Link>
                     </li>

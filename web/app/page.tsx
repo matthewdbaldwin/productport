@@ -389,6 +389,7 @@ export default function CatalogPage() {
   const router = useRouter();
   const { user, loading } = useAuth();
   const tProfile = useTranslations('profile');
+  const tHelp = useTranslations('help');
   const [products, setProducts] = useState<Product[] | null>(null);
   const [loadError, setLoadError] = useState(false);
   const [profileOpen, setProfileOpen] = useState(false);
@@ -528,7 +529,7 @@ export default function CatalogPage() {
                 <Plus size={15} /> Add product
               </button>
               <ImportCsvButton onDone={loadProducts} />
-              <Tooltip content="Downloads the current catalog as a CSV, in the same column format Import CSV expects.">
+              <Tooltip content={tHelp('exportCsvTooltip')}>
                 <a className={s.btn} href="/api/products/export.csv" {...testId(NS, 'exportCsv')} style={{ textDecoration: 'none' }}>
                   <Download size={15} /> Export CSV
                 </a>
