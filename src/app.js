@@ -36,6 +36,15 @@ app.use(helmet({
   },
 }));
 
+// CORS — in production WEB_ORIGIN must be set; never fall back to wildcard.
+// Mirrors the salesport/execport/opsport/clinicport hard startup guard so a
+// misconfigured deploy is caught at boot rather than silently running with
+// `origin: true`, which reflects ANY origin back with credentials: true.
+if (process.env.NODE_ENV === 'production' && !process.env.WEB_ORIGIN) {
+  logger.error('WEB_ORIGIN env var is required in production — refusing to start with open CORS');
+  process.exit(1);
+}
+
 const corsOrigins = (process.env.WEB_ORIGIN || '').split(',').map((s) => s.trim()).filter(Boolean);
 app.use(cors({ origin: corsOrigins.length ? corsOrigins : true, credentials: true }));
 
