@@ -56,5 +56,15 @@
     "errorDetail": "La description est requise.",
     "errorScreenshotTooLarge": "La capture doit faire 2 Mo ou moins.",
     "errorSend": "Échec de l'envoi. Veuillez réessayer."
+  },
+  "help": {
+    "libraryTitle": "Bibliothèque d'aide",
+    "backToApp": "Retour à ProductPort",
+    "searchPlaceholder": "Rechercher dans l'aide…",
+    "noArticles": "Aucun article d'aide n'est disponible pour le moment.",
+    "helpLabel": "Aide",
+    "resultCount": "{count, plural, one {# résultat} other {# résultats}}",
+    "noResultsFor": "Aucun résultat pour « {query} ».",
+    "didYouMean": "Vouliez-vous dire…"
   }
 }

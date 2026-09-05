@@ -56,5 +56,15 @@
     "errorDetail": "请填写描述。",
     "errorScreenshotTooLarge": "截图不得超过 2 MB。",
     "errorSend": "提交失败，请重试。"
+  },
+  "help": {
+    "libraryTitle": "帮助库",
+    "backToApp": "返回 ProductPort",
+    "searchPlaceholder": "搜索帮助…",
+    "noArticles": "暂无帮助文章。",
+    "helpLabel": "帮助",
+    "resultCount": "{count, plural, one {# 条结果} other {# 条结果}}",
+    "noResultsFor": "未找到“{query}”的相关结果。",
+    "didYouMean": "您是不是要找…"
   }
 }
