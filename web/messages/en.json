@@ -69,6 +69,7 @@
     "sectionCatalog": "Catalog",
     "sectionAdmin": "Product administration",
     "sectionAccount": "Account",
-    "exportCsvTooltip": "Downloads the current catalog as a CSV, in the same column format Import CSV expects."
+    "exportCsvTooltip": "Downloads the current catalog as a CSV, in the same column format Import CSV expects.",
+    "signInHelpLink": "Help with signing in"
   }
 }

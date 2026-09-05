@@ -16,6 +16,13 @@
 // `return null`, so it must not call a hook — it reads the namespace from the
 // bundled message files by locale instead.
 //
+// Null user is a SUPPORTED path, not a bug: app/help/layout.tsx lets a
+// signed-out visitor read /help/login, and useUser() is null there. The shared
+// client does not refuse a null user — it only returns null when the slug has
+// no content — and HelpArticleView's canSee()-based pager/related cards simply
+// come out empty. Do not add a `if (!user) return null` guard here; the
+// layout owns the auth gate. Pinned by app/help/layout.test.tsx.
+//
 // Section titles: HelpArticleView derives its breadcrumb's middle crumb from
 // the `sections` port (`sections.find(…)?.title`), and that port is a static
 // array, not a per-render function — so one client is built per locale over
