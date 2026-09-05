@@ -19,6 +19,7 @@ import { ProductEditModal } from './ProductEditModal';
 import { ImportCsvButton } from './ImportCsvButton';
 import { galleryImageSrc, disableProduct, enableProduct, type ProductInput, type GalleryImage } from '@/lib/products';
 import { useToast } from '@/components/ui/Toast';
+import { HelpLauncher } from '@/components/help/HelpLauncher';
 import { AppSwitcher } from '@/components/layout/AppSwitcher';
 import { ProfileModal } from '@/components/layout/ProfileModal';
 import s from './catalog.module.css';
@@ -488,6 +489,7 @@ export default function CatalogPage() {
           </span>
           <span className={s.conf}>For Internal Use Only</span>
           <span className={s.chromeGroup}>
+            <HelpLauncher />
             <AppSwitcher />
             <Tooltip content={tProfile('openProfile')}>
               <button
@@ -507,9 +509,11 @@ export default function CatalogPage() {
                 <Plus size={15} /> Add product
               </button>
               <ImportCsvButton onDone={loadProducts} />
-              <a className={s.btn} href="/api/products/export.csv" {...testId(NS, 'exportCsv')} style={{ textDecoration: 'none' }}>
-                <Download size={15} /> Export CSV
-              </a>
+              <Tooltip content="Downloads the current catalog as a CSV, in the same column format Import CSV expects.">
+                <a className={s.btn} href="/api/products/export.csv" {...testId(NS, 'exportCsv')} style={{ textDecoration: 'none' }}>
+                  <Download size={15} /> Export CSV
+                </a>
+              </Tooltip>
             </span>
           )}
         </div>
