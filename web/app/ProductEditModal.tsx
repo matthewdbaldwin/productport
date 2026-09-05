@@ -17,6 +17,10 @@ import {
   type ProductInput, type ProductTier, type ProductClassification, type ProductStatus, type GalleryImage,
   type ClearanceRow, type ClearanceStatus,
 } from '@/lib/products';
+import { HelpButton } from '@matthewdbaldwin/microport-ui/help';
+import { getPopoverContent, getPopoverTitle } from '@/lib/help/popovers';
+import { useAuth } from '@/contexts/AuthContext';
+import { DEFAULT_LOCALE } from '@/lib/locales';
 
 type Initial = Partial<ProductInput> & { slug?: string; images?: GalleryImage[]; clearances?: ClearanceRow[] };
 
@@ -73,6 +77,13 @@ export function ProductEditModal({ mode, initial, onClose, onSaved, onGalleryCha
   onGalleryChanged?: () => void | Promise<void>;
 }) {
   const i = initial ?? {};
+  // Contextual help for the two edit-only sub-sections (Help Library, Task 7).
+  // Locale-aware via the user's hub-provisioned locale; useAuth() outside a
+  // provider yields user:null, so bare renders (tests) fall back to English.
+  const { user } = useAuth();
+  const helpLocale = user?.locale ?? DEFAULT_LOCALE;
+  const galleryPopover = getPopoverContent('gallery', helpLocale);
+  const clearancePopover = getPopoverContent('clearance', helpLocale);
   const [f, setF] = useState<Record<string, string>>({
     slug: i.slug ?? '', name: i.name ?? '', subsidiary: i.subsidiary ?? '', therapeuticArea: i.therapeuticArea ?? '',
     category: i.category ?? '', type: i.type ?? '', businessSegment: i.businessSegment ?? '', image: i.image ?? '',
@@ -306,7 +317,10 @@ export function ProductEditModal({ mode, initial, onClose, onSaved, onGalleryCha
 
         {mode === 'edit' && (
           <div className={s.efield} style={{ marginBottom: 12 }}>
-            <span>Product images <em style={{ color: 'var(--grey)', fontWeight: 400 }}>— gallery; the primary shows on the catalog card. JPEG/PNG/WebP, max 6 MB each.</em></span>
+            <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
+              Product images <em style={{ color: 'var(--grey)', fontWeight: 400 }}>— gallery; the primary shows on the catalog card. JPEG/PNG/WebP, max 6 MB each.</em>
+              <HelpButton content={galleryPopover} title={getPopoverTitle('gallery', helpLocale)} inline />
+            </span>
             <div style={{ display: 'flex', flexWrap: 'wrap', gap: 10, marginTop: 6, alignItems: 'flex-start' }}>
               {gallery.map((img) => {
                 const busy = imgBusy === img.id;
@@ -348,7 +362,10 @@ export function ProductEditModal({ mode, initial, onClose, onSaved, onGalleryCha
 
         {mode === 'edit' && (
           <div className={s.efield} style={{ marginBottom: 12 }}>
-            <span>Regulatory clearances <em style={{ color: 'var(--grey)', fontWeight: 400 }}>— status, certificate number(s) (pipe-separated), and any caveat, per region.</em></span>
+            <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
+              Regulatory clearances <em style={{ color: 'var(--grey)', fontWeight: 400 }}>— status, certificate number(s) (pipe-separated), and any caveat, per region.</em>
+              <HelpButton content={clearancePopover} title={getPopoverTitle('clearance', helpLocale)} inline />
+            </span>
             <div style={{ overflowX: 'auto' }}>
               <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13, marginTop: 6 }}>
                 <thead>
