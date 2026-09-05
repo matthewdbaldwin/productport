@@ -10,10 +10,17 @@
 //
 // Run once against the target DB:
 //   DATABASE_URL=... node prisma/seed.js
+// Production targets are refused by ./seed-guard.js — the real import needs
+//   SEED_ALLOW_PROD=1 DATABASE_URL=... node prisma/seed.js
 'use strict';
 const fs = require('node:fs');
 const path = require('node:path');
 const { parse } = require('csv-parse/sync');
+const { assertSeedTargetAllowed } = require('./seed-guard');
+
+// Refuses production targets (platform-db*.rds) — SEED_ALLOW_PROD=1 to override.
+assertSeedTargetAllowed();
+
 const db = require('../src/lib/db');
 const { parseProductRow, parseTrialRow } = require('../src/lib/productRow');
 
