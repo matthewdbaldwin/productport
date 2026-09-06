@@ -68,7 +68,7 @@ describe('microport-ui 0.39.1 help subpath resolution', () => {
 
 - [ ] **Step 2: Run the test to verify it fails**
 
-Run: `cd /home/ubuntu/dev/productport/web && npx vitest run lib/help/moduleResolution.smoke.test.ts`
+Run: `cd ~/dev/productport/web && npx vitest run lib/help/moduleResolution.smoke.test.ts`
 Expected: FAIL — `Error: Failed to resolve import "@matthewdbaldwin/microport-ui/help/fuzzy"` (0.38.1 doesn't publish that subpath, and `HelpDropdown`/`HelpCommandPalette` aren't exported from `./help` yet).
 
 - [ ] **Step 3: Bump the version pin**
@@ -83,7 +83,7 @@ Apply to `web/package.json:16`.
 - [ ] **Step 4: Regenerate the lockfile with npm 10.9.2**
 
 ```bash
-cd /home/ubuntu/dev/productport/web
+cd ~/dev/productport/web
 git status
 NODE_AUTH_TOKEN="$(gh auth token)" npx -y npm@10.9.2 install --no-audit --no-fund
 ```
@@ -102,13 +102,13 @@ Expected: `npm ci` completes with no `EUSAGE`; `npm ls @swc/helpers` shows no "i
 
 - [ ] **Step 6: Run the smoke test again to verify it passes**
 
-Run: `cd /home/ubuntu/dev/productport/web && npx vitest run lib/help/moduleResolution.smoke.test.ts`
+Run: `cd ~/dev/productport/web && npx vitest run lib/help/moduleResolution.smoke.test.ts`
 Expected: PASS — 1 test, 8 assertions.
 
 - [ ] **Step 7: Commit**
 
 ```bash
-cd /home/ubuntu/dev/productport
+cd ~/dev/productport
 git add web/package.json web/package-lock.json web/lib/help/moduleResolution.smoke.test.ts
 git commit -m "Bump @matthewdbaldwin/microport-ui to 0.39.1 for the Help Library
 
@@ -183,7 +183,7 @@ describe('HELP_SECTIONS registry', () => {
 
 - [ ] **Step 2: Run test to verify it fails**
 
-Run: `cd /home/ubuntu/dev/productport/web && npx vitest run lib/help/sections.test.ts`
+Run: `cd ~/dev/productport/web && npx vitest run lib/help/sections.test.ts`
 Expected: FAIL — `Error: Failed to resolve import "./sections"`.
 
 - [ ] **Step 3: Write the implementation**
@@ -280,13 +280,13 @@ export function visibleSectionsFor(user: HelpGateUser | null | undefined): HelpS
 
 - [ ] **Step 4: Run test to verify it passes**
 
-Run: `cd /home/ubuntu/dev/productport/web && npx vitest run lib/help/sections.test.ts`
+Run: `cd ~/dev/productport/web && npx vitest run lib/help/sections.test.ts`
 Expected: PASS — 5 tests.
 
 - [ ] **Step 5: Commit**
 
 ```bash
-cd /home/ubuntu/dev/productport
+cd ~/dev/productport
 git add web/lib/help/sections.ts web/lib/help/sections.test.ts
 git commit -m "Add HELP_SECTIONS registry for the Help Library
 
@@ -362,7 +362,7 @@ describe('help content registry', () => {
 
 - [ ] **Step 2: Run test to verify it fails**
 
-Run: `cd /home/ubuntu/dev/productport/web && npx vitest run lib/help/content.test.ts`
+Run: `cd ~/dev/productport/web && npx vitest run lib/help/content.test.ts`
 Expected: FAIL — `Error: Failed to resolve import "./content"`.
 
 - [ ] **Step 3: Write the English content modules**
@@ -757,13 +757,13 @@ export const HELP_CONTENT_SLUGS: string[] = Object.keys(EN);
 
 - [ ] **Step 6: Run test to verify it passes**
 
-Run: `cd /home/ubuntu/dev/productport/web && npx vitest run lib/help/content.test.ts`
+Run: `cd ~/dev/productport/web && npx vitest run lib/help/content.test.ts`
 Expected: PASS — 5 tests.
 
 - [ ] **Step 7: Commit**
 
 ```bash
-cd /home/ubuntu/dev/productport
+cd ~/dev/productport
 git add web/lib/help/content.ts web/lib/help/content/
 git commit -m "Add the 6 Help Library articles (en/zh/fr), all live from day one
 
@@ -835,7 +835,7 @@ describe('buildSearchDocs', () => {
 
 - [ ] **Step 2: Run test to verify it fails**
 
-Run: `cd /home/ubuntu/dev/productport/web && npx vitest run lib/help/searchDocs.test.ts`
+Run: `cd ~/dev/productport/web && npx vitest run lib/help/searchDocs.test.ts`
 Expected: FAIL — `Error: Failed to resolve import "./searchDocs"`.
 
 - [ ] **Step 3: Write the popover content (English defaults + locale-aware getters)**
@@ -981,13 +981,13 @@ export function buildSearchDocs(locale: string = 'en-US'): HelpSearchDoc[] {
 
 - [ ] **Step 6: Run test to verify it passes**
 
-Run: `cd /home/ubuntu/dev/productport/web && npx vitest run lib/help/searchDocs.test.ts`
+Run: `cd ~/dev/productport/web && npx vitest run lib/help/searchDocs.test.ts`
 Expected: PASS — 4 tests. (Step 1's test only exercises `buildSearchDocs('en-US')`, which resolves to the `GALLERY_POPOVER`/`CLEARANCE_POPOVER` English constants via `getPopoverContent`'s `en` branch — the assertions against those two constants still hold unchanged.)
 
 - [ ] **Step 7: Commit**
 
 ```bash
-cd /home/ubuntu/dev/productport
+cd ~/dev/productport
 git add web/lib/help/popovers.ts web/lib/help/popovers.zh.ts web/lib/help/popovers.fr.ts web/lib/help/searchDocs.ts web/lib/help/searchDocs.test.ts
 git commit -m "Add buildSearchDocs + the 2 contextual popovers, localized en/zh/fr
 
@@ -1058,7 +1058,7 @@ In `model User` (`prisma/schema.prisma:32-46`), add the back-relation:
 - [ ] **Step 2: Generate the migration**
 
 ```bash
-cd /home/ubuntu/dev/productport
+cd ~/dev/productport
 npx prisma migrate dev --name add_help_search_miss
 ```
 
@@ -1122,7 +1122,7 @@ describe('POST /api/help', () => {
 
 - [ ] **Step 4: Run test to verify it fails**
 
-Run: `cd /home/ubuntu/dev/productport && CI=true npx jest tests/help.test.js`
+Run: `cd ~/dev/productport && CI=true npx jest tests/help.test.js`
 Expected: FAIL — `Cannot find module '../src/routes/help'`.
 
 - [ ] **Step 5: Write the route**
@@ -1179,13 +1179,13 @@ In `src/app.js`, insert directly after the `opsport` mount (research-confirmed l
 
 - [ ] **Step 7: Run test to verify it passes**
 
-Run: `cd /home/ubuntu/dev/productport && CI=true npx jest tests/help.test.js`
+Run: `cd ~/dev/productport && CI=true npx jest tests/help.test.js`
 Expected: PASS — 3 tests.
 
 - [ ] **Step 8: Commit the server side**
 
 ```bash
-cd /home/ubuntu/dev/productport
+cd ~/dev/productport
 git add prisma/schema.prisma prisma/migrations src/routes/help.js src/app.js tests/help.test.js
 git commit -m "Add HelpSearchMiss model + POST /api/help write path
 
@@ -1223,7 +1223,7 @@ describe('recordHelpSearchMiss', () => {
 
 - [ ] **Step 10: Run test to verify it fails**
 
-Run: `cd /home/ubuntu/dev/productport/web && npx vitest run lib/help/searchMiss.test.ts`
+Run: `cd ~/dev/productport/web && npx vitest run lib/help/searchMiss.test.ts`
 Expected: FAIL — `Error: Failed to resolve import "./searchMiss"`.
 
 - [ ] **Step 11: Write the client helper**
@@ -1245,13 +1245,13 @@ export function recordHelpSearchMiss({
 
 - [ ] **Step 12: Run test to verify it passes**
 
-Run: `cd /home/ubuntu/dev/productport/web && npx vitest run lib/help/searchMiss.test.ts`
+Run: `cd ~/dev/productport/web && npx vitest run lib/help/searchMiss.test.ts`
 Expected: PASS — 2 tests.
 
 - [ ] **Step 13: Commit the client side**
 
 ```bash
-cd /home/ubuntu/dev/productport
+cd ~/dev/productport
 git add web/lib/help/searchMiss.ts web/lib/help/searchMiss.test.ts
 git commit -m "Add recordHelpSearchMiss client helper for POST /api/help"
 ```
@@ -1432,13 +1432,13 @@ describe('/help index', () => {
 
 - [ ] **Step 7: Run test to verify it fails, then passes**
 
-Run: `cd /home/ubuntu/dev/productport/web && npx vitest run app/help/page.test.tsx`
+Run: `cd ~/dev/productport/web && npx vitest run app/help/page.test.tsx`
 Expected: first FAIL (`Cannot find module './page'` if run before Step 4 — reorder if you're following steps strictly TDD-first, or run after Step 5 to see it PASS directly). Either way, confirm PASS once Steps 2-5 exist: 2 tests.
 
 - [ ] **Step 8: Commit**
 
 ```bash
-cd /home/ubuntu/dev/productport
+cd ~/dev/productport
 git add web/messages/en.json web/messages/zh.json web/messages/fr.json \
   web/components/help/HelpArticleClient.tsx \
   web/app/help/layout.tsx web/app/help/page.tsx web/app/help/page.test.tsx web/app/help/[slug]/page.tsx
@@ -1499,7 +1499,7 @@ describe('ProductEditModal help popovers (edit mode only)', () => {
 
 - [ ] **Step 2: Run test to verify it fails**
 
-Run: `cd /home/ubuntu/dev/productport/web && npx vitest run app/ProductEditModal.help.test.tsx`
+Run: `cd ~/dev/productport/web && npx vitest run app/ProductEditModal.help.test.tsx`
 Expected: FAIL — no `HelpButton`/"about this" trigger exists yet (0 matches, expected ≥2).
 
 - [ ] **Step 3: Wire the two `HelpButton`s, locale-aware**
@@ -1550,18 +1550,18 @@ Expected: FAIL — no `HelpButton`/"about this" trigger exists yet (0 matches, e
 
 - [ ] **Step 4: Run test to verify it passes**
 
-Run: `cd /home/ubuntu/dev/productport/web && npx vitest run app/ProductEditModal.help.test.tsx`
+Run: `cd ~/dev/productport/web && npx vitest run app/ProductEditModal.help.test.tsx`
 Expected: PASS — 2 tests.
 
 - [ ] **Step 5: Run the full ProductEditModal suite to verify nothing else broke**
 
-Run: `cd /home/ubuntu/dev/productport/web && npx vitest run app/ProductEditModal.test.tsx`
+Run: `cd ~/dev/productport/web && npx vitest run app/ProductEditModal.test.tsx`
 Expected: PASS — unrelated existing assertions untouched (only the gallery/Clearance section headers gained a sibling button).
 
 - [ ] **Step 6: Commit**
 
 ```bash
-cd /home/ubuntu/dev/productport
+cd ~/dev/productport
 git add web/app/ProductEditModal.tsx web/app/ProductEditModal.help.test.tsx
 git commit -m "Wire the gallery + Clearance-matrix help popovers into ProductEditModal
 
@@ -1630,7 +1630,7 @@ describe('HelpLauncher', () => {
 
 - [ ] **Step 2: Run test to verify it fails**
 
-Run: `cd /home/ubuntu/dev/productport/web && npx vitest run components/help/HelpLauncher.test.tsx`
+Run: `cd ~/dev/productport/web && npx vitest run components/help/HelpLauncher.test.tsx`
 Expected: FAIL — `Error: Failed to resolve import "./HelpLauncher"`.
 
 - [ ] **Step 3: Write `HelpLauncher.tsx`**
@@ -1715,18 +1715,18 @@ In `web/app/page.tsx`:
 
 - [ ] **Step 5: Run test to verify it passes**
 
-Run: `cd /home/ubuntu/dev/productport/web && npx vitest run components/help/HelpLauncher.test.tsx`
+Run: `cd ~/dev/productport/web && npx vitest run components/help/HelpLauncher.test.tsx`
 Expected: PASS — 3 tests.
 
 - [ ] **Step 6: Run the full catalog page suite to verify nothing else broke**
 
-Run: `cd /home/ubuntu/dev/productport/web && npx vitest run app/page.test.tsx`
+Run: `cd ~/dev/productport/web && npx vitest run app/page.test.tsx`
 Expected: PASS (adjust the file name if the existing catalog page test lives elsewhere — locate it first with `find web/app -iname "page.test.*"`).
 
 - [ ] **Step 7: Commit**
 
 ```bash
-cd /home/ubuntu/dev/productport
+cd ~/dev/productport
 git add web/components/help/HelpLauncher.tsx web/components/help/HelpLauncher.test.tsx web/app/page.tsx
 git commit -m "Mount HelpDropdown in the catalog top bar (HelpLauncher)
 
@@ -1766,7 +1766,7 @@ test('help-audit.js reports zero blockers against the current repo state', () =>
 
 - [ ] **Step 2: Run test to verify it fails**
 
-Run: `cd /home/ubuntu/dev/productport && CI=true npx jest tests/helpAudit.test.js`
+Run: `cd ~/dev/productport && CI=true npx jest tests/helpAudit.test.js`
 Expected: FAIL — `scripts/help-audit.js` doesn't exist yet.
 
 - [ ] **Step 3: Write the script**
@@ -1959,13 +1959,13 @@ In root `package.json`'s `scripts` block:
 
 - [ ] **Step 5: Run test to verify it passes**
 
-Run: `cd /home/ubuntu/dev/productport && CI=true npx jest tests/helpAudit.test.js`
+Run: `cd ~/dev/productport && CI=true npx jest tests/helpAudit.test.js`
 Expected: PASS — 0 blockers (fix any it finds by re-checking the affected task's files before moving on; a red run here means either the registry/content/popover wiring drifted from an earlier task, or this script's own parsing needs adjusting to the actual file shapes — verify against the real files before assuming the script's regex is wrong).
 
 - [ ] **Step 6: Commit**
 
 ```bash
-cd /home/ubuntu/dev/productport
+cd ~/dev/productport
 git add scripts/help-audit.js package.json tests/helpAudit.test.js
 git commit -m "Add scripts/help-audit.js — SPA-adapted static Help Library checker
 
