@@ -1,4 +1,8 @@
-node_modules/
+# No trailing slash, deliberately. `node_modules/` matches DIRECTORIES only, so
+# it does not ignore a node_modules SYMLINK — the standard worktree workaround
+# for typechecking and Playwright — leaving it untracked-but-not-ignored, where
+# `git add -A` commits an absolute path valid on exactly one machine.
+node_modules
 .env
 .env.local
 *.log
@@ -12,3 +16,12 @@ prisma/*.db
 *.tsbuildinfo
 next-env.d.ts
 .claude/
+
+# Playwright storage state — real signed session JWTs written by e2e/auth.setup.ts.
+web/e2e/.auth/
+
+# help-media capture pipeline: tool deps and raw capture scratch.
+# .out/ holds Playwright recordings taken against a LOCAL seeded catalog;
+# only the transcoded result under web/public/help-media/ is committed.
+tools/help-media/node_modules
+tools/help-media/.out/

@@ -1,6 +1,6 @@
 {
   "name": "productport-api",
-  "version": "0.11.0",
+  "version": "0.11.1",
   "private": true,
   "description": "ProductPort API — a MicroPort satellite.",
   "main": "src/server.js",
@@ -12,7 +12,8 @@
     "test": "jest",
     "test:ci": "CI=true jest",
     "lint": "eslint src",
-    "help:audit": "node scripts/help-audit.js"
+    "help:audit": "node scripts/help-audit.js",
+    "help:media": "node tools/help-media/build.js"
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.1078.0",
