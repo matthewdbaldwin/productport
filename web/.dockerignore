@@ -1,0 +1,25 @@
+# The image is built with `COPY . .` from ./web, so anything here that is not
+# excluded ships in the production artifact.
+#
+# WHY THIS EXISTS (2026-09-06): e2e/auth.setup.ts writes a REAL signed admin
+# session JWT to e2e/.auth/admin.json, and deploys run from the same devbox that
+# runs the tests (`deploy-local productport prod`), so that file is present at
+# build time on the machine building the image. Without this file the token is
+# baked into the production image. .gitignore does not help — Docker's build
+# context includes ignored files. Landed BEFORE the harness that writes it.
+# Nothing below is needed by `next build` or by the running server.
+e2e/
+playwright.config.ts
+e2e-results/
+test-results/
+playwright-report/
+
+# Build scratch. node_modules is deliberately NOT excluded: the Dockerfile runs
+# `npm ci` before `COPY . .`, and changing which node_modules wins is a separate
+# decision from this one.
+.next/
+
+# Secrets a developer creates locally. This app ships no .env.local.example
+# today (unlike salesport, which keeps one and negates it below its rule), so
+# the glob needs no exception — add one alongside the example if that changes.
+.env*

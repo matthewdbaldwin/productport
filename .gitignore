@@ -12,3 +12,6 @@ prisma/*.db
 *.tsbuildinfo
 next-env.d.ts
 .claude/
+
+# Playwright storage state — real signed session JWTs written by e2e/auth.setup.ts.
+web/e2e/.auth/
