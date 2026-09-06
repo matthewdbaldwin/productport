@@ -5,12 +5,11 @@
 FROM node:22-alpine AS backend-deps
 WORKDIR /app
 # GitHub Packages auth for @matthewdbaldwin/* deps. Scoped to this build stage.
-ARG NODE_AUTH_TOKEN
-ENV NODE_AUTH_TOKEN=${NODE_AUTH_TOKEN}
 COPY package*.json .npmrc ./
 COPY prisma.config.mjs ./
 COPY prisma ./prisma
-RUN npm ci
+RUN --mount=type=secret,id=npm_token,required=true \
+    NODE_AUTH_TOKEN="$(cat /run/secrets/npm_token)" npm ci
 RUN npx prisma generate
 RUN npm prune --omit=dev
 

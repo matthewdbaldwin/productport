@@ -118,13 +118,15 @@ jobs:
 
       - name: Build and push productport-api:latest
         env:
+          DOCKER_BUILDKIT: 1
           NODE_AUTH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          docker build --build-arg NODE_AUTH_TOKEN=$NODE_AUTH_TOKEN -t $ECR_REGISTRY/productport-api:latest .
+          docker build --secret id=npm_token,env=NODE_AUTH_TOKEN -t $ECR_REGISTRY/productport-api:latest .
           docker push $ECR_REGISTRY/productport-api:latest
 
       - name: Build and push productport-web:latest
         env:
+          DOCKER_BUILDKIT: 1
           NODE_AUTH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           # Sentry: DSN baked into the browser bundle, AUTH_TOKEN authorises
           # source-map upload during the build. Both are pulled from GH
@@ -135,9 +137,9 @@ jobs:
         run: |
           docker build \
             --build-arg API_URL=http://localhost:4006 \
-            --build-arg NODE_AUTH_TOKEN=$NODE_AUTH_TOKEN \
+            --secret id=npm_token,env=NODE_AUTH_TOKEN \
             --build-arg NEXT_PUBLIC_SENTRY_DSN=$NEXT_PUBLIC_SENTRY_DSN \
-            --build-arg SENTRY_AUTH_TOKEN=$SENTRY_AUTH_TOKEN \
+            --secret id=sentry_token,env=SENTRY_AUTH_TOKEN \
             -t $ECR_REGISTRY/productport-web:latest ./web
           docker push $ECR_REGISTRY/productport-web:latest
 
