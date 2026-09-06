@@ -19,6 +19,9 @@
  * (`login-identifier` / `login-password` / `login-submit`), which is why this
  * file matches opsport's harness rather than reviewport's older local-form one.
  *
+ * Modelled on clinicport's harness (the one whose hop chain was curl-verified
+ * against the live mesh) rather than opsport's, which predates the chooser.
+ *
  * Against the deployed dev mesh:
  *   TEST_USER_EMAIL=... TEST_USER_PASSWORD=... \
  *     BASE_URL=https://product-dev.microport.com npx playwright test --project=chromium
@@ -43,6 +46,19 @@ setup('authenticate as admin', async ({ page }) => {
   // /login → /api/auth/sso/start → the portal's form. Generous timeout: this is
   // two redirects across hosts, and on a cold dev server the first compile of
   // the login route dominates.
+  // The broker fronts a passkey-first chooser (data-testid "panel-choose", open
+  // by default) that renders ON TOP of the identifier/password form and
+  // INTERCEPTS clicks on login-submit — the fields underneath still fill fine,
+  // so this fails at the submit, not at the typing, which makes it look like a
+  // credentials problem. Live finding from clinicport's harness (2026-08-31,
+  // verified against the dev mesh); opsport's original predates it and does not
+  // dismiss the chooser. Optional by design: if some environment doesn't show
+  // it, we fall through to the identifier wait below unchanged.
+  const usePassword = page.getByTestId('login-use-password');
+  if (await usePassword.waitFor({ state: 'visible', timeout: 10_000 }).then(() => true).catch(() => false)) {
+    await usePassword.click();
+  }
+
   await expect(page.getByTestId('login-identifier')).toBeVisible({ timeout: 20_000 });
   await page.getByTestId('login-identifier').fill(EMAIL);
   await page.getByTestId('login-password').fill(PASSWORD);
