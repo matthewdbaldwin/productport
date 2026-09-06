@@ -189,7 +189,7 @@ function DetailModal({ p, onClose, onEdit, onToggleDisabled, toggling }: {
 
   return (
     <div className={s.modalOverlay} onClick={(e) => { if (toggling) return; if (e.target === e.currentTarget) onClose(); }}>
-      <div ref={trapRef} className={s.modal} role="dialog" aria-modal="true" aria-labelledby="pp-modal-title" style={{ maxHeight: '92vh', overflowY: 'auto' }}>
+      <div ref={trapRef} className={s.modal} role="dialog" aria-modal="true" aria-labelledby="pp-modal-title" style={{ maxHeight: '92vh', overflowY: 'auto' }} {...testId(NS, 'detailDialog')}>
         <Tooltip content="Close">
           <button className={s.closeButton} onClick={onClose} disabled={toggling} aria-label="Close" {...testId(NS, 'closeDetail')}>&times;</button>
         </Tooltip>
