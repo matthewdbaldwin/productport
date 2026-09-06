@@ -19,3 +19,9 @@ next-env.d.ts
 
 # Playwright storage state — real signed session JWTs written by e2e/auth.setup.ts.
 web/e2e/.auth/
+
+# help-media capture pipeline: tool deps and raw capture scratch.
+# .out/ holds Playwright recordings taken against a LOCAL seeded catalog;
+# only the transcoded result under web/public/help-media/ is committed.
+tools/help-media/node_modules
+tools/help-media/.out/
