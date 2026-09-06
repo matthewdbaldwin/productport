@@ -27,8 +27,9 @@
  *     BASE_URL=https://product-dev.microport.com npx playwright test --project=chromium
  */
 
-import { test as setup, expect } from '@playwright/test';
+import { test as setup, expect, errors } from '@playwright/test';
 import path from 'path';
+import fs from 'fs/promises';
 
 const authFile = path.join(__dirname, '.auth', 'admin.json');
 const APP_ORIGIN = process.env.BASE_URL || 'http://localhost:3100';
@@ -55,9 +56,24 @@ setup('authenticate as admin', async ({ page }) => {
   // dismiss the chooser. Optional by design: if some environment doesn't show
   // it, we fall through to the identifier wait below unchanged.
   const usePassword = page.getByTestId('login-use-password');
-  if (await usePassword.waitFor({ state: 'visible', timeout: 10_000 }).then(() => true).catch(() => false)) {
-    await usePassword.click();
+
+  // ⚠ ONLY a timeout may be swallowed here. The blanket `.catch(() => false)`
+  // this replaced also ate a strict-mode violation (two nodes matching the
+  // testid) and a closed page, and then SKIPPED the dismissal — leaving the
+  // chooser to intercept the submit and resurface as a credentials failure,
+  // which is the exact bug this block exists to prevent. Verified against
+  // Playwright 1.61.1 (2026-09-06): an absent element throws
+  // errors.TimeoutError; a strict violation throws a plain Error. They separate.
+  let chooserShown = true;
+  try {
+    await usePassword.waitFor({ state: 'visible', timeout: 10_000 });
+  } catch (err) {
+    if (!(err instanceof errors.TimeoutError)) throw err;
+    chooserShown = false;
   }
+  // The click stays OUTSIDE the try: click() times out when something covers
+  // the button, and that timeout is a real failure, not an absent chooser.
+  if (chooserShown) await usePassword.click();
 
   await expect(page.getByTestId('login-identifier')).toBeVisible({ timeout: 20_000 });
   await page.getByTestId('login-identifier').fill(EMAIL);
@@ -81,10 +97,21 @@ setup('authenticate as admin', async ({ page }) => {
   // Fail loudly HERE if the handshake did not actually stick. Without this the
   // setup goes green, writes a logged-out state, and the failure resurfaces as
   // unrelated redirect loops in whatever spec happens to run first.
-  const state = await page.context().storageState({ path: authFile });
+  // Capture WITHOUT `path` so nothing reaches disk yet. Writing first and
+  // asserting second left a signed-OUT admin.json behind after every failed run,
+  // and the next run loaded it without complaint. Assert, THEN write — and write
+  // the very object that was asserted, because a second storageState({ path })
+  // call re-captures and could differ from what actually passed.
+  const state = await page.context().storageState();
   const names = state.cookies.map((c) => c.name);
   expect(
     names,
-    `no ${SESSION_COOKIE} cookie after SSO — saved a signed-OUT state; got: ${names.join(', ') || '(none)'}`,
+    `no ${SESSION_COOKIE} cookie after SSO — landed on ${page.url()} holding a ` +
+      `signed-OUT state; cookies present: ${names.join(', ') || '(none)'}`,
   ).toContain(SESSION_COOKIE);
+
+  // Playwright used to create this directory as a side effect of `path`; it no
+  // longer runs, so make it ourselves.
+  await fs.mkdir(path.dirname(authFile), { recursive: true });
+  await fs.writeFile(authFile, JSON.stringify(state, null, 2));
 });
