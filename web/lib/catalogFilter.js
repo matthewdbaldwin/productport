@@ -7,20 +7,11 @@
 // companion catalogFilter.d.ts. The React page owns only the state + render.
 'use strict';
 
-// Therapeutic-area display order — the canonical 10 (2026-07-01). Mirrors
-// src/lib/therapeuticAreas.js + web/lib/products.ts THERAPEUTIC_AREAS.
-const AREA_ORDER = [
-  'Coronary and Structural Heart',
-  'Heart Failure and Electrophysiology',
-  'Aortic and Peripheral Vasculature',
-  'Robotic Surgery, AI, and Telesurgery',
-  'Neurovascular and Brain-Computer Interfaces',
-  'Orthopedic Joint, Spine, and Trauma',
-  'Urology, Oncology, and Gastroenterology',
-  'Emergency and Critical Care',
-  'Endocrinology and Reproductive Health',
-  'Regenerative Medicine and Medical Aesthetics',
-];
+// Therapeutic-area display order, taken from the shared contract rather than
+// copied. orderedAreas() below appends anything not in this list alphabetically,
+// so a product still carrying a retired area stays visible while the data
+// migration runs — it just sorts after the curated ones.
+const { THERAPEUTIC_AREAS: AREA_ORDER } = require('@matthewdbaldwin/microport-contracts');
 
 // "Present in a market" = a live clearance state, not absent/rejected.
 const PRESENT_STATUSES = ['APPROVED', 'IN_PROGRESS', 'SUBMITTED'];
