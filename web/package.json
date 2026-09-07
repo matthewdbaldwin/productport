@@ -10,6 +10,7 @@
     "lint": "eslint .",
     "test": "vitest run",
     "e2e": "playwright test",
+    "e2e:public": "playwright test --project=public",
     "help:capture": "playwright test --config=playwright.help-capture.config.ts"
   },
   "dependencies": {
