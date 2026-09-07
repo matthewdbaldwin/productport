@@ -22,7 +22,7 @@ const productCreate: HelpArticleContent = {
       blocks: [
         { kind: 'paragraph', text: '顶部的网格包含短字段；下方的全宽字段包含较长的文本。必填字段带有红色星号。空白的可选字段将被存储为空。' },
         { kind: 'list', items: [
-          'Name、Slug (url key)、Subsidiary 和 Therapeutic area 是必填字段。Subsidiary 是自由文本；Therapeutic area 是包含十个标准治疗领域的下拉列表。',
+          'Name、Slug (url key)、Subsidiary 和 Therapeutic area 是必填字段。Subsidiary 是自由文本；Therapeutic area 是包含八个标准治疗领域的下拉列表。',
           'Slug (url key)必须为小写字母、数字和短横线。它成为产品的链接（/?product=<slug>）以及 CSV 中的 id 列，已被占用的 slug 会被拒绝，因此请选择一个简短且稳定的 slug。',
         ], labels: ['Name', 'Slug (url key)', 'Subsidiary', 'Therapeutic area'] },
         { kind: 'list', items: [
