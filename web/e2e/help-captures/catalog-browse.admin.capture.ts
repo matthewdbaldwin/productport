@@ -37,9 +37,11 @@
 //   testId(NS,'clearFilters')      -> "catalog-clear-filters"       (line 622)
 //   testId(NS,`productCard-<id>`)  -> "catalog-product-card-<id>"   (line 636)
 //   testId(NS,'closeDetail')       -> "catalog-close-detail"        (line 194)
-// The detail dialog itself carries NO data-testid — only role="dialog" and
-// aria-labelledby="pp-modal-title" (line 192) — so it is matched on that pair
-// rather than on role alone, which ProfileModal would also answer to.
+//   testId(NS,'detailDialog')      -> "catalog-detail-dialog"       (line 192)
+// The detail dialog used to carry no data-testid, so this capture matched it on
+// role="dialog" + aria-labelledby="pp-modal-title" to avoid also selecting
+// ProfileModal. It has carried testId(NS,'detailDialog') since, so the testId is
+// the selector now — same element, and it no longer breaks if the aria wiring moves.
 //
 // ⚠ If the clip trips build.js's 25s gate, that is the first paint of a cold
 // `next dev` compile, not the scripted beats (~15s). Trim it with a sidecar
@@ -57,7 +59,7 @@ const CE      = '[data-testid="catalog-market-pill-ce"]';
 const CLEAR   = '[data-testid="catalog-clear-filters"]';
 const CARD    = '[data-testid^="catalog-product-card-"]';
 const CLOSE   = '[data-testid="catalog-close-detail"]';
-const DETAIL  = '[role="dialog"][aria-labelledby="pp-modal-title"]';
+const DETAIL  = '[data-testid="catalog-detail-dialog"]';
 
 test('browse the catalog — stack two facets, clear them, then search', async ({ page }) => {
   await page.goto('/');
