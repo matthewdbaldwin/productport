@@ -63,6 +63,8 @@
     "searchPlaceholder": "Rechercher dans l'aide…",
     "noArticles": "Aucun article d'aide n'est disponible pour le moment.",
     "helpLabel": "Aide",
+    "mediaPlay": "Lire",
+    "mediaPause": "Pause",
     "resultCount": "{count, plural, one {# résultat} other {# résultats}}",
     "noResultsFor": "Aucun résultat pour « {query} ».",
     "didYouMean": "Vouliez-vous dire…",
