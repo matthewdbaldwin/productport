@@ -8,16 +8,18 @@ Prior art to port: FinPort's mint helper and its accompanying middleware test. D
 
 **Blocked by:** None (can start immediately).
 
-**Status:** ready-for-agent
+**Status:** done
 
-- [ ] A helper mints an RS256 session token for ProductPort carrying the claim set the API enforces, including the ProductPort app role and the app's own audience
-- [ ] The token omits the session id claim on purpose, so it takes the stateless path rather than failing closed against a session row that does not exist
-- [ ] The keypair is generated locally and both halves live only in the gitignored local environment file; neither is committed
-- [ ] The helper refuses to mint when the private key or the issuer is missing, and the error names the missing variable
-- [ ] The helper verifies its own signature against the configured public key before returning, so a mismatched pair fails with a plain message instead of as a 401 three layers away
-- [ ] A test mounts the API's real auth middleware and proves the minted cookie authenticates on the stateless path and just-in-time upserts the user, with no session lookup
-- [ ] The test pins the helper's duplicated cookie name and audience literals against the API's own exports, so they cannot drift silently
-- [ ] The test proves the token satisfies the shared SSO claims schema, which the API runs in enforce mode
-- [ ] The test generates its own keypair rather than depending on local environment state
-- [ ] The full test suite is green
-- [ ] Running the helper from the command line prints a token that the running local API answers 200 for
+**Done:** 2026-09-07. `web/e2e/helpers/mint-session.cjs` ported from FinPort, retargeted to `productport_token` / `product_admin` wire role. `tests/e2e-mint-session.test.js` ported and green (mounts the real `requireAuth`, proves the stateless path, no `db.session.findUnique` call, literals pinned against the middleware's own exports). Full suite: 54 suites / 502 tests green. CLI mint verified against the running local API: `GET /api/auth/me` with the minted cookie → 200, JIT-upserted `product_admin` user. Local `.env` keypair generated and set (gitignored, not committed).
+
+- [x] A helper mints an RS256 session token for ProductPort carrying the claim set the API enforces, including the ProductPort app role and the app's own audience
+- [x] The token omits the session id claim on purpose, so it takes the stateless path rather than failing closed against a session row that does not exist
+- [x] The keypair is generated locally and both halves live only in the gitignored local environment file; neither is committed
+- [x] The helper refuses to mint when the private key or the issuer is missing, and the error names the missing variable
+- [x] The helper verifies its own signature against the configured public key before returning, so a mismatched pair fails with a plain message instead of as a 401 three layers away
+- [x] A test mounts the API's real auth middleware and proves the minted cookie authenticates on the stateless path and just-in-time upserts the user, with no session lookup
+- [x] The test pins the helper's duplicated cookie name and audience literals against the API's own exports, so they cannot drift silently
+- [x] The test proves the token satisfies the shared SSO claims schema, which the API runs in enforce mode
+- [x] The test generates its own keypair rather than depending on local environment state
+- [x] The full test suite is green
+- [x] Running the helper from the command line prints a token that the running local API answers 200 for
