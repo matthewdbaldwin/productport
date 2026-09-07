@@ -11,7 +11,7 @@ function csvRow(overrides = {}) {
     id: 'firehawk',
     name: 'Firehawk',
     subsidiary: 'MicroPort Cardiovascular',
-    therapeutic_area: 'Coronary and Structural Heart',
+    therapeutic_area: 'Comprehensive Cardiac Care',
     category: 'Drug-Eluting Stent',
     type: '  ',
     tagline: 'Target-eluting',

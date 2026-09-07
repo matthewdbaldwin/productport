@@ -7,7 +7,7 @@
 'use strict';
 const { validateProductWrite } = require('../src/lib/productWrite');
 
-const good = (o = {}) => ({ slug: 'firehawk', name: 'Firehawk', subsidiary: 'MicroPort Cardiovascular', therapeuticArea: 'Coronary and Structural Heart', ...o });
+const good = (o = {}) => ({ slug: 'firehawk', name: 'Firehawk', subsidiary: 'MicroPort Cardiovascular', therapeuticArea: 'Comprehensive Cardiac Care', ...o });
 
 describe('validateProductWrite — create (partial=false)', () => {
   test('accepts a minimal valid product and defaults status to ACTIVE', () => {

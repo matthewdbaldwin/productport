@@ -144,7 +144,7 @@ describe('shapeProduct — Prisma row → catalog contract', () => {
 describe('shapeProduct — clearance cert# + qualifier (WS2)', () => {
   test('carries certificateNumbers + qualifier through the contract', () => {
     const shaped = shapeProduct({
-      slug: 'x', name: 'X', subsidiary: 'S', therapeuticArea: 'Emergency and Critical Care',
+      slug: 'x', name: 'X', subsidiary: 'S', therapeuticArea: 'Robotics, Life Support, and Clinical AI',
       clearances: [
         { region: 'CE', status: 'APPROVED', certificateNumbers: 'CE-1', qualifier: 'CMD-only', notes: 'n' },
         { region: 'FDA', status: 'NONE', certificateNumbers: null, qualifier: null, notes: null },
