@@ -10,8 +10,13 @@
 // deliverable — so the operator starts the app once, by hand, and keeps the
 // run serial (fullyParallel: false, workers: 1 below).
 //
-// It reuses e2e/auth.setup.ts unchanged, so a capture signs in exactly the
-// way the test suite does — here that is ProductPort's three-host SSO flow.
+// Its own setup project points at e2e/capture.setup.ts, NOT the test suite's
+// e2e/auth.setup.ts: that file drives the hub's three-host SSO login form,
+// which needs a reachable HubPort IdP and a matching hub seed — neither
+// exists locally. capture.setup.ts mints a session directly instead, with
+// the throwaway keypair the local API is configured to trust (ticket 01),
+// and writes to the same ./e2e/.auth/<role>.json path the role projects
+// below already read.
 //
 // Role comes from the filename: <slug>.<role>.capture.ts.
 
@@ -127,7 +132,7 @@ export default defineConfig({
   projects: [
     // No video: these are Playwright's own setup tests, not capture
     // material, and there is nothing here worth recording or transcoding.
-    { name: 'setup', testMatch: /auth\.setup\.ts/, use: { ...browser, video: 'off' } },
+    { name: 'setup', testMatch: /capture\.setup\.ts/, use: { ...browser, video: 'off' } },
     ...ROLES.map((role) => ({
       name: role,
       testMatch: new RegExp(`help-captures/.*\\.${role}\\.capture\\.ts`),

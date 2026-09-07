@@ -8,14 +8,16 @@ The two proofs before writing state are the point of the ticket, not ceremony. O
 
 **Blocked by:** 01 (Mint a ProductPort session the API accepts).
 
-**Status:** ready-for-agent
+**Status:** done
 
-- [ ] A capture-only setup mints a session and writes Playwright storage state for the capture role
-- [ ] Before writing anything, the setup proves the API accepts the session: the identity endpoint answers 200 for the minted identity
-- [ ] Before writing anything, the setup proves the browser accepts it too: a browser holding the cookie lands on the base URL and the app's identity probe answers 200 with no bounce to login
-- [ ] The browser check compares origin, not host, because locally every app is on localhost and they differ only by port
-- [ ] When either proof fails, the setup fails loudly and writes no storage state
-- [ ] Only the help-capture Playwright config's setup project points at the new setup
-- [ ] The existing hub-login setup file is unchanged and the main config still uses it
-- [ ] The capture config's setup project goes green on a machine with no hub reachable
-- [ ] A capture spec depending on that setup starts in an authenticated session rather than on the login screen
+**Done:** 2026-09-07. `web/e2e/capture.setup.ts` added, mints via ticket 01's helper, proves both the API and the browser accept the session before writing storage state, writes to the same `./e2e/.auth/admin.json` path the capture config's role project already reads. Repointed only `playwright.help-capture.config.ts`'s setup project. `e2e/auth.setup.ts` untouched. Also narrowed `playwright.config.ts`'s own setup-project regex from `/.*\.setup\.ts/` to `/auth\.setup\.ts/`: the wildcard would otherwise have swept the new capture-only setup into the main suite too, and thrown there (no local keypair in that context), breaking every authenticated main-suite run. Verified end to end against the running local API and dev server: setup goes green with no hub reachable; a negative run (API down) fails loudly with no storage state written; `catalog-browse.admin.capture.ts` then runs starting from an authenticated session and produces a clip. Full suite still 54/54, 502/502.
+
+- [x] A capture-only setup mints a session and writes Playwright storage state for the capture role
+- [x] Before writing anything, the setup proves the API accepts the session: the identity endpoint answers 200 for the minted identity
+- [x] Before writing anything, the setup proves the browser accepts it too: a browser holding the cookie lands on the base URL and the app's identity probe answers 200 with no bounce to login
+- [x] The browser check compares origin, not host, because locally every app is on localhost and they differ only by port
+- [x] When either proof fails, the setup fails loudly and writes no storage state
+- [x] Only the help-capture Playwright config's setup project points at the new setup
+- [x] The existing hub-login setup file is unchanged and the main config still uses it
+- [x] The capture config's setup project goes green on a machine with no hub reachable
+- [x] A capture spec depending on that setup starts in an authenticated session rather than on the login screen
