@@ -37,6 +37,12 @@ concurrency:
 permissions:
   id-token: write
   contents: read
+  # Required by the "Verify CI is green for this commit" step below: an explicit
+  # permissions block sets every UNLISTED scope to none, and
+  # GET /repos/{repo}/actions/runs needs `actions: read`. Without this the gate
+  # 403s on every dispatch and fails closed -- which would push the operator
+  # straight to skip_ci_check, the exact override the gate exists to avoid.
+  actions: read
   packages: read
 
 env:
@@ -132,8 +138,14 @@ jobs:
           N=$(echo "$RUNS" | jq 'length')
           if [ "$N" -eq 0 ]; then
             echo "REFUSED: no CI run found for $SHA." >&2
-            echo "         Push the commit and let CI finish, or re-dispatch with" >&2
-            echo "         skip_ci_check=true if you are deliberately breaking glass." >&2
+            echo "         Two causes, and they need different responses:" >&2
+            echo "           * CI has not run yet     -> wait for it, then re-dispatch." >&2
+            echo "           * CI never runs for this commit, because ci.yml's" >&2
+            echo "             paths-ignore (docs/**, *.md, LICENSE, .gitignore," >&2
+            echo "             .env.example) skipped it -> there is nothing to wait" >&2
+            echo "             for; re-dispatch with skip_ci_check=true." >&2
+            echo "         Saying only \"wait for CI\" when the second case is true" >&2
+            echo "         trains the operator to reach for the override reflexively." >&2
             exit 1
           fi
           read -r ST CC URL <<<"$(echo "$RUNS" | jq -r \
