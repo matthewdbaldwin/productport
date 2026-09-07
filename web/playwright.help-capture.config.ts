@@ -26,14 +26,15 @@ import { RAW_DIR } from './e2e/help-captures/helpers/paths';
 const VIEWPORT = { width: 1280, height: 720 };
 
 // The roles this app records as. Each needs a matching e2e/.auth/<role>.json
-// produced by auth.setup.ts, and capture files named
+// produced by capture.setup.ts, and capture files named
 // e2e/help-captures/<slug>.<role>.capture.ts.
 //
-// ProductPort's harness produces `admin` alone (e2e/auth.setup.ts writes only
-// .auth/admin.json). Every authenticated employee is a catalog Viewer and the
-// admin session is a superset of that surface, so one role covers the library
-// today. Add entries here and the projects below follow without further edits,
-// but each new role needs its own auth.setup.ts state first.
+// ProductPort's harness produces `admin` alone (capture.setup.ts's PRINCIPALS
+// writes only .auth/admin.json). Every authenticated employee is a catalog
+// Viewer and the admin session is a superset of that surface, so one role
+// covers the library today. Add entries here and the projects below follow
+// without further edits, but each new role needs its own entry in
+// capture.setup.ts's PRINCIPALS first.
 const ROLES = ['admin'] as const;
 
 // ── Browser resolution ───────────────────────────────────────────────

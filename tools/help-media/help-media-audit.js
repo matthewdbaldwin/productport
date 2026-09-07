@@ -52,8 +52,8 @@ const fs   = require('fs');
 const path = require('path');
 const { CLIP_MAX_BYTES, CLIP_MAX_SECONDS, STILL_MAX_BYTES, durationSeconds } = require('./build.js');
 
-// help-media-audit.js -> tools/help-media -> repo root (one level shallower
-// than build.js's own REPO, since this file sits beside it, not under it).
+// help-media-audit.js and build.js are siblings, both directly under
+// tools/help-media/, so both resolve REPO the same two levels up.
 const REPO = path.resolve(__dirname, '..', '..');
 const WEB  = path.join(REPO, 'web');
 
@@ -188,7 +188,7 @@ for (const urlPath of referenced) {
     }
     const secs = durationSeconds(filePath);
     if (secs === null) {
-      add('warning', 'media-clip-duration-unreadable',
+      add('blocker', 'media-clip-duration-unreadable',
         `${urlPath} has no readable duration (ffmpeg produced no parseable Duration: line)`, urlPath);
     } else if (secs > CLIP_MAX_SECONDS) {
       add('blocker', 'media-clip-duration',

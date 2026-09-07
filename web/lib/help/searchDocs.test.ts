@@ -45,6 +45,20 @@ describe('buildSearchDocs', () => {
     expect(catalogBrowse.labels).toContain('Verify (dry run)');
   });
 
+  it('a media block\'s alt, caption, and labels reach the doc so help search can find it', () => {
+    const docs = buildSearchDocs('en-US');
+    const catalogBrowse = docs.find(d => d.slug === 'catalog-browse')!;
+    // alt/caption prose is unique to the media block, unlike 'Clear filters'
+    // below (also declared on three other blocks in this same article) —
+    // these two alone prove the media block itself was walked.
+    expect(catalogBrowse.body).toContain('Filtering the catalog by therapeutic area');
+    expect(catalogBrowse.body).toContain('The two facets stack');
+    // 'Clear filters' is declared on 4 blocks total (3 text blocks + this
+    // media block); a count of 4, not 3, is what proves the media block's
+    // own labels contributed rather than just the other three.
+    expect((catalogBrowse.labels ?? []).filter(l => l === 'Clear filters')).toHaveLength(4);
+  });
+
   it('the product-edit body keeps Clearance as the umbrella term', () => {
     const docs = buildSearchDocs('en-US');
     const productEdit = docs.find(d => d.slug === 'product-edit')!;

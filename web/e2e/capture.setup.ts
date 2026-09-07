@@ -66,33 +66,36 @@ for (const role of ROLES) {
 
     // 2. A browser holding it lands on the app, not on /login.
     const context = await browser.newContext({ baseURL: BASE_URL });
-    await context.addCookies([{
-      name: COOKIE_NAME,
-      value: token,
-      domain: base.hostname,
-      path: '/',
-      httpOnly: true,
-      secure: base.protocol === 'https:',
-      sameSite: 'Lax',
-      expires: expiresAt,
-    }]);
-    const page = await context.newPage();
-    // web/lib/api.ts's auto-logout brake only fires off a 401 whose path
-    // includes '/auth/me', so that probe's status is the decisive signal.
-    // Exact path: /api/auth/me/theme (web/lib/theme.ts) is a different call.
-    const probe = page.waitForResponse((r) => new URL(r.url()).pathname === '/api/auth/me');
-    const shell = await page.goto('/');
-    // Name a broken app shell as such. Without this, a 500 from the dev
-    // server (a stale .next cache does it) surfaces only as the probe
-    // timing out.
-    expect(shell?.status(), `GET / answered ${shell?.status()} — the app shell itself failed`).toBeLessThan(400);
-    expect((await probe).status()).toBe(200);
-    const landed = new URL(page.url());
-    expect(landed.origin).toBe(base.origin);
-    expect(landed.pathname).not.toMatch(/^\/login/);
+    try {
+      await context.addCookies([{
+        name: COOKIE_NAME,
+        value: token,
+        domain: base.hostname,
+        path: '/',
+        httpOnly: true,
+        secure: base.protocol === 'https:',
+        sameSite: 'Lax',
+        expires: expiresAt,
+      }]);
+      const page = await context.newPage();
+      // web/lib/api.ts's auto-logout brake only fires off a 401 whose path
+      // includes '/auth/me', so that probe's status is the decisive signal.
+      // Exact path: /api/auth/me/theme (web/lib/theme.ts) is a different call.
+      const probe = page.waitForResponse((r) => new URL(r.url()).pathname === '/api/auth/me');
+      const shell = await page.goto('/');
+      // Name a broken app shell as such. Without this, a 500 from the dev
+      // server (a stale .next cache does it) surfaces only as the probe
+      // timing out.
+      expect(shell?.status(), `GET / answered ${shell?.status()} — the app shell itself failed`).toBeLessThan(400);
+      expect((await probe).status()).toBe(200);
+      const landed = new URL(page.url());
+      expect(landed.origin).toBe(base.origin);
+      expect(landed.pathname).not.toMatch(/^\/login/);
 
-    fs.mkdirSync(AUTH_DIR, { recursive: true });
-    await context.storageState({ path: path.join(AUTH_DIR, `${role}.json`) });
-    await context.close();
+      fs.mkdirSync(AUTH_DIR, { recursive: true });
+      await context.storageState({ path: path.join(AUTH_DIR, `${role}.json`) });
+    } finally {
+      await context.close();
+    }
   });
 }

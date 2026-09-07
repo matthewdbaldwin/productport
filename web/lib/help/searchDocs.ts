@@ -22,6 +22,7 @@ function walk(blocks: HelpBlock[], body: string[], labels: string[]): void {
     else if (b.kind === 'list')  { body.push(...b.items); if (b.labels) labels.push(...b.labels); }
     else if (b.kind === 'steps') { body.push(...b.steps); if (b.labels) labels.push(...b.labels); }
     else if (b.kind === 'faq')   { b.items.forEach(qa => body.push(qa.q, qa.a)); if (b.labels) labels.push(...b.labels); }
+    else if (b.kind === 'media') { body.push(b.alt); if (b.caption) body.push(b.caption); if (b.labels) labels.push(...b.labels); }
     else if (b.kind === 'roleBlock') { walk(b.blocks, body, labels); }
   }
 }

@@ -74,22 +74,26 @@ const REPO_ROOT = path.resolve(__dirname, '..', '..', '..');
 
 // Mirror the API's dotenv load so a developer running the harness does not
 // have to export the API's secrets by hand. dotenv never overwrites a
-// variable that is already set. It resolves from the repo root's
-// node_modules (web/ has its own, separate node_modules and does not carry
-// its own dotenv dependency); if it is somehow absent, an exported env still
-// works.
+// variable that is already set. Node's resolution walks up from this file's
+// own directory, so it finds whichever dotenv comes first — today that's
+// web/node_modules' own copy (hoisted in via @sentry/nextjs, same 16.x line
+// as the root's), not the root's; if neither is present, an exported env
+// still works.
 try {
   require('dotenv').config({ path: path.join(REPO_ROOT, '.env') });
 } catch {
   /* env already exported is fine */
 }
 
-// Must match src/lib/cookies.js (cookie name) and src/middleware/auth.js
-// (AUDIENCE). Duplicated as literals rather than required from the API: those
-// modules pull in microport-auth and jwtTtl.js for the sake of one string
-// each, and tests/e2e-mint-session.test.js pins both against the API's own
-// exports so they cannot drift silently.
-const COOKIE_NAME = 'productport_token';
+// COOKIE_NAME is imported straight from the API's own src/lib/cookies.js —
+// that module only wraps microport-auth's createCookieHelpers + jwtTtl.js, so
+// requiring it here has no side effects (no DB connection, unlike
+// src/middleware/auth.js, which pulls in src/lib/db.js's eager PrismaClient
+// construction and would make this helper fail without a live DATABASE_URL).
+// AUDIENCE has no such safe seam — it lives only in src/middleware/auth.js —
+// so it stays a duplicated literal; tests/e2e-mint-session.test.js pins it
+// against the API's own export so it cannot drift silently.
+const { COOKIE_NAME } = require('../../../src/lib/cookies');
 const AUDIENCE = ['productport', 'microport-apps'];
 const APP = 'productport';
 // A hub session is eight hours; a capture run never needs more.

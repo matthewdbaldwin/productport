@@ -32,10 +32,28 @@ const pair = () => crypto.generateKeyPairSync('rsa', {
 });
 const { publicKey, privateKey } = pair();
 const ISSUER = 'https://sales-dev.microport.com';
+
+// Saved so afterAll below can restore these, rather than leak them into
+// whichever test file jest's shared worker process runs next — every other
+// productport test touching SSO_CLAIMS_MODE defaults to 'off'.
+const ORIGINAL_ENV = {
+  SALESPORT_JWT_ISSUER:     process.env.SALESPORT_JWT_ISSUER,
+  SALESPORT_JWT_PUBLIC_KEY: process.env.SALESPORT_JWT_PUBLIC_KEY,
+  E2E_JWT_PRIVATE_KEY:      process.env.E2E_JWT_PRIVATE_KEY,
+  SSO_CLAIMS_MODE:          process.env.SSO_CLAIMS_MODE,
+};
+
 process.env.SALESPORT_JWT_ISSUER     = ISSUER;
 process.env.SALESPORT_JWT_PUBLIC_KEY = Buffer.from(publicKey).toString('base64');
 process.env.E2E_JWT_PRIVATE_KEY      = Buffer.from(privateKey).toString('base64');
 process.env.SSO_CLAIMS_MODE          = 'enforce'; // exercise the real claims schema, not just the sig
+
+afterAll(() => {
+  for (const [key, value] of Object.entries(ORIGINAL_ENV)) {
+    if (value === undefined) delete process.env[key];
+    else process.env[key] = value;
+  }
+});
 
 const { requireAuth, COOKIE_NAME, AUDIENCE } = require('../src/middleware/auth');
 const db = require('../src/lib/db');
