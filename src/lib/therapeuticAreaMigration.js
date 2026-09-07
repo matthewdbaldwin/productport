@@ -68,10 +68,94 @@ function mapTherapeuticArea(therapeuticArea, category) {
   return null;
 }
 
+// ---------------------------------------------------------------------------
+// SQL projection of the rules above.
+//
+// The Prisma data migration is GENERATED from this table rather than restating
+// it, and tests/therapeuticAreaMigration.test.js regenerates it and fails on
+// drift. Without that, "single source of truth" is a comment rather than a
+// property: the CSV rewriter and the migration could silently disagree, and the
+// disagreement would only surface as mis-filed rows in prod.
+
+const MIGRATION_DIR = '20260906230000_therapeutic_areas_10_to_8';
+
+const sql = (v) => `'${String(v).replace(/'/g, "''")}'`;
+const update = (to, where) => `UPDATE "products" SET "therapeuticArea" = ${sql(to)} WHERE ${where};`;
+
+/**
+ * Render the Release 2 data migration. Deterministic — same rules in, same
+ * bytes out — so a test can assert the committed file still matches.
+ * @returns {string} the full contents of the migration.sql
+ */
+function buildMigrationSql() {
+  const out = [
+    '-- Release 2 of the 10 -> 8 therapeutic-area taxonomy migration: re-file the',
+    '-- catalog rows that already exist. Release 1 (the additive contract,',
+    '-- microport-contracts 0.21.0) is already live, so both vocabularies validate',
+    '-- and there is no window where the database holds values the write path',
+    '-- rejects. Design + rationale:',
+    '-- docs/superpowers/specs/2026-09-06-productport-therapeutic-area-taxonomy-design.md',
+    '--',
+    '-- GENERATED from src/lib/therapeuticAreaMigration.js, the same rule table the',
+    '-- seed-CSV rewriter uses. Do not hand-edit: tests/therapeuticAreaMigration.test.js',
+    '-- regenerates this file and fails if the two drift apart.',
+    '--',
+    '-- Prisma 7 + adapter-pg migrations are NOT transactional',
+    '-- (feedback_prisma7_non_transactional_migrations), so every statement stands',
+    '-- alone and is individually idempotent: each WHERE matches only retired',
+    '-- values, so a second run touches zero rows.',
+    '--',
+    '-- The three identity mappings are deliberately absent — those names survive',
+    '-- the migration unchanged, which is why 177 of the 417 rows are untouched by',
+    '-- design and the post-migration recount must expect that rather than read it',
+    '-- as a failure.',
+    '--',
+    '-- Soft-deleted rows are migrated too (no deletedAt filter): restoring one',
+    '-- must not resurrect a retired area.',
+    '',
+    '-- Rule 1 - RENAME. Destination depends only on the old area.',
+  ];
+
+  for (const [from, to] of Object.entries(RENAME)) {
+    if (from === to) continue; // identity: nothing to write
+    out.push(update(to, `"therapeuticArea" = ${sql(from)}`));
+  }
+
+  out.push(
+    '',
+    `-- Rule 2 - SPLIT. ${SPLIT_SOURCE} retires with no successor and splits on`,
+    '-- category. It is the only area needing row-level logic.',
+  );
+  for (const [category, to] of Object.entries(SPLIT_BY_CATEGORY)) {
+    out.push(update(to, `"therapeuticArea" = ${sql(SPLIT_SOURCE)} AND "category" = ${sql(category)}`));
+  }
+
+  out.push(
+    '',
+    '-- Guard. Mirrors mapTherapeuticArea returning null rather than guessing: a row',
+    '-- still sitting in the retired area is uncategorised, or carries a category the',
+    '-- split table has never seen. Stop the deploy rather than strand it silently.',
+    'DO $$',
+    'DECLARE',
+    '  stranded INTEGER;',
+    'BEGIN',
+    `  SELECT count(*) INTO stranded FROM "products" WHERE "therapeuticArea" = ${sql(SPLIT_SOURCE)};`,
+    '  IF stranded > 0 THEN',
+    `    RAISE EXCEPTION 'therapeutic-area migration: % row(s) still hold the retired area ${SPLIT_SOURCE}. Their category is missing, or absent from SPLIT_BY_CATEGORY in src/lib/therapeuticAreaMigration.js.', stranded;`,
+    '  END IF;',
+    'END $$;',
+    '',
+  );
+
+  return out.join('\n');
+}
+
 module.exports = {
   NEW_THERAPEUTIC_AREAS,
   RENAME,
   SPLIT_SOURCE,
   SPLIT_BY_CATEGORY,
   mapTherapeuticArea,
+  MIGRATION_DIR,
+  buildMigrationSql,
 };

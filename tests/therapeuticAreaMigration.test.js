@@ -10,7 +10,10 @@ const {
   NEW_THERAPEUTIC_AREAS,
   RENAME,
   SPLIT_SOURCE,
+  SPLIT_BY_CATEGORY,
   mapTherapeuticArea,
+  MIGRATION_DIR,
+  buildMigrationSql,
 } = require('../src/lib/therapeuticAreaMigration');
 const { THERAPEUTIC_AREAS } = require('../src/lib/therapeuticAreas');
 
@@ -76,5 +79,88 @@ describe('therapeutic-area migration rules', () => {
     ]) {
       expect(mapTherapeuticArea(kept)).toBe(kept);
     }
+  });
+});
+
+// Apply the migration's UPDATEs the way Postgres would: in file order, each one
+// rewriting every row its WHERE matches. Only the two statement shapes this
+// migration emits are understood — an unrecognised one throws rather than being
+// silently skipped, which would make the whole simulation vacuously pass.
+const UPDATE_RE = /^UPDATE "products" SET "therapeuticArea" = '(.+?)' WHERE "therapeuticArea" = '(.+?)'(?: AND "category" = '(.+?)')?;$/;
+
+function applyMigration(rows) {
+  const statements = buildMigrationSql().split('\n').filter((l) => l.startsWith('UPDATE '));
+  expect(statements.length).toBeGreaterThan(0);
+  for (const statement of statements) {
+    const m = UPDATE_RE.exec(statement);
+    if (!m) throw new Error(`unsupported statement shape: ${statement}`);
+    const [, to, fromArea, fromCategory] = m;
+    for (const row of rows) {
+      if (row.therapeuticArea !== fromArea) continue;
+      if (fromCategory !== undefined && row.category !== fromCategory) continue;
+      row.therapeuticArea = to;
+    }
+  }
+  return rows;
+}
+
+describe('the Prisma data migration (Release 2)', () => {
+  const migrationSql = () =>
+    fs.readFileSync(path.join(__dirname, '..', 'prisma', 'migrations', MIGRATION_DIR, 'migration.sql'), 'utf8');
+
+  test('the committed migration still matches the rule table', () => {
+    // The migration is a PROJECTION of the rules, not a second copy of them.
+    // Edit one side only and this is what catches it; without it the two would
+    // first disagree in prod, as mis-filed rows nobody is looking for.
+    expect(migrationSql()).toBe(buildMigrationSql());
+  });
+
+  test('the SQL agrees with mapTherapeuticArea on every input the rules define', () => {
+    // Byte-equality above proves the file matches the generator. This proves the
+    // generator matches the function the CSV rewriter and seed data were built
+    // from — otherwise both could be self-consistently wrong.
+    const inputs = [
+      ...Object.keys(RENAME).map((therapeuticArea) => ({ therapeuticArea, category: null })),
+      ...Object.keys(SPLIT_BY_CATEGORY).map((category) => ({ therapeuticArea: SPLIT_SOURCE, category })),
+      // Already-migrated rows must survive a re-run untouched.
+      ...NEW_THERAPEUTIC_AREAS.map((therapeuticArea) => ({ therapeuticArea, category: null })),
+    ];
+    const expected = inputs.map((r) => mapTherapeuticArea(r.therapeuticArea, r.category));
+    const actual = applyMigration(inputs.map((r) => ({ ...r }))).map((r) => r.therapeuticArea);
+    expect(actual).toEqual(expected);
+  });
+
+  test('no statement can re-update a row an earlier one already moved', () => {
+    // Sequential UPDATEs cascade if any target is also a later WHERE value — a
+    // row would land two areas past where the rules put it. It is not true here,
+    // and this is what keeps it true as the table grows.
+    const sql = buildMigrationSql();
+    const targets = new Set([...sql.matchAll(/SET "therapeuticArea" = '([^']+)'/g)].map((m) => m[1]));
+    const sources = [...sql.matchAll(/WHERE "therapeuticArea" = '([^']+)'/g)].map((m) => m[1]);
+    expect(sources.filter((s) => targets.has(s))).toEqual([]);
+  });
+
+  test('never names a surviving area in a WHERE — the 177 untouched rows stay untouched', () => {
+    const sources = [...buildMigrationSql().matchAll(/WHERE "therapeuticArea" = '([^']+)'/g)].map((m) => m[1]);
+    for (const kept of [
+      'Orthopedic Joint, Spine, and Trauma',
+      'Urology, Oncology, and Gastroenterology',
+      'Endocrinology and Reproductive Health',
+    ]) {
+      expect(sources).not.toContain(kept);
+    }
+  });
+
+  test('writes only values the shipped vocabulary accepts', () => {
+    const targets = [...buildMigrationSql().matchAll(/SET "therapeuticArea" = '([^']+)'/g)].map((m) => m[1]);
+    expect([...new Set(targets)].filter((t) => !THERAPEUTIC_AREAS.includes(t))).toEqual([]);
+  });
+
+  test('refuses to finish with rows stranded in the retired split area', () => {
+    // The SQL counterpart of mapTherapeuticArea returning null: an uncategorised
+    // row would otherwise be left holding a value Release 3 will reject.
+    const sql = buildMigrationSql();
+    expect(sql).toContain(`SELECT count(*) INTO stranded FROM "products" WHERE "therapeuticArea" = '${SPLIT_SOURCE}';`);
+    expect(sql).toContain('RAISE EXCEPTION');
   });
 });
