@@ -13,7 +13,7 @@
 //      install (the Prisma-7 bare-client trap, feedback_prisma7_bare_client_trap).
 //      The schema is the source of truth the client is generated FROM, so
 //      parsing it gives the same guarantee, CI-safe.
-//   2. THERAPEUTIC_AREAS is golden-pinned to the exact canonical 10, so a
+//   2. THERAPEUTIC_AREAS is golden-pinned to the exact canonical 8, so a
 //      contract-side edit that drifts the catalog's areas becomes a RED TEST
 //      here, not a silently-changed filter.
 //
@@ -54,17 +54,17 @@ const {
 
 const available = Array.isArray(THERAPEUTIC_AREAS) && Array.isArray(CLEARANCE_STATUSES);
 
-const CANONICAL_10 = [
-  'Coronary and Structural Heart',
-  'Heart Failure and Electrophysiology',
-  'Aortic and Peripheral Vasculature',
-  'Robotic Surgery, AI, and Telesurgery',
-  'Neurovascular and Brain-Computer Interfaces',
+// The golden pin. Replaced the canonical 10 on 2026-09-06 (contracts 0.21.0);
+// a contract-side edit that drifts the catalog's areas is a RED TEST here.
+const CANONICAL_8 = [
+  'Comprehensive Cardiac Care',
+  'Aortic and Peripheral Vascular Intervention',
+  'Robotics, Life Support, and Clinical AI',
+  'Neuroscience and Neural Interfaces',
   'Orthopedic Joint, Spine, and Trauma',
   'Urology, Oncology, and Gastroenterology',
-  'Emergency and Critical Care',
   'Endocrinology and Reproductive Health',
-  'Regenerative Medicine and Medical Aesthetics',
+  'Advanced Biotechnology and Medical Aesthetics',
 ];
 
 (available ? describe : describe.skip)('vocabulary contract — productport', () => {
@@ -79,8 +79,8 @@ const CANONICAL_10 = [
     }
   });
 
-  test('THERAPEUTIC_AREAS is the golden canonical 10 (order included)', () => {
-    expect(THERAPEUTIC_AREAS).toEqual(CANONICAL_10);
+  test('THERAPEUTIC_AREAS is the golden canonical 8 (order included)', () => {
+    expect(THERAPEUTIC_AREAS).toEqual(CANONICAL_8);
   });
 
   test('the local therapeuticAreas module re-exports the contract (one definition)', () => {

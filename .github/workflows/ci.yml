@@ -13,6 +13,24 @@ on:
 # proceed unless that commit's CI run is green. feedback_deploy_does_not_gate_on_ci.
 
 jobs:
+  # ── Build-secret guard ───────────────────────────────────────────────────
+  # Fails the build if a credential can reach a shipped image, via any of:
+  #   ENV FOO_TOKEN=...     persists into the final image config
+  #   ARG FOO_TOKEN         recorded in `docker history`
+  #   --build-arg FOO_TOKEN=...   the workflow side of the same leak
+  # On 2026-09-06 all 9 fleet repos were found publishing a live GitHub
+  # Packages token (7 of them a Sentry token too) in their ECR images by
+  # exactly those routes. Fixing them was a one-time cleanup; this job is what
+  # turns it into an invariant. Pure grep — no Node, no install, seconds.
+  build-secrets:
+    name: Build-secret guard
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v7
+      - name: No credentials in ENV / ARG / --build-arg
+        run: ./scripts/check-build-secrets.sh
+
   api:
     runs-on: ubuntu-latest
     steps:
@@ -56,3 +74,59 @@ jobs:
       - run: npm run build
         env:
           NODE_AUTH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  # ── Public E2E smoke ─────────────────────────────────────────────────────
+  # Wired up 2026-09-06. This repo already shipped a Playwright config, an
+  # `e2e` script and smoke specs, but ci.yml never referenced any of them, so
+  # those specs were green by never running — the one failure mode a passing
+  # test report cannot show you.
+  #
+  # main/PR only: the browser download is the expensive part, and the
+  # 2026-05-19 spend decision keeps costly jobs off develop pushes.
+  #
+  # Runs ONLY the `public` project. The config's other projects (`setup` +
+  # `chromium`) authenticate and need a real API and a seeded DB; `public` is
+  # signed-out by construction and inherits no storageState. EngagePort's
+  # golden-path.spec.ts self-skips without D2_LEGAL_ENTITY_ID / D2_CONTRACT_ID,
+  # so it stays out of CI on its own.
+  #
+  # Deliberately does NOT stand up Postgres and the API, unlike the e2e-public
+  # job in opsport/reviewport/clinicport/execport. Verified locally 2026-09-06:
+  # the smoke spec drives /login?sso_err=no_role, which dead-ends in the
+  # loop-guard with no backend — it logs an ECONNREFUSED proxying /api/auth/me
+  # and still passes (1 passed, ~17s, web dev server only). A database and an
+  # API boot here would buy nothing and cost minutes on every run.
+  e2e-public:
+    name: E2E public smoke
+    if: github.ref != 'refs/heads/develop'
+    needs: web
+    runs-on: ubuntu-latest
+    # A hung Playwright job otherwise burns the runner's 6h default, which is
+    # the opposite of the spend discipline this job is gated for.
+    timeout-minutes: 15
+    defaults:
+      run:
+        working-directory: web
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 22
+          registry-url: https://npm.pkg.github.com
+      - run: npm ci
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      - run: npx playwright install --with-deps chromium
+      - name: Run public smoke
+        run: npm run e2e:public
+        env:
+          CI: true
+          NODE_AUTH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      - name: Upload Playwright artifacts on failure
+        if: failure()
+        uses: actions/upload-artifact@v7
+        with:
+          name: playwright-productport
+          path: web/test-results/
+          retention-days: 7
+          if-no-files-found: ignore

@@ -47,7 +47,7 @@ const csvImport: HelpArticleContent = {
       id: 'row-rules', heading: 'What each row must contain',
       blocks: [
         { kind: 'list', items: [
-          'id, name, subsidiary and therapeutic_area are required. therapeutic_area must be one of the ten canonical names, spelled exactly as in the export.',
+          'id, name, subsidiary and therapeutic_area are required. therapeutic_area must be one of the eight canonical names, spelled exactly as in the export.',
           'The market columns fda, ce, nmpa, pmda and tga accept cleared or approved, in progress, submitted, not cleared, and blank or none. Any other word silently becomes none, and Verify (dry run) will not flag it, so a typo such as clearred erases that market’s status.',
           'Each *_qualifier must be blank or one of CMD-only, CE-invalid, agent, pending, recently-approved. Each *_cert is pipe-separated (CE-100|CE-200), up to 1000 characters.',
           'tier accepts 1, Tier 1, TIER1 and similar spellings; classification accepts CORE, HIPO, FLAGSHIP and a few spelled-out forms. An unknown word in either silently becomes blank, which on an update keeps the existing value.',
