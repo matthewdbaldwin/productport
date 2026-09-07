@@ -201,4 +201,11 @@ function main() {
   }
 }
 
-main();
+// Exported so help-media-audit.js can enforce the SAME limits against
+// already-built files, rather than duplicating the numbers and risking the
+// two silently disagreeing. Guarding main() behind require.main keeps
+// `require('./build.js')` side-effect-free — only `node build.js` /
+// `npm run help:media` (both set require.main === module) actually builds.
+module.exports = { CLIP_MAX_BYTES, CLIP_MAX_SECONDS, STILL_MAX_BYTES, durationSeconds };
+
+if (require.main === module) main();

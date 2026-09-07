@@ -41,6 +41,9 @@ cd web && API_ORIGIN=http://localhost:<port> npm run dev   # web on :3100
 # 3. In a third shell:
 cd web && npm run help:capture   # writes tools/help-media/.out/<slug>/*
 cd .. && npm run help:media      # writes web/public/help-media/<slug>/*
+
+# 4. Check the wiring and re-check the gates against what actually landed:
+npm run help:media:audit
 ```
 
 Step 3's `help:capture` signs in via `e2e/capture.setup.ts`, which mints a
@@ -75,6 +78,20 @@ most 200,000 bytes. Posters keep the clip's 1280 width and are always JPEG, beca
 poster is what a reduced-motion reader sees instead of the video. Standalone stills
 downscale to 1024 wide and stay PNG unless a sidecar asks for JPEG. Over a limit the
 build exits non-zero and names the file and the fix.
+
+## Auditing what's already built
+
+`npm run help:media:audit` (`help-media-audit.js`, ported from OpsPort's
+script of the same name) is a read-only check, separate from the build: every
+media block in `web/lib/help/content/*.ts` resolves to a real same-origin
+file, carries alt text, and a clip carries a poster; translated twins (`.fr`,
+`.zh`) show the same assets as the original; nothing is committed under
+`web/public/help-media/` that no article references (a warning, not a
+blocker — staging ahead of an article is fine); and every referenced clip and
+poster still fits the Gates above, re-checked against the file on disk rather
+than assumed from the last build. Full rationale, including why this file
+lives here rather than in `scripts/` alongside `help-audit.js`, is in its own
+header. Exits 1 on any blocker.
 
 ## Encoder settings
 
