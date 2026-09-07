@@ -9,6 +9,13 @@ const catalogBrowse: HelpArticleContent = {
     {
       id: 'page-layout', heading: 'La page du catalogue en un coup d’œil',
       blocks: [
+        { kind: 'media',
+          src: '/help-media/catalog-browse/filter-and-search.mp4',
+          poster: '/help-media/catalog-browse/filter-and-search.jpg',
+          width: 1280, height: 720,
+          alt: 'Filtrage du catalogue par domaine thérapeutique puis par marché, réinitialisation des filtres, puis recherche textuelle et ouverture de la vue détaillée d’un produit.',
+          caption: 'Les deux filtres se cumulent : ajouter un filtre de marché après un filtre de domaine thérapeutique réduit encore le nombre de résultats plutôt que de le remplacer.',
+          labels: ['Clear filters'] },
         { kind: 'list', items: [
           'Barre supérieure : la zone de recherche, une pastille verte indiquant le nombre de produits chargés (elle affiche Loading… en attendant), le sélecteur d’applications et le bouton Profil.',
           'Volet des filtres : Therapeutic area (domaine thérapeutique), Subsidiary (filiale), Regulatory (réglementaire) et Category (catégorie), dans cet ordre.',

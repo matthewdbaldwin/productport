@@ -22,7 +22,7 @@ const { parseProductRow } = require('../src/lib/productRow');
 
 const good = (o = {}) => ({
   slug: 'firehawk', name: 'Firehawk', subsidiary: 'MicroPort Cardiovascular',
-  therapeuticArea: 'Coronary and Structural Heart', ...o,
+  therapeuticArea: 'Comprehensive Cardiac Care', ...o,
 });
 
 // The shape actually found in prod: newline-separated, no pipes.
@@ -101,7 +101,7 @@ describe('parseProductRow — the CSV import path normalises the same way', () =
   // NB the CSV contract keys the slug as `id`, not `slug` (productRow.js:34).
   const row = (o = {}) => ({
     id: 'firehawk', name: 'Firehawk', subsidiary: 'MicroPort Cardiovascular',
-    therapeutic_area: 'Coronary and Structural Heart', ...o,
+    therapeutic_area: 'Comprehensive Cardiac Care', ...o,
   });
 
   test('a newline-separated CSV cell is normalised to pipes', () => {

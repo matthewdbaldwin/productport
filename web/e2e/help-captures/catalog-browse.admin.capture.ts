@@ -10,8 +10,8 @@
 // A screenshot of the filter bar cannot convey that the facets stack; watching
 // the number fall does.
 //
-// Role: admin. auth.setup.ts produces .auth/admin.json alone, and admin is a
-// superset of the Viewer surface this article describes — the extra Add
+// Role: admin. capture.setup.ts produces .auth/admin.json alone, and admin is
+// a superset of the Viewer surface this article describes — the extra Add
 // product / Import / Export chrome sits in the toolbar but is not driven here.
 //
 // Seed data: the committed catalog snapshot, `node prisma/seed.js` against a

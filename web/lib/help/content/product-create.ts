@@ -22,7 +22,7 @@ const productCreate: HelpArticleContent = {
       blocks: [
         { kind: 'paragraph', text: 'The grid at the top holds the short fields; the full-width fields under it hold the longer text. Required fields carry a red asterisk. Blank optional fields are stored empty.' },
         { kind: 'list', items: [
-          'Name, Slug (url key), Subsidiary and Therapeutic area are required. Subsidiary is free text; Therapeutic area is a dropdown of the ten canonical areas.',
+          'Name, Slug (url key), Subsidiary and Therapeutic area are required. Subsidiary is free text; Therapeutic area is a dropdown of the eight canonical areas.',
           'Slug (url key) must be lowercase letters, digits and hyphens. It becomes the product’s link (/?product=<slug>) and its id column in CSV, and a slug that is already in use is refused, so choose something short and stable.',
         ], labels: ['Name', 'Slug (url key)', 'Subsidiary', 'Therapeutic area'] },
         { kind: 'list', items: [

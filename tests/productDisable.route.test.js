@@ -35,7 +35,7 @@ const SUPER = { id: 3, email: 'su@microport.com', role: 'viewer', isSuperuser: t
 // Minimal product row that shapeProduct() (real, not mocked) can serialize.
 const prod = (over = {}) => ({
   id: 7, slug: 'latent-perit', name: 'Latent Perit', subsidiary: 'MicroPort Surgical',
-  therapeuticArea: 'Emergency and Critical Care', status: 'ACTIVE', disabledAt: null, ...over,
+  therapeuticArea: 'Robotics, Life Support, and Clinical AI', status: 'ACTIVE', disabledAt: null, ...over,
 });
 
 beforeEach(() => {

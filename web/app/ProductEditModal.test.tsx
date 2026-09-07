@@ -42,7 +42,7 @@ const initial = {
   slug: 'dnfinity115',
   name: 'Dnfinity115',
   subsidiary: 'MicroPort',
-  therapeuticArea: 'Emergency and Critical Care',
+  therapeuticArea: 'Robotics, Life Support, and Clinical AI',
 };
 
 const renderModal = (onSaved = vi.fn()) =>

@@ -17,11 +17,20 @@ describe('therapeuticAreas', () => {
     expect(isTherapeuticArea(null)).toBe(false);
   });
 
-  test('TRANSITIONAL: a retired area still validates, so un-migrated rows keep working', () => {
-    // Remove this test together with RETIRED_THERAPEUTIC_AREAS, once the prod
-    // data migration has run. Until then, dropping it would hide the very
-    // window it exists to protect.
-    expect(isTherapeuticArea('Coronary and Structural Heart')).toBe(true);
-    expect(THERAPEUTIC_AREAS).not.toContain('Coronary and Structural Heart');
+  test('the retired areas are rejected now the prod migration has run', () => {
+    // Was the mirror image of this until contracts 0.22.0: while ProductPort's
+    // rows were being re-filed a retired name had to keep validating, or every
+    // edit touching an un-migrated row 400d. The migration ran in prod on
+    // 2026-09-06, so accepting one would now only let a stale CSV put the old
+    // vocabulary back.
+    for (const retired of [
+      'Coronary and Structural Heart',
+      'Heart Failure and Electrophysiology',
+      'Emergency and Critical Care',
+      'Regenerative Medicine and Medical Aesthetics',
+    ]) {
+      expect(isTherapeuticArea(retired)).toBe(false);
+      expect(THERAPEUTIC_AREAS).not.toContain(retired);
+    }
   });
 });

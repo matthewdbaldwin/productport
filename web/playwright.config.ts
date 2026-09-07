@@ -43,8 +43,16 @@ export default defineConfig({
 
   projects: [
     {
+      // Narrowed to auth.setup.ts specifically (was /.*\.setup\.ts/) once
+      // e2e/capture.setup.ts landed: that file mints a session directly and
+      // throws if the local-only E2E_JWT_PRIVATE_KEY/SALESPORT_JWT_ISSUER
+      // aren't set, which is never true in CI or against a live mesh — the
+      // broad wildcard would have swept it into this project and failed the
+      // whole 'setup' step (and everything depending on it) on every
+      // authenticated run. capture.setup.ts runs only under
+      // playwright.help-capture.config.ts's own 'setup' project.
       name: 'setup',
-      testMatch: /.*\.setup\.ts/,
+      testMatch: /auth\.setup\.ts/,
       use: { ...browser },
     },
     {

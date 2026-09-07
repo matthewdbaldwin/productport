@@ -7,7 +7,7 @@ const { serializeProductRow, EXPORT_COLUMNS } = require('../src/lib/serializePro
 const { parseProductRow } = require('../src/lib/productRow');
 
 const product = {
-  slug: 'firehawk', name: 'Firehawk', subsidiary: 'MicroPort CV', therapeuticArea: 'Coronary and Structural Heart',
+  slug: 'firehawk', name: 'Firehawk', subsidiary: 'MicroPort CV', therapeuticArea: 'Comprehensive Cardiac Care',
   category: 'DES', type: 'Stent', tagline: 'Target-eluting', overview: 'o', features: 'a|b',
   indication: 'ind', patientPopulation: 'pp', specs: 'len: 3', regNotes: 'rn', image: 'firehawk.jpg',
   tier: 'TIER1', classification: 'CORE', businessSegment: 'Cardio', applicableDepartments: 'Cath Lab|ICU',
@@ -25,7 +25,7 @@ describe('serializeProductRow', () => {
   test('emits the seed CSV columns (id from slug) + the new dimension columns', () => {
     const row = serializeProductRow(product, clearances);
     expect(row.id).toBe('firehawk');
-    expect(row.therapeutic_area).toBe('Coronary and Structural Heart');
+    expect(row.therapeutic_area).toBe('Comprehensive Cardiac Care');
     expect(row.tier).toBe('TIER1');
     expect(row.classification).toBe('CORE');
     expect(row.business_segment).toBe('Cardio');

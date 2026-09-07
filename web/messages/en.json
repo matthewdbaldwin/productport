@@ -63,6 +63,8 @@
     "searchPlaceholder": "Search help…",
     "noArticles": "No help articles are available yet.",
     "helpLabel": "Help",
+    "mediaPlay": "Play",
+    "mediaPause": "Pause",
     "resultCount": "{count, plural, one {# result} other {# results}}",
     "noResultsFor": "No results for \"{query}\".",
     "didYouMean": "Did you mean…",

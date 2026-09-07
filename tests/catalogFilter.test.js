@@ -48,19 +48,6 @@ describe('orderedAreas', () => {
     ]);
   });
 
-  test('TRANSITIONAL: a not-yet-migrated area still appears, sorted after the curated 8', () => {
-    // This is what makes the 10 -> 8 migration safe to run while the catalog is
-    // live: a product still carrying a retired area is never dropped from the
-    // facet list, it just loses its curated position. Remove alongside
-    // RETIRED_THERAPEUTIC_AREAS once prod is migrated.
-    const products = [
-      product({ id: '1', therapeuticArea: 'Comprehensive Cardiac Care' }),
-      product({ id: '2', therapeuticArea: 'Coronary and Structural Heart' }), // retired
-    ];
-    expect(orderedAreas(products)).toEqual([
-      'Comprehensive Cardiac Care', 'Coronary and Structural Heart',
-    ]);
-  });
   test('de-duplicates and returns [] for no products', () => {
     expect(orderedAreas([])).toEqual([]);
     const dups = [product({ id: '1' }), product({ id: '2' })]; // both Coronary

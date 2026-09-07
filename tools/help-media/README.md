@@ -21,17 +21,39 @@ cd tools/help-media && npm install
 ## Use
 
 ```bash
-# 1. Local database with the committed catalog snapshot (417 products).
+# 0. Repo root .env needs, all local-only (see the README's env var table and
+#    web/e2e/helpers/mint-session.cjs's header for the one-liner that
+#    generates the keypair): DATABASE_URL, IDP_API_URL (placeholder is fine —
+#    nothing here dials it), SALESPORT_JWT_ISSUER, SALESPORT_JWT_PUBLIC_KEY,
+#    E2E_JWT_PRIVATE_KEY.
+
+# 1. A local Postgres, migrated (`npx prisma migrate dev` from the repo
+#    root — see the main README's Local development section) and seeded
+#    with the committed catalog snapshot (417 products) DATABASE_URL points
+#    at:
 DATABASE_URL=postgres://…localhost… node prisma/seed.js
 
-# 2. Bring the app up BY HAND and leave it up. The capture config has no
-#    webServer on purpose — recording does not parallelise.
-cd web && npm run dev            # next dev -p 3100
+# 2. Bring the API and the web app up BY HAND and leave them up. The capture
+#    config has no webServer on purpose — recording does not parallelise.
+node src/server.js                             # API on :4006 (or $PORT)
+cd web && API_ORIGIN=http://localhost:<port> npm run dev   # web on :3100
 
-# 3. In a second shell:
+# 3. In a third shell:
 cd web && npm run help:capture   # writes tools/help-media/.out/<slug>/*
 cd .. && npm run help:media      # writes web/public/help-media/<slug>/*
+
+# 4. Check the wiring and re-check the gates against what actually landed:
+npm run help:media:audit
 ```
+
+Step 3's `help:capture` signs in via `e2e/capture.setup.ts`, which mints a
+session directly with the local keypair from step 0 — no HubPort IdP needed,
+and no browser login form driven. It writes `e2e/.auth/admin.json`, then each
+`*.admin.capture.ts` spec in `e2e/help-captures/` runs against that session.
+See that file's header for the full rationale (ProductPort has no login of
+its own; this is not a backdoor — nothing here runs in the server process,
+and a token minted this way is rejected by any API not deliberately
+configured to trust this keypair, i.e. every deployed one).
 
 On this devbox `npx playwright install chromium` hard-fails on Ubuntu 26.04, so the
 capture run needs the same browser escape hatch the e2e suite uses — either
@@ -56,6 +78,20 @@ most 200,000 bytes. Posters keep the clip's 1280 width and are always JPEG, beca
 poster is what a reduced-motion reader sees instead of the video. Standalone stills
 downscale to 1024 wide and stay PNG unless a sidecar asks for JPEG. Over a limit the
 build exits non-zero and names the file and the fix.
+
+## Auditing what's already built
+
+`npm run help:media:audit` (`help-media-audit.js`, ported from OpsPort's
+script of the same name) is a read-only check, separate from the build: every
+media block in `web/lib/help/content/*.ts` resolves to a real same-origin
+file, carries alt text, and a clip carries a poster; translated twins (`.fr`,
+`.zh`) show the same assets as the original; nothing is committed under
+`web/public/help-media/` that no article references (a warning, not a
+blocker — staging ahead of an article is fine); and every referenced clip and
+poster still fits the Gates above, re-checked against the file on disk rather
+than assumed from the last build. Full rationale, including why this file
+lives here rather than in `scripts/` alongside `help-audit.js`, is in its own
+header. Exits 1 on any blocker.
 
 ## Encoder settings
 

@@ -9,6 +9,13 @@ const catalogBrowse: HelpArticleContent = {
     {
       id: 'page-layout', heading: 'The catalog page at a glance',
       blocks: [
+        { kind: 'media',
+          src: '/help-media/catalog-browse/filter-and-search.mp4',
+          poster: '/help-media/catalog-browse/filter-and-search.jpg',
+          width: 1280, height: 720,
+          alt: 'Filtering the catalog by therapeutic area and then by market, clearing the filters, then searching by text and opening a product’s detail view.',
+          caption: 'The two facets stack: adding a market filter after a therapeutic-area filter narrows the count further rather than replacing it.',
+          labels: ['Clear filters'] },
         { kind: 'list', items: [
           'Top bar: the search box, a green pill showing how many products loaded (it reads Loading… until then), the app switcher and the Profile button.',
           'Filter rail: Therapeutic area, Subsidiary, Regulatory and Category, in that order.',

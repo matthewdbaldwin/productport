@@ -38,10 +38,18 @@ import en from '@/messages/en.json';
 import zh from '@/messages/zh.json';
 import fr from '@/messages/fr.json';
 
-const HELP_CHROME: Record<HelpLocale, { helpLabel: string }> = { en: en.help, zh: zh.help, fr: fr.help };
+// mediaPlay/mediaPause feed MediaFigure's clip controls. They are supplied even
+// though ProductPort ships no help media yet: the shared lib falls back to its
+// own English defaults when a label is absent, so a missing key here surfaces as
+// an English Play/Pause button sitting on an otherwise translated zh/fr page —
+// silently, since Partial<HelpViewStrings> makes the omission typecheck.
+// OpsPort shipped clips with exactly that gap.
+const HELP_CHROME: Record<HelpLocale, { helpLabel: string; mediaPlay: string; mediaPause: string }> =
+  { en: en.help, zh: zh.help, fr: fr.help };
 
 function helpViewStrings(locale: string): Partial<HelpViewStrings> {
-  return { help: HELP_CHROME[normalizeLocale(locale)].helpLabel };
+  const chrome = HELP_CHROME[normalizeLocale(locale)];
+  return { help: chrome.helpLabel, mediaPlay: chrome.mediaPlay, mediaPause: chrome.mediaPause };
 }
 
 // Full codes, so localizedSections normalises them the same way getHelpContent

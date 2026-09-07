@@ -75,6 +75,29 @@ jobs:
         env:
           NODE_AUTH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
+  # ── Help Library media gate ──────────────────────────────────────────────
+  # Pairs every `kind: 'media'` block in web/lib/help/content/*.ts with a real
+  # file under web/public/help-media/ — nothing typechecks those strings, so a
+  # renamed clip or a translated twin left on an old path fails only in the
+  # browser, where a <video> whose src 404s just sits on its poster and looks
+  # fine. Its own job so a failure earlier in another job can't mask it.
+  #
+  # Unlike the satellite template's version of this script, this one needs
+  # `npm ci` first: help-media-audit.js requires build.js, which requires
+  # ffmpeg-static to check clip duration — so simply loading the script 404s
+  # on the module without tools/help-media's own deps installed. Scoped to
+  # that directory's own package-lock.json, not the repo root's.
+  help-media:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 22
+      - run: npm ci
+        working-directory: tools/help-media
+      - run: npm run help:media:audit
+
   # ── Public E2E smoke ─────────────────────────────────────────────────────
   # Wired up 2026-09-06. This repo already shipped a Playwright config, an
   # `e2e` script and smoke specs, but ci.yml never referenced any of them, so

@@ -37,7 +37,7 @@ function csv(columns, values = {}) {
   const row = columns.map((c) => (values[c] ?? '')).join(',');
   return `${header}\n${row}`;
 }
-const VALID = { id: 'firehawk', name: 'Firehawk', subsidiary: 'MicroPort CV', therapeutic_area: 'Coronary and Structural Heart' };
+const VALID = { id: 'firehawk', name: 'Firehawk', subsidiary: 'MicroPort CV', therapeutic_area: 'Comprehensive Cardiac Care' };
 const OLD_HEADER = ['id', 'name', 'subsidiary', 'therapeutic_area', 'category', 'type', 'tagline', 'overview',
   'features', 'indication', 'patient_population', 'specs', 'fda', 'ce', 'nmpa', 'pmda', 'reg_notes', 'image'];
 
