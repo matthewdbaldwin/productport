@@ -10,15 +10,17 @@ Scope is one entry, the one that proves the loop closes. Authoring the rest of t
 
 **Blocked by:** 02 (Capture specs authenticate with no hub reachable).
 
-**Status:** ready-for-agent
+**Status:** done
 
-- [ ] A capture spec runs against the staged capture database and produces a clip of a real ProductPort screen
-- [ ] The clip and its poster are transcoded with the repo's vendored ffmpeg
-- [ ] Media is served from same-origin help media paths, never a CDN
-- [ ] The clip is at most 1,500,000 bytes and at most 25 seconds
-- [ ] The poster or still is at most 200,000 bytes
-- [ ] A help entry references the clip so it renders in the help library
-- [ ] The help audit is green, confirming the help key resolves and the button is actually visible
-- [ ] Opening the help library in the running app shows the entry and the clip plays
-- [ ] No fictional person data is introduced: ProductPort's captured screens show catalog data, so the question does not arise here and should not be pre-empted for apps where it does
-- [ ] The capture database used is documented well enough for someone else to stage the same environment
+**Done:** 2026-09-07. Ran `catalog-browse.admin.capture.ts` (via ticket 02's no-hub setup) against the staged local catalog DB, transcoded with `npm run help:media` (vendored ffmpeg): `filter-and-search.mp4` 495kB/16.4s, `filter-and-search.jpg` poster 166kB — all three gates well clear. Both land at `web/public/help-media/catalog-browse/`, same-origin, no CDN. Added a `kind:'media'` block to the existing `catalog-browse` article (en/fr/zh, translated alt+caption, shared src/poster) in its "at a glance" section. `npm run help:audit` is green (0 blockers/warnings/nits). Verified live in the running app with a Playwright browser session: opened `/help/catalog-browse`, clicked Play, confirmed `paused:false` and `currentTime` advancing with no video error — the clip actually plays, not just resolves. Documented the capture DB + auth prerequisite in `tools/help-media/README.md` (was missing the auth step entirely — capture specs had never run before ticket 02) and added the missing `IDP_API_URL` boot requirement to the main README's env table (a real local-boot blocker hit while staging this). Full suite still green: 54/54 jest, 20/20 vitest files (89 tests).
+
+- [x] A capture spec runs against the staged capture database and produces a clip of a real ProductPort screen
+- [x] The clip and its poster are transcoded with the repo's vendored ffmpeg
+- [x] Media is served from same-origin help media paths, never a CDN
+- [x] The clip is at most 1,500,000 bytes and at most 25 seconds
+- [x] The poster or still is at most 200,000 bytes
+- [x] A help entry references the clip so it renders in the help library
+- [x] The help audit is green, confirming the help key resolves and the button is actually visible
+- [x] Opening the help library in the running app shows the entry and the clip plays
+- [x] No fictional person data is introduced: ProductPort's captured screens show catalog data, so the question does not arise here and should not be pre-empted for apps where it does
+- [x] The capture database used is documented well enough for someone else to stage the same environment

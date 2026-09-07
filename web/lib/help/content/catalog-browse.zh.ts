@@ -9,6 +9,13 @@ const catalogBrowse: HelpArticleContent = {
     {
       id: 'page-layout', heading: '目录页面概览',
       blocks: [
+        { kind: 'media',
+          src: '/help-media/catalog-browse/filter-and-search.mp4',
+          poster: '/help-media/catalog-browse/filter-and-search.jpg',
+          width: 1280, height: 720,
+          alt: '先按治疗领域筛选目录，再按市场筛选，然后清除筛选并按文字搜索，最后打开某个产品的详情视图。',
+          caption: '两个筛选条件会叠加：在治疗领域筛选之后再添加市场筛选，会进一步缩小结果数量，而不是替换之前的筛选。',
+          labels: ['Clear filters'] },
         { kind: 'list', items: [
           '顶部栏：搜索框、一个绿色状态标签（显示已加载的产品数量，加载完成前显示 Loading…）、应用切换器和“个人资料”按钮。',
           '筛选栏：Therapeutic area（治疗领域）、Subsidiary（子公司）、Regulatory（监管）和 Category（类别），按此顺序排列。',

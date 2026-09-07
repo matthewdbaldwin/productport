@@ -68,6 +68,7 @@ Auth goes through SalesPort SSO — a local instance needs `SALESPORT_JWT_PUBLIC
 | `SALESPORT_WEB_URL` | SalesPort hub web URL (SSO round-trip origin) |
 | `SALESPORT_LIFECYCLE_SECRET` | HMAC secret for inbound SalesPort → ProductPort SSO-lifecycle webhooks (`/api/sso/lifecycle`) |
 | `ALLOW_UNSIGNED_LIFECYCLE` | Dev-only: skip lifecycle HMAC when no secret is provisioned (guard fails closed otherwise) |
+| `IDP_API_URL` | SSO handoff-code exchange target (`src/routes/auth.js`). Required — the API throws at boot without it, even locally. Only dialed by `POST /api/auth/sso/exchange`, so a placeholder value is enough on a machine that never drives that route (e.g. the help-media capture harness below, which mints sessions directly instead). |
 | `WEBHOOK_SECRET_PRODUCTPORT_SALESPORT` | HMAC secret for outbound ProductPort → SalesPort events (e.g. bug reports) |
 | `OPSPORT_API_KEY` | Static bearer key for the inbound OpsPort seam (`GET /api/opsport/*`: catalog search + live clearance reads) |
 | `REVIEWPORT_API_KEY` | Static bearer key for the inbound ReviewPort seam (`GET /api/reviewport/*`: product search + detail for ReviewPort's "Add from ProductPort" picker; read-only, same guard as OpsPort, separate key) |
