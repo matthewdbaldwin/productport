@@ -79,11 +79,13 @@ done < <(git ls-files | grep -iE '(^|/)[^/]*dockerfile[^/]*$')
 dockerfiles=$scanned
 
 # ── 2. Workflows and shell scripts: --build-arg passing a credential ─────────
-# Both the `NAME=value` and the bare `NAME` (inherit-from-environment) forms.
+# Both the `NAME=value` and the bare `NAME` (inherit-from-environment) forms,
+# and both the space-separated (`--build-arg NAME=...`) and `=`-joined
+# (`--build-arg=NAME=...`) flag syntaxes Docker's CLI accepts for either.
 while IFS= read -r f; do
   [ -f "$f" ] || continue
   scan "$f" "--build-arg passes a credential" \
-       "--build-arg[[:space:]]+${SECRET_RE}([=[:space:]]|$)"
+       "--build-arg[[:space:]=]+${SECRET_RE}([=[:space:]]|$)"
 done < <(git ls-files | grep -iE '(^\.github/workflows/.*\.ya?ml$|\.sh$)')
 
 echo
