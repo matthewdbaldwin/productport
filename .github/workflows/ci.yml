@@ -98,6 +98,20 @@ jobs:
         working-directory: tools/help-media
       - run: npm run help:media:audit
 
+  # Help Library content-coverage gate (scripts/help-audit.js). Read-only
+  # static analyzer — reports blockers/warnings/nits across the helpContent
+  # i18n schema + page coverage. Confirmed 0/0/0 on 2026-09-07; wired
+  # blocking from the start since it shipped clean. Separate job from the
+  # existing help:media:audit job (different script, different deps).
+  help-audit:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 22
+      - run: npm run help:audit
+
   # ── Public E2E smoke ─────────────────────────────────────────────────────
   # Wired up 2026-09-06. This repo already shipped a Playwright config, an
   # `e2e` script and smoke specs, but ci.yml never referenced any of them, so

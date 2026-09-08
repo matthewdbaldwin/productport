@@ -11,6 +11,15 @@
 //    as applied instead of failing.
 'use strict';
 
+const pkg = require('../package.json');
+
+// Printed BEFORE anything that can exit -- before the env guard, before the
+// requires that could fail on a broken image, before `migrate deploy`. A
+// failure here short-circuits the boot chain's `&&` and server.js never
+// prints its own banner. Plain console.log, not the pino logger: app deps
+// aren't guaranteed loaded yet at migrate time. feedback_db_migrate_pattern.
+console.log(`${pkg.name}@${pkg.version} migrate`);
+
 const { execSync } = require('node:child_process');
 const fs = require('node:fs');
 const { PrismaClient } = require('@prisma/client');
