@@ -69,14 +69,33 @@ jobs:
       # X from lock file" with no pointer back to the manifest edit that
       # caused it. Failed CI twice on that exact shape (2026-08-23, and again
       # this week) when @swc/helpers was added to package.json without
-      # `npm install` re-running to update the lockfile. `--package-lock-only
-      # --dry-run` resolves the tree without touching node_modules or the
-      # lockfile on disk, so it surfaces the same drift fast and up front,
-      # with a message that actually names the missing package.
+      # `npm install` re-running to update the lockfile.
+      # The lockfile's root entry (packages[""]) records every dependency map
+      # exactly as package.json declared it at the last `npm install`, so
+      # comparing the two names the drifted package without touching the
+      # network. Two earlier shapes of this step were wrong:
+      # `npm install --package-lock-only --dry-run` exits 0 when package.json
+      # declares a dep the lockfile lacks, and dropping --dry-run then
+      # `git diff`ing the lockfile fails on an IN-SYNC lockfile, because
+      # CI's npm 10 rewrites fields a local npm 11 wrote (verified 2026-09-12).
       - name: Verify package-lock.json is in sync with package.json
-        run: npm install --package-lock-only --dry-run
-        env:
-          NODE_AUTH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          node -e '
+            const pkg = require("./package.json");
+            const root = require("./package-lock.json").packages[""];
+            const drift = [];
+            for (const field of ["dependencies", "devDependencies", "optionalDependencies", "peerDependencies"]) {
+              const want = pkg[field] || {}, have = root[field] || {};
+              for (const name of new Set([...Object.keys(want), ...Object.keys(have)])) {
+                if (want[name] !== have[name]) drift.push(`${field}.${name}: package.json=${want[name] ?? "(absent)"} lockfile=${have[name] ?? "(absent)"}`);
+              }
+            }
+            if (drift.length) {
+              console.log("::error::package-lock.json is out of sync with package.json — run npm install and commit package-lock.json");
+              drift.forEach((d) => console.log("  " + d));
+              process.exit(1);
+            }
+          '
       - run: npm ci
         env:
           NODE_AUTH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
