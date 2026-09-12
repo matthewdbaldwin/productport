@@ -2,6 +2,9 @@
   "name": "productport-api",
   "version": "0.12.1",
   "private": true,
+  "engines": {
+    "npm": "^10.0.0"
+  },
   "description": "ProductPort API — a MicroPort satellite.",
   "main": "src/server.js",
   "scripts": {
