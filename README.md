@@ -61,7 +61,6 @@ Auth goes through SalesPort SSO — a local instance needs `SALESPORT_JWT_PUBLIC
 | `DATABASE_URL` | PostgreSQL connection string (`app_runtime` in prod) |
 | `SALESPORT_JWT_PUBLIC_KEY` | Public key used to verify SalesPort SSO handoff tokens |
 | `SALESPORT_JWT_ISSUER` | Expected issuer claim on SSO tokens |
-| `JWT_SECRET` | Signing secret for local session tokens |
 | `SSO_CLAIMS_MODE` | How SSO claims are read / verified |
 | `COOKIE_DOMAIN` | Session cookie domain (`.microport.com` in prod) |
 | `SALESPORT_API_URL` | SalesPort API base URL (SSO + audit) |
