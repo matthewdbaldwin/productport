@@ -44,6 +44,11 @@ jobs:
       # feedback_private_gh_packages_dep_needs_token_in_ci_test_job. The repo must
       # also be GRANTED Manage-Actions(Read) on each package.
       # feedback_new_private_package_ci_access.
+      # Lockfile-drift guard; see the web job and scripts/check-lockfile.sh.
+      - name: Verify package-lock.json installs under npm 10
+        run: ./scripts/check-lockfile.sh .
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       - run: npm ci
         env:
           NODE_AUTH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -63,18 +68,17 @@ jobs:
         with:
           node-version: 22
           registry-url: https://npm.pkg.github.com
-      # Lockfile-drift guard. `npm ci` demands an exact match between
-      # package.json and package-lock.json and fails EUSAGE otherwise — it
-      # does this deep inside the install, so the error is a generic "Missing:
-      # X from lock file" with no pointer back to the manifest edit that
-      # caused it. Failed CI twice on that exact shape (2026-08-23, and again
-      # this week) when @swc/helpers was added to package.json without
-      # `npm install` re-running to update the lockfile. `--package-lock-only
-      # --dry-run` resolves the tree without touching node_modules or the
-      # lockfile on disk, so it surfaces the same drift fast and up front,
-      # with a message that actually names the missing package.
-      - name: Verify package-lock.json is in sync with package.json
-        run: npm install --package-lock-only --dry-run
+      # Lockfile-drift guard. Root cause of the recurring
+      # `EUSAGE: Missing: @swc/helpers@0.5.23 from lock file` (2026-08-23,
+      # 2026-09-11): the lockfile was written by npm 11 (devbox, Node 24),
+      # which drops a nested pin that npm 10 (this job, Node 22) requires.
+      # Prevention lives in package.json engines.npm + .npmrc engine-strict,
+      # so npm 11 refuses to install here. This step is the backstop: an npm 10
+      # `npm ci --dry-run` that names the cause and the fix. The step it
+      # replaces (`npm install --package-lock-only --dry-run`) exited 0 on the
+      # real broken lockfile, so it never guarded anything.
+      - name: Verify package-lock.json installs under npm 10
+        run: ../scripts/check-lockfile.sh web
         env:
           NODE_AUTH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       - run: npm ci
