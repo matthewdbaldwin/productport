@@ -6,6 +6,7 @@
 // (token verify, session revocation, claims schema) are NOT reimplemented here.
 // prd_canonical_auth_guard_lib, prd_microport_contracts, b1_phase4_satellite_cookie_migration.
 'use strict';
+const jwt = require('jsonwebtoken'); // decode-only, for the seam's rejection classifier
 const db = require('../lib/db');
 const logger = require('../lib/logger');
 const { createVerifier, createWithFreshAccessToken } = require('@matthewdbaldwin/microport-auth');
@@ -184,4 +185,33 @@ function requireProductAdmin(req, res, next) {
   return res.status(403).json({ error: 'Forbidden — ProductPort admin only' });
 }
 
-module.exports = { requireAuth, requireRole, requireProductAdmin, isProductAdmin, COOKIE_NAME, AUDIENCE, withFreshAccessToken };
+// ── SSO consumer seam (hubport#21; mirrors OpsPort#28, opsport f589a2b) ─────
+// Deliberately NARROWER than AUDIENCE. 'microport-apps' is a PROXY audience:
+// it may authenticate an ordinary request, but it must never SEAT a session.
+// `HandoffCode.targetApp` is enforced only at the IdP, which signs `aud` with the
+// target app, so the one thing the redeeming side must establish is that the
+// token was minted for productport. Same verifier as requireAuth (RS256, issuer,
+// dual-key/JWKS, claims mode); only the audience differs.
+const SEAM_AUDIENCE = 'productport';
+
+function verifySeamToken(token) {
+  return verify(token, { audience: SEAM_AUDIENCE });
+}
+
+// Classifier for the seam's REJECTION path only, never an authorisation input.
+// Re-verifies against the token's OWN declared audience, so it still proves
+// signature + issuer (a forgery returns null). Non-null means "genuine token
+// from an accepted signer, addressed elsewhere", as opposed to "cannot verify at
+// all", which is a key/issuer misconfiguration between our own services. The two
+// get different statuses so the first stays visible in the logs.
+function classifyForeignAudience(token) {
+  let aud;
+  try { aud = jwt.decode(token)?.aud; } catch { return null; }
+  if (!aud || (Array.isArray(aud) && aud.length === 0)) return null;
+  try { return verify(token, { audience: aud }); } catch { return null; }
+}
+
+module.exports = {
+  requireAuth, requireRole, requireProductAdmin, isProductAdmin, COOKIE_NAME, AUDIENCE, withFreshAccessToken,
+  SEAM_AUDIENCE, verifySeamToken, classifyForeignAudience,
+};

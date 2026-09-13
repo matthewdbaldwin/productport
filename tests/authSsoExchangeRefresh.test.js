@@ -12,10 +12,21 @@
 jest.mock('../src/lib/db', () => ({ session: { update: jest.fn() } }));
 
 const crypto = require('crypto');
-const { publicKey } = crypto.generateKeyPairSync('rsa', { modulusLength: 2048 });
+const { publicKey, privateKey } = crypto.generateKeyPairSync('rsa', { modulusLength: 2048 });
+const jwt = require('jsonwebtoken');
 
+const ISSUER = 'https://sales-dev.microport.com';
 process.env.SALESPORT_JWT_PUBLIC_KEY = Buffer.from(publicKey.export({ type: 'spki', format: 'pem' })).toString('base64');
-process.env.SALESPORT_JWT_ISSUER = 'https://sales-dev.microport.com';
+process.env.SALESPORT_JWT_ISSUER = ISSUER;
+
+// 2026-09-13: was the literal ACCESS_TOK. The seam now verifies the access
+// token before setting either cookie (hubport#21), so the fixture is a real
+// productport-audience token. The refresh-pair behavior under test is unchanged.
+const ACCESS_TOK = jwt.sign(
+  { sub: 1, email: 'pm@microport.com', app_roles: { productport: 'viewer' } },
+  privateKey.export({ type: 'pkcs8', format: 'pem' }),
+  { algorithm: 'RS256', issuer: ISSUER, audience: 'productport', expiresIn: '8h' },
+);
 process.env.SSO_CLAIMS_MODE = 'off';
 process.env.IDP_API_URL = 'https://hub-dev.microport.com';
 
@@ -42,7 +53,7 @@ describe('POST /api/auth/sso/exchange — refresh-pair opt-in', () => {
     global.fetch = jest.fn().mockResolvedValue({
       ok: true, status: 200,
       json: async () => ({
-        token: 'access-tok',
+        token: ACCESS_TOK,
         role: 'viewer',
         refreshToken: 'raw-refresh-xyz',
         refreshTokenExpiresAt: new Date(Date.now() + 90 * 24 * 60 * 60 * 1000).toISOString(),
@@ -59,7 +70,7 @@ describe('POST /api/auth/sso/exchange — refresh-pair opt-in', () => {
     const setCookies = res.headers['set-cookie'] || [];
     expect(setCookies.some(c => c.startsWith('productport_token='))).toBe(true);
     expect(setCookies.some(c => c.startsWith('productport_refresh=raw-refresh-xyz'))).toBe(true);
-    expect(res.body.token).toBe('access-tok');
+    expect(res.body.token).toBe(ACCESS_TOK);
     expect(res.body.refreshToken).toBeUndefined();
     expect(res.body.refreshTokenExpiresAt).toBeUndefined();
   });
@@ -67,7 +78,7 @@ describe('POST /api/auth/sso/exchange — refresh-pair opt-in', () => {
   test('flag off → the opt-in header is never sent, byte-identical to today (regression)', async () => {
     process.env.PRODUCTPORT_REFRESH_ENABLED = 'false';
     global.fetch = jest.fn().mockResolvedValue({
-      ok: true, status: 200, json: async () => ({ token: 'access-tok', role: 'viewer' }),
+      ok: true, status: 200, json: async () => ({ token: ACCESS_TOK, role: 'viewer' }),
     });
 
     const res = await request(makeApp())
@@ -79,13 +90,13 @@ describe('POST /api/auth/sso/exchange — refresh-pair opt-in', () => {
     expect(opts.headers['X-Satellite-Refresh']).toBeUndefined();
     const setCookies = res.headers['set-cookie'] || [];
     expect(setCookies.some(c => c.startsWith('productport_refresh='))).toBe(false);
-    expect(res.body).toEqual({ token: 'access-tok', role: 'viewer' });
+    expect(res.body).toEqual({ token: ACCESS_TOK, role: 'viewer' });
   });
 
   test('flag on but the IdP returns no pair anyway → byte-identical to today', async () => {
     process.env.PRODUCTPORT_REFRESH_ENABLED = 'true';
     global.fetch = jest.fn().mockResolvedValue({
-      ok: true, status: 200, json: async () => ({ token: 'access-tok', role: 'viewer' }),
+      ok: true, status: 200, json: async () => ({ token: ACCESS_TOK, role: 'viewer' }),
     });
 
     const res = await request(makeApp())
@@ -95,7 +106,7 @@ describe('POST /api/auth/sso/exchange — refresh-pair opt-in', () => {
     expect(res.status).toBe(200);
     const setCookies = res.headers['set-cookie'] || [];
     expect(setCookies.some(c => c.startsWith('productport_refresh='))).toBe(false);
-    expect(res.body).toEqual({ token: 'access-tok', role: 'viewer' });
+    expect(res.body).toEqual({ token: ACCESS_TOK, role: 'viewer' });
   });
 
   test('flag on + IdP denies the exchange but still includes a refreshToken → the raw refresh token is stripped from the (non-2xx) response body', async () => {
@@ -146,7 +157,7 @@ describe('POST /api/auth/sso/exchange — refresh-pair opt-in', () => {
     global.fetch = jest.fn().mockResolvedValue({
       ok: true, status: 200,
       json: async () => ({
-        token: 'access-tok',
+        token: ACCESS_TOK,
         role: 'viewer',
         refreshToken: 'raw-refresh-xyz',
         refreshTokenExpiresAt: new Date(Date.now() + 90 * 24 * 60 * 60 * 1000).toISOString(),
@@ -164,6 +175,6 @@ describe('POST /api/auth/sso/exchange — refresh-pair opt-in', () => {
     expect(setCookies.some(c => c.startsWith('productport_refresh='))).toBe(false);
     expect(res.body.refreshToken).toBeUndefined();
     expect(res.body.refreshTokenExpiresAt).toBeUndefined();
-    expect(res.body.token).toBe('access-tok');
+    expect(res.body.token).toBe(ACCESS_TOK);
   });
 });

@@ -12,14 +12,25 @@
 jest.mock('../src/lib/db', () => ({ session: { update: jest.fn() } }));
 
 const crypto = require('crypto');
-const { publicKey } = crypto.generateKeyPairSync('rsa', { modulusLength: 2048 });
+const { publicKey, privateKey } = crypto.generateKeyPairSync('rsa', { modulusLength: 2048 });
+const jwt = require('jsonwebtoken');
 
 // middleware/auth loads at require time and needs these (see sso-exchange-idp-url.test.js).
+const ISSUER = 'https://sales-dev.microport.com';
 process.env.SALESPORT_JWT_PUBLIC_KEY = Buffer.from(publicKey.export({ type: 'spki', format: 'pem' })).toString('base64');
-process.env.SALESPORT_JWT_ISSUER = 'https://sales-dev.microport.com';
+process.env.SALESPORT_JWT_ISSUER = ISSUER;
 process.env.SSO_CLAIMS_MODE = 'off';
 process.env.IDP_API_URL = 'https://sales-dev.microport.com';
 delete process.env.JWT_EXPIRES_IN; // exercise the 8h default
+
+// 2026-09-13: was the literal 'tok-123'. The seam now verifies before
+// cookieing (hubport#21), so the fixture is a real productport-audience token.
+// The Max-Age claim under test is unchanged.
+const SSO_TOKEN = jwt.sign(
+  { sub: 1, email: 'pm@microport.com', app_roles: { productport: 'viewer' } },
+  privateKey.export({ type: 'pkcs8', format: 'pem' }),
+  { algorithm: 'RS256', issuer: ISSUER, audience: 'productport', expiresIn: '8h' },
+);
 
 const express = require('express');
 const cookieParser = require('cookie-parser');
@@ -41,7 +52,7 @@ afterEach(() => { delete global.fetch; });
 describe('POST /api/auth/sso/exchange — session cookie', () => {
   test('sets productport_token with an 8h Max-Age (not a browser-session-only cookie)', async () => {
     global.fetch = jest.fn().mockResolvedValue({
-      ok: true, status: 200, json: async () => ({ token: 'tok-123', role: 'viewer' }),
+      ok: true, status: 200, json: async () => ({ token: SSO_TOKEN, role: 'viewer' }),
     });
 
     const res = await request(makeApp())
