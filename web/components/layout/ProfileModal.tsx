@@ -53,7 +53,7 @@ export function ProfileModal({ open, onClose }: Props) {
   if (!open || !user || typeof document === 'undefined') return null;
 
   return createPortal(
-    <div className="fixed inset-0 z-50">
+    <div className="fixed inset-0 z-modal">
       <div className="absolute inset-0" style={{ background: 'var(--overlay)' }} onClick={onClose} />
 
       <div

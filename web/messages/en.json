@@ -73,5 +73,11 @@
     "sectionAccount": "Account",
     "exportCsvTooltip": "Downloads the current catalog as a CSV, in the same column format Import CSV expects.",
     "signInHelpLink": "Help with signing in"
+  },
+  "palette": {
+    "label": "Command palette",
+    "placeholder": "Search pages and help…",
+    "empty": "No results.",
+    "goTo": "Go to"
   }
 }

@@ -150,7 +150,7 @@ function DetailModal({ p, onClose, onEdit, onToggleDisabled, toggling }: {
   const [copied, setCopied] = useState(false);
   const [heroId, setHeroId] = useState<string | null>(null); // gallery thumb → swap the hero
   // Contextual help for the detail view (Help Library). The overlay below is
-  // z-index 50 and covers the top bar's HelpLauncher (z-index 20), so while a
+  // on the modal layer and covers the top bar's HelpLauncher (header layer), so while a
   // product is open this is the only help affordance the user can reach. The
   // popover shows the product-detail article's intro + section headings and
   // links through to the full article. Locale-aware like ProductEditModal's

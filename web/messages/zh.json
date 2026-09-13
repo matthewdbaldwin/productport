@@ -73,5 +73,11 @@
     "sectionAccount": "账户",
     "exportCsvTooltip": "将当前目录下载为 CSV，列格式与“Import CSV”所需的格式相同。",
     "signInHelpLink": "登录帮助"
+  },
+  "palette": {
+    "label": "命令面板",
+    "placeholder": "搜索页面和帮助…",
+    "empty": "无结果。",
+    "goTo": "前往"
   }
 }

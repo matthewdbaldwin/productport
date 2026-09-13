@@ -2,8 +2,8 @@
 import { describe, it, expect, vi } from 'vitest';
 import { render, screen, fireEvent, within } from '@testing-library/react';
 
-// The catalog top bar's HelpLauncher sits at z-index 20 and DetailModal's
-// overlay at z-index 50, so while a product is open the modal's own HelpButton
+// The catalog top bar's HelpLauncher sits on the header layer and DetailModal's
+// overlay on the modal layer, so while a product is open the modal's own HelpButton
 // is the only help affordance the user can reach. This pins that it renders
 // inside the open detail modal and opens the product-detail article popover.
 

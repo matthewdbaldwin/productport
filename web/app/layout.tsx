@@ -6,6 +6,7 @@ import { AuthProvider } from '@/contexts/AuthContext';
 import { LocaleProvider } from '@/components/LocaleProvider';
 import { ToastProvider } from '@/components/ui/Toast';
 import { BugReportButton } from '@/components/BugReportButton';
+import { AppCommandPalette } from '@/components/layout/AppCommandPalette';
 
 export const metadata = {
   // Absolute-URL base so relative og:image / og:url resolve for social scrapers.
@@ -43,6 +44,7 @@ export default async function RootLayout({ children }: { children: React.ReactNo
             <ToastProvider>
               {children}
               <BugReportButton />
+              <AppCommandPalette />
             </ToastProvider>
           </AuthProvider>
         </LocaleProvider>
