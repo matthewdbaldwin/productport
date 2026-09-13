@@ -20,8 +20,8 @@ import { CommandPalette } from '@matthewdbaldwin/microport-ui';
 import { helpCommandGroup } from '@matthewdbaldwin/microport-ui/help';
 import type { HelpSearchResult } from '@matthewdbaldwin/microport-ui/help/logic';
 import { useAuth } from '@/contexts/AuthContext';
+import { useHelpLocale } from '@/lib/help/useHelpLocale';
 import { buildSearchDocs } from '@/lib/help/searchDocs';
-import { DEFAULT_LOCALE } from '@/lib/locales';
 
 export function AppCommandPalette() {
   const { user } = useAuth();
@@ -29,7 +29,7 @@ export function AppCommandPalette() {
   const t = useTranslations('palette');
   const tHelp = useTranslations('help');
   const [query, setQuery] = useState('');
-  const locale = user?.locale ?? DEFAULT_LOCALE;
+  const locale = useHelpLocale();
   const docs = useMemo(() => buildSearchDocs(locale), [locale]);
 
   if (!user) return null;

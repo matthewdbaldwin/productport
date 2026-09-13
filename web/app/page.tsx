@@ -13,10 +13,10 @@ import { UserCircle, Plus, Download } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { useTranslations } from 'next-intl';
 import { useAuth } from '@/contexts/AuthContext';
+import { useHelpLocale } from '@/lib/help/useHelpLocale';
 import { api } from '@/lib/api';
 import { statusOf, orderedAreas, filterProducts } from '@/lib/catalogFilter';
 import { testId } from '@/lib/i18nIds';
-import { DEFAULT_LOCALE } from '@/lib/locales';
 import { getHelpContent } from '@/lib/help/content';
 import { ProductEditModal } from './ProductEditModal';
 import { ImportCsvButton } from './ImportCsvButton';
@@ -154,9 +154,10 @@ function DetailModal({ p, onClose, onEdit, onToggleDisabled, toggling }: {
   // product is open this is the only help affordance the user can reach. The
   // popover shows the product-detail article's intro + section headings and
   // links through to the full article. Locale-aware like ProductEditModal's
-  // popovers; useAuth() outside a provider yields user:null → English.
+  // popovers; useHelpLocale() follows the active UI locale (productport#27).
   const { user } = useAuth();
-  const helpArticle = getHelpContent('product-detail', user?.locale ?? DEFAULT_LOCALE);
+  const helpLocale = useHelpLocale();
+  const helpArticle = getHelpContent('product-detail', helpLocale);
   const helpContent: HelpContent | null = helpArticle
     ? { summary: helpArticle.intro, bullets: helpArticle.sections.map((sec) => sec.heading) }
     : null;

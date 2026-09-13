@@ -18,7 +18,7 @@ import { BookOpen, ChevronRight, KeyRound, LayoutGrid, Search, Settings, type Lu
 import { searchHelp, type HelpSearchResult } from '@matthewdbaldwin/microport-ui/help/logic';
 import type { HelpFuzzySearchResult } from '@matthewdbaldwin/microport-ui/help/fuzzy';
 import { useAuth } from '@/contexts/AuthContext';
-import { DEFAULT_LOCALE } from '@/lib/locales';
+import { useHelpLocale } from '@/lib/help/useHelpLocale';
 import { visibleSectionsFor } from '@/lib/help/sections';
 import { getSectionTitle } from '@/lib/help/sectionTitles';
 import { getHelpContent } from '@/lib/help/content';
@@ -51,7 +51,7 @@ function ResultRow({ r }: { r: HelpSearchResult | HelpFuzzySearchResult }) {
 export default function HelpIndexPage() {
   const { user } = useAuth();
   const t = useTranslations('help');
-  const locale = user?.locale ?? DEFAULT_LOCALE;
+  const locale = useHelpLocale();
   const [query, setQuery] = useState('');
   const sections = useMemo(() => visibleSectionsFor(user), [user]);
   const docs = useMemo(() => buildSearchDocs(locale), [locale]);

@@ -7,7 +7,7 @@ const login: HelpArticleContent = {
   slug:  'login',
   title: '登录',
   intro: 'ProductPort 本身没有密码。您通过公司门户（hub.microport.com）登录，ProductPort 信任公司门户返回的结果。',
-  lastUpdated: '2026-09-04',
+  lastUpdated: '2026-09-13',
   sections: [
     {
       id: 'how-it-works', heading: '登录流程',
@@ -42,6 +42,7 @@ const login: HelpArticleContent = {
       id: 'profile', heading: '您的个人资料与退出登录',
       blocks: [
         { kind: 'paragraph', text: '顶部栏中的“个人资料”图标会打开一个侧边面板，显示您的姓名、邮箱和角色。这些信息由中心统一管理，此处只读；“管理您的账户”会在新标签页中打开公司门户。', labels: ['个人资料', '管理您的账户'] },
+        { kind: 'paragraph', text: '“语言”可在 English、中文和 Français 之间切换 ProductPort 的界面语言。选择后页面会以该语言重新加载，帮助文章、帮助搜索和 ⌘K 命令面板也会随之切换。该设置仅保存在当前浏览器中，不会保存到您的账户，因此其他浏览器或设备会保留各自的设置。', labels: ['语言'] },
         { kind: 'paragraph', text: '“主题”选择器可更改 ProductPort 的外观。您的选择会保存到您的账户，并在其他 MicroPort 应用中沿用。', labels: ['主题'] },
         { kind: 'paragraph', text: '“退出登录”按钮位于面板底部，是 ProductPort 中唯一的退出登录入口。退出后您会回到登录页面，该页面会立即重新开始登录流程，因此如果您已完成操作，请直接关闭标签页。', labels: ['退出登录'] },
       ],

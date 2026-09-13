@@ -5,14 +5,14 @@
 // glue (useUser + useLocale + content resolution + null guard + render) lives
 // behind createHelpArticleClient; this file only supplies ProductPort's ports.
 //
-// Locale: useAuth().user.locale — the hub-provisioned DB column
-// (src/middleware/auth.js). This app carries TWO locale signals: the
-// NEXT_LOCALE cookie next-intl reads for UI chrome (written by the
-// ProfileModal language picker, productport#8), and this per-user column.
-// Help content resolves against the column, as do the popovers
-// (ProductEditModal) and the search corpus (HelpLauncher, /help), so article,
-// popover and search agree with each other; they do NOT follow a
-// cookie-only language change made in the profile modal.
+// Locale: useHelpLocale() (lib/help/useHelpLocale.ts). This app carries TWO
+// locale signals: the NEXT_LOCALE cookie next-intl reads for UI chrome (written
+// by the ProfileModal language picker, productport#8), and the hub-provisioned
+// per-user column. Help follows the ACTIVE UI locale (the cookie, via
+// next-intl) and falls back to the column, then English (productport#27). The
+// popovers (ProductEditModal, detail view), the search corpus (HelpLauncher,
+// /help, ⌘K) use the same hook, so article, popover and search agree with each
+// other and with the switcher.
 //
 // Chrome strings come from the `help` namespace of messages/*.json. getStrings
 // is a plain port the generated component invokes AFTER its early
@@ -30,10 +30,10 @@
 // the `sections` port (`sections.find(…)?.title`), and that port is a static
 // array, not a per-render function — so one client is built per locale over
 // localizedSections(locale) and the exported component picks the right one
-// from the same useAuth() locale the inner useLocale port reads.
+// from the same useHelpLocale() locale the inner useLocale port reads.
 import Link from 'next/link';
 import { useAuth } from '@/contexts/AuthContext';
-import { DEFAULT_LOCALE } from '@/lib/locales';
+import { useHelpLocale } from '@/lib/help/useHelpLocale';
 import { localizedSections } from '@/lib/help/sectionTitles';
 import { getHelpContent, normalizeLocale, type HelpLocale } from '@/lib/help/content';
 import { createHelpArticleClient, type HelpViewStrings } from '@matthewdbaldwin/microport-ui/help';
@@ -62,7 +62,7 @@ const CLIENT_LOCALE: Record<HelpLocale, string> = { en: 'en-US', zh: 'zh-CN', fr
 function makeClient(locale: HelpLocale) {
   return createHelpArticleClient({
     useUser: () => useAuth().user,
-    useLocale: () => useAuth().user?.locale ?? DEFAULT_LOCALE,
+    useLocale: () => useHelpLocale(),
     getContent: (slug, l) => getHelpContent(slug, l),
     getStrings: helpViewStrings,
     sections: localizedSections(CLIENT_LOCALE[locale]),
@@ -77,7 +77,6 @@ const CLIENTS: Record<HelpLocale, ReturnType<typeof makeClient>> = {
 };
 
 export function HelpArticleClient({ slug }: { slug: string }) {
-  const { user } = useAuth();
-  const Client = CLIENTS[normalizeLocale(user?.locale ?? DEFAULT_LOCALE)];
+  const Client = CLIENTS[normalizeLocale(useHelpLocale())];
   return <Client slug={slug} />;
 }

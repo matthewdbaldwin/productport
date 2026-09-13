@@ -16,6 +16,7 @@ jest.mock('../src/lib/logger', () => ({ info: jest.fn(), warn: jest.fn(), error:
 jest.mock('../src/lib/db', () => ({
   user: { upsert: jest.fn(), findUnique: jest.fn().mockResolvedValue(null) },
   session: { findUnique: jest.fn() },
+  productAudit: { create: jest.fn().mockResolvedValue({}) },
 }));
 
 const { publicKey, privateKey } = crypto.generateKeyPairSync('rsa', { modulusLength: 2048 });
@@ -46,35 +47,48 @@ describe('isProductAdmin — fleetSuperuser OR-arm', () => {
   });
 });
 
-describe('requireProductAdmin — bypass is logged (audit-log gap stop-gap)', () => {
-  const run = (user) => {
+describe('requireProductAdmin — bypass is durably audited, awaited, fail closed (productport#27)', () => {
+  const run = async (user) => {
     const req = { user, originalUrl: '/api/products/x', method: 'PATCH' };
     const res = mockRes();
     const next = jest.fn();
-    requireProductAdmin(req, res, next);
+    await requireProductAdmin(req, res, next);
     return { res, next };
   };
 
-  test('a viewer admitted only by fleetSuperuser passes and warns, tagged distinctly', () => {
-    const { next } = run({ id: 9, role: 'viewer', fleetSuperuser: true });
-    expect(next).toHaveBeenCalled();
-    expect(logger.warn).toHaveBeenCalledTimes(1);
-    const [fields, msg] = logger.warn.mock.calls[0];
-    expect(fields).toMatchObject({ event: 'FLEET_SUPERUSER_BYPASS', userId: 9, method: 'PATCH', path: '/api/products/x' });
-    expect(msg).toMatch(/fleetSuperuser bypass/);
-    expect(msg).toMatch(/audit/i);
+  test('a viewer admitted only by fleetSuperuser writes a ProductAudit row BEFORE next()', async () => {
+    const order = [];
+    db.productAudit.create.mockImplementationOnce(async () => { order.push('audit'); return {}; });
+    const req = { user: { id: 9, email: 'fs@test.local', role: 'viewer', fleetSuperuser: true }, originalUrl: '/api/products/x', method: 'PATCH' };
+    const res = mockRes();
+    await requireProductAdmin(req, res, () => order.push('next'));
+    expect(order).toEqual(['audit', 'next']);
+    const { data } = db.productAudit.create.mock.calls[0][0];
+    expect(data).toMatchObject({ productId: null, userId: 9, userEmail: 'fs@test.local', action: 'FLEET_SUPERUSER_BYPASS' });
+    expect(JSON.parse(data.newValue)).toEqual({ method: 'PATCH', path: '/api/products/x' });
   });
 
-  test('a real product_admin who also holds the flag is NOT logged as a bypass', () => {
-    const { next } = run({ id: 1, role: 'product_admin', fleetSuperuser: true });
-    expect(next).toHaveBeenCalled();
-    expect(logger.warn).not.toHaveBeenCalled();
+  test('the audit write failing refuses the request with 500 (fail closed)', async () => {
+    db.productAudit.create.mockRejectedValueOnce(new Error('db down'));
+    const { res, next } = await run({ id: 9, role: 'viewer', fleetSuperuser: true });
+    expect(next).not.toHaveBeenCalled();
+    expect(res.statusCode).toBe(500);
+    expect(res.body).toEqual({ error: 'Authorization audit failed.' });
+    expect(logger.error).toHaveBeenCalledTimes(1);
+    expect(logger.error.mock.calls[0][0]).toMatchObject({ event: 'FLEET_SUPERUSER_BYPASS', userId: 9 });
   });
 
-  test('a viewer without the flag is still 403', () => {
-    const { res, next } = run({ id: 2, role: 'viewer', fleetSuperuser: false });
+  test('a real product_admin who also holds the flag is NOT audited as a bypass', async () => {
+    const { next } = await run({ id: 1, role: 'product_admin', fleetSuperuser: true });
+    expect(next).toHaveBeenCalled();
+    expect(db.productAudit.create).not.toHaveBeenCalled();
+  });
+
+  test('a viewer without the flag is still 403 and writes nothing', async () => {
+    const { res, next } = await run({ id: 2, role: 'viewer', fleetSuperuser: false });
     expect(next).not.toHaveBeenCalled();
     expect(res.statusCode).toBe(403);
+    expect(db.productAudit.create).not.toHaveBeenCalled();
   });
 });
 

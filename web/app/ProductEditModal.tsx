@@ -21,7 +21,7 @@ import {
 import { HelpButton } from '@matthewdbaldwin/microport-ui/help';
 import { getPopoverContent, getPopoverTitle } from '@/lib/help/popovers';
 import { useAuth } from '@/contexts/AuthContext';
-import { DEFAULT_LOCALE } from '@/lib/locales';
+import { useHelpLocale } from '@/lib/help/useHelpLocale';
 
 type Initial = Partial<ProductInput> & { slug?: string; images?: GalleryImage[]; clearances?: ClearanceRow[] };
 
@@ -79,10 +79,10 @@ export function ProductEditModal({ mode, initial, onClose, onSaved, onGalleryCha
 }) {
   const i = initial ?? {};
   // Contextual help for the two edit-only sub-sections (Help Library, Task 7).
-  // Locale-aware via the user's hub-provisioned locale; useAuth() outside a
-  // provider yields user:null, so bare renders (tests) fall back to English.
+  // Locale-aware via useHelpLocale(): the active UI locale, then the account's
+  // saved locale, then English for bare renders (tests). productport#27.
   const { user } = useAuth();
-  const helpLocale = user?.locale ?? DEFAULT_LOCALE;
+  const helpLocale = useHelpLocale();
   const galleryPopover = getPopoverContent('gallery', helpLocale);
   const clearancePopover = getPopoverContent('clearance', helpLocale);
   const [f, setF] = useState<Record<string, string>>({
