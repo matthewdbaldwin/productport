@@ -2,6 +2,9 @@
   "name": "productport-web",
   "version": "0.13.2",
   "private": true,
+  "engines": {
+    "npm": "^10.0.0"
+  },
   "scripts": {
     "dev": "next dev -p 3100",
     "//start-note": "PORT env set to 3000 by the task def (fleet web container_port)",
@@ -15,7 +18,7 @@
   },
   "dependencies": {
     "@matthewdbaldwin/microport-contracts": "^0.22.0",
-    "@matthewdbaldwin/microport-ui": "^0.47.1",
+    "@matthewdbaldwin/microport-ui": "^0.50.0",
     "@sentry/nextjs": "^10.63.0",
     "next": "^16.2.6",
     "next-intl": "^4.12.0",
@@ -42,6 +45,5 @@
   "overrides": {
     "postcss": "^8.5.18",
     "sharp": "^0.35.3"
-  },
-  "//note": "No file: self-deps. microport-ui pinned. feedback_develop_to_main_bump_breaks_web_lockfile."
+  }
 }

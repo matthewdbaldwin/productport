@@ -44,6 +44,11 @@ jobs:
       # feedback_private_gh_packages_dep_needs_token_in_ci_test_job. The repo must
       # also be GRANTED Manage-Actions(Read) on each package.
       # feedback_new_private_package_ci_access.
+      # Lockfile-drift guard; see the web job and scripts/check-lockfile.sh.
+      - name: Verify package-lock.json installs under npm 10
+        run: ./scripts/check-lockfile.sh .
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       - run: npm ci
         env:
           NODE_AUTH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -63,6 +68,44 @@ jobs:
         with:
           node-version: 22
           registry-url: https://npm.pkg.github.com
+      # Lockfile-drift guard, two complementary checks. `npm ci` fails EUSAGE
+      # deep inside the install with a generic "Missing: X from lock file"
+      # (2026-08-23, 2026-09-11: @swc/helpers@0.5.23). It has two causes:
+      #  1. package.json edited without re-running install. The lockfile's
+      #     root entry (packages[""]) records every dependency map as declared
+      #     at the last install, so comparing the two names the drifted
+      #     package without touching the network (first step).
+      #  2. Lockfile written by npm 11 (devbox, Node 24), which drops a nested
+      #     pin npm 10 (this job, Node 22) requires. The root entry still
+      #     matches, so check 1 can't see it; an npm 10 `npm ci --dry-run`
+      #     can (second step, scripts/check-lockfile.sh). Prevention is
+      #     engines.npm + .npmrc engine-strict: npm 11 refuses to install here.
+      # Two earlier shapes were wrong: `npm install --package-lock-only
+      # --dry-run` exits 0 on both failures, and dropping --dry-run then
+      # `git diff`ing fails on an IN-SYNC lockfile, because npm 10 rewrites
+      # fields npm 11 wrote (verified 2026-09-12).
+      - name: Verify package-lock.json is in sync with package.json
+        run: |
+          node -e '
+            const pkg = require("./package.json");
+            const root = require("./package-lock.json").packages[""];
+            const drift = [];
+            for (const field of ["dependencies", "devDependencies", "optionalDependencies", "peerDependencies"]) {
+              const want = pkg[field] || {}, have = root[field] || {};
+              for (const name of new Set([...Object.keys(want), ...Object.keys(have)])) {
+                if (want[name] !== have[name]) drift.push(`${field}.${name}: package.json=${want[name] ?? "(absent)"} lockfile=${have[name] ?? "(absent)"}`);
+              }
+            }
+            if (drift.length) {
+              console.log("::error::package-lock.json is out of sync with package.json — run npx -y npm@10 install and commit package-lock.json");
+              drift.forEach((d) => console.log("  " + d));
+              process.exit(1);
+            }
+          '
+      - name: Verify package-lock.json installs under npm 10
+        run: ../scripts/check-lockfile.sh web
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       - run: npm ci
         env:
           NODE_AUTH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
