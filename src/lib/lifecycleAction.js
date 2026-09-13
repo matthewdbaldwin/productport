@@ -37,28 +37,43 @@
 // `ctx` (optional) carries { newRole, mapRole } — the event's wire role and a
 // mapRole-shaped (wire) => enum | null mapper, injected so this stays pure
 // (same pattern as resolveRole). Without ctx the no-row grant stays a noop.
+//
+// fleetSuperuser (productport#11, hubport#88): HubPort stamps the user's CURRENT
+// flag on every lifecycle event, whatever kind. `ctx.fleetSuperuser` is written
+// onto an existing row on EVERY kind when it differs, alongside (never instead
+// of) the active-flag policy above. An ABSENT value (an emitter that predates the
+// field) means "no change", never false, per the contracts LifecycleEvent note.
 function decideUserUpdate(kind, existing, ctx = {}) {
+  const flag = typeof ctx.fleetSuperuser === 'boolean' ? ctx.fleetSuperuser : undefined;
+  const flagPatch = existing && flag !== undefined && existing.fleetSuperuser !== flag
+    ? { fleetSuperuser: flag } : {};
+  const withFlag = (active, noop) => {
+    const data = { ...active, ...flagPatch };
+    return Object.keys(data).length ? { data } : noop;
+  };
+
   switch (kind) {
     case 'disable':
-      if (existing && existing.active !== false) return { data: { active: false } };
-      return { noop: true, reason: existing ? 'already-disabled' : 'no-local-user' };
+      if (existing && existing.active !== false) return withFlag({ active: false });
+      return withFlag({}, { noop: true, reason: existing ? 'already-disabled' : 'no-local-user' });
 
     case 'grant':
     case 'reactivate': {
-      if (existing && existing.active === false) return { data: { active: true } };
-      if (existing) return { noop: true, reason: 'already-active' };
+      if (existing && existing.active === false) return withFlag({ active: true });
+      if (existing) return withFlag({}, { noop: true, reason: 'already-active' });
       // No local row — create it when the granted role maps (fleet decision
       // 2026-08-19). Role IS written here (unlike the update paths above):
       // there is no row for JIT to re-resolve against yet, and sync-on-login
       // overwrites it from the SSO claim at first login anyway.
       const mapped = ctx.newRole && typeof ctx.mapRole === 'function' ? ctx.mapRole(ctx.newRole) : null;
-      if (mapped) return { create: { role: mapped } };
+      if (mapped) return { create: { role: mapped, ...(flag !== undefined ? { fleetSuperuser: flag } : {}) } };
       return { noop: true, reason: ctx.newRole ? 'unmapped-role' : 'no-local-user' };
     }
 
     case 'revoke':
       // Universal app — role drops to viewer JIT on next login; still an employee.
-      return { noop: true, reason: 'role-jit-on-login' };
+      // The flag is still synced: it is independent of the productport grant.
+      return withFlag({}, { noop: true, reason: 'role-jit-on-login' });
 
     default:
       return { skip: true, reason: 'unknown_kind' };

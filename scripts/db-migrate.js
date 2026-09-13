@@ -22,6 +22,8 @@ console.log(`${pkg.name}@${pkg.version} migrate`);
 
 const { execSync } = require('node:child_process');
 const fs = require('node:fs');
+// Dependency-free, so it loads even when app deps don't. productport#13.
+const { reportMigrateFailure } = require('./migrateFailure');
 const { PrismaClient } = require('@prisma/client');
 const { PrismaPg } = require('@prisma/adapter-pg');
 
@@ -75,7 +77,12 @@ async function main() {
   }
 }
 
+// ⚠ Never log the raw error here (productport#13). `console.error(msg, e)`
+// expands the message, stack and own properties (cause, stdout, meta), and a
+// connection failure can carry MIGRATE_DATABASE_URL — credentials included —
+// straight into CloudWatch. reportMigrateFailure logs a redacted summary that
+// still names the error, its code, and whether it was a connection failure.
 main().catch((e) => {
-  console.error('[db-migrate] failed:', e);
+  reportMigrateFailure(e);
   process.exit(1);
 });
