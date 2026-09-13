@@ -22,6 +22,24 @@
 #
 # Escape hatch: `build-secrets-guard: allow <reason>` in a comment on the
 # offending line or the one directly above it.
+#
+# What this guard is NOT. It is a static grep over workflows, Dockerfiles and
+# shell scripts: a defence against the ACCIDENTAL, literal form of the leak, not
+# against a determined author. Shell indirection defeats it by construction:
+#
+#   ARG_NAME=NPM_TOKEN
+#   docker build --build-arg="$ARG_NAME=$VAL" .
+#
+# The credential's name never appears on the offending line, so no regex over
+# that line can see it, and tightening SECRET_RE or the directive patterns will
+# not close the gap. Catching it would mean evaluating the shell, which a grep
+# cannot do. This is a known, irreducible limitation, not a bug to fix.
+#
+# Why it is written down: eight bypasses have been closed in two waves (six on
+# 2026-09-06, the `=`-joined form on 09-07, the quoted forms on 09-08), each
+# found by someone re-reading the patterns and asking "what else gets past
+# this?". A reader who believes the guard is exhaustive stops asking. Keep
+# asking, and keep reviewing build steps by eye. salesport#82.
 
 set -uo pipefail
 cd "$(git rev-parse --show-toplevel)" || exit 2
