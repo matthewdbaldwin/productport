@@ -6,7 +6,8 @@
 // tier/classification/status are enums; empty inputs submit as null.
 
 import { useState } from 'react';
-import { useModalEsc, useFocusTrap, optimizeImageForUpload, Tooltip } from '@matthewdbaldwin/microport-ui';
+import { useTranslations } from 'next-intl';
+import { useModalEsc, useFocusTrap, optimizeImageForUpload, Tooltip, useConfirm } from '@matthewdbaldwin/microport-ui';
 import { useToast } from '@/components/ui/Toast';
 import { ApiError } from '@/lib/api';
 import { testId } from '@/lib/i18nIds';
@@ -115,15 +116,20 @@ export function ProductEditModal({ mode, initial, onClose, onSaved, onGalleryCha
   const isDirty = clrDirty || Object.keys(f).some((k) => f[k] !== initialF[k]);
   const trapRef = useFocusTrap<HTMLDivElement>();
   const { toast } = useToast();
+  const tc = useTranslations('confirmDialog');
+  const { confirm, confirmDialog } = useConfirm({ confirmLabel: tc('confirm'), cancelLabel: tc('cancel') });
 
   // Every dismissal path (ESC, backdrop click, the X button, Cancel) funnels
   // through here: a dirty, unsaved form asks for confirmation before discarding
   // it. useModalEsc's own `!saving` gate (below) already blocks ESC outright
   // while a save is in flight; backdrop/X/Cancel re-check `saving` too so a
-  // stray call can't slip through and pop the confirm mid-save.
-  const requestClose = () => {
+  // stray call can't slip through and pop the confirm mid-save. While the
+  // confirm is open its Radix overlay covers this modal and its Escape handler
+  // stops propagation, so useModalEsc can't re-enter; a second call would only
+  // supersede (resolve false) the first, never stack two dialogs.
+  const requestClose = async () => {
     if (saving) return;
-    if (isDirty && !confirm('Discard your unsaved changes?')) return;
+    if (isDirty && !(await confirm({ title: tc('title'), message: tc('discardChanges'), tone: 'default' }))) return;
     onClose();
   };
   useModalEsc(requestClose, !saving);
@@ -440,6 +446,7 @@ export function ProductEditModal({ mode, initial, onClose, onSaved, onGalleryCha
           </span>
         </div>
       </div>
+      {confirmDialog}
     </div>
   );
 }

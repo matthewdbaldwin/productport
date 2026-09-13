@@ -73,5 +73,11 @@
     "sectionAccount": "Account",
     "exportCsvTooltip": "Downloads the current catalog as a CSV, in the same column format Import CSV expects.",
     "signInHelpLink": "Help with signing in"
+  },
+  "confirmDialog": {
+    "title": "Are you sure?",
+    "confirm": "Confirm",
+    "cancel": "Cancel",
+    "discardChanges": "Discard your unsaved changes?"
   }
 }
