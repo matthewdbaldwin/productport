@@ -20,6 +20,7 @@
     "close": "Fermer",
     "ssoNote": "Votre nom, votre e-mail et votre rôle sont gérés par le hub MicroPort.",
     "theme": "Thème",
+    "language": "Langue",
     "manageAccount": "Gérer votre compte",
     "signOut": "Se déconnecter"
   },
