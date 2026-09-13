@@ -13,7 +13,10 @@ vi.mock('@matthewdbaldwin/microport-ui', () => ({
   ToastProvider: ({ children }: { children: React.ReactNode }) => children,
   useToast: () => ({ toast: vi.fn() }),
   Tooltip: ({ children }: { children: React.ReactNode }) => children,
+  // Discard-confirm never opens in these help-popover tests.
+  useConfirm: () => ({ confirm: async () => false, confirmDialog: null }),
 }));
+vi.mock('next-intl', () => ({ useTranslations: () => (key: string) => key }));
 
 vi.mock('@/lib/products', async (importOriginal) => {
   const actual = await importOriginal<typeof import('@/lib/products')>();

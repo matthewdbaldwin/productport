@@ -73,5 +73,11 @@
     "sectionAccount": "Compte",
     "exportCsvTooltip": "Télécharge le catalogue actuel au format CSV, avec les mêmes colonnes que celles attendues par Import CSV.",
     "signInHelpLink": "Aide à la connexion"
+  },
+  "confirmDialog": {
+    "title": "Êtes-vous sûr ?",
+    "confirm": "Confirmer",
+    "cancel": "Annuler",
+    "discardChanges": "Abandonner les modifications non enregistrées ?"
   }
 }
