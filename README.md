@@ -44,8 +44,8 @@ Two tiers, deployed as two containers behind the shared ALB:
 git clone https://github.com/matthewdbaldwin/productport
 cd productport
 cp .env.example .env               # fill in DATABASE_URL, SALESPORT_JWT_PUBLIC_KEY, etc.
-npm install                        # api tier (Express + Prisma, port 4006)
-cd web && npm install              # web tier (Next.js, port 3100)
+npx -y npm@10 install              # api tier (Express + Prisma, port 4006) — engine-strict requires npm ^10.0.0
+cd web && npx -y npm@10 install    # web tier (Next.js, port 3100) — same npm ^10.0.0 requirement
 cd .. && npx prisma migrate dev    # apply migrations to local Postgres
 npm run seed                       # optional: seed the sample catalog
 npm run dev                        # API on :4006
