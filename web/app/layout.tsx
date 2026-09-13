@@ -1,5 +1,5 @@
 import './globals.css';
-import { getLocale, getMessages } from 'next-intl/server';
+import { getLocale, getMessages, getTimeZone } from 'next-intl/server';
 import { themeScript } from '@/lib/theme';
 import { preloadCleanupScript, chunkRecoveryScript } from '@matthewdbaldwin/microport-ui';
 import { AuthProvider } from '@/contexts/AuthContext';
@@ -28,6 +28,7 @@ export const metadata = {
 export default async function RootLayout({ children }: { children: React.ReactNode }) {
   const locale = await getLocale();
   const messages = await getMessages();
+  const timeZone = await getTimeZone(); // 'UTC' from i18n.ts; see LocaleProvider
   return (
     <html lang={locale} suppressHydrationWarning>
       <head>
@@ -39,7 +40,7 @@ export default async function RootLayout({ children }: { children: React.ReactNo
         <script dangerouslySetInnerHTML={{ __html: chunkRecoveryScript }} />
       </head>
       <body>
-        <LocaleProvider locale={locale} messages={messages}>
+        <LocaleProvider locale={locale} messages={messages} timeZone={timeZone}>
           <AuthProvider>
             <ToastProvider>
               {children}
