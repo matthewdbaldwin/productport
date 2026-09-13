@@ -10,7 +10,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { useTranslations } from 'next-intl';
 import { Bug, Upload, X } from 'lucide-react';
-import { Tooltip, useModalEsc, useFocusTrap, optimizeImageForUpload } from '@matthewdbaldwin/microport-ui';
+import { Tooltip, useModalEsc, useFocusTrap, optimizeImageForUpload, useConfirm } from '@matthewdbaldwin/microport-ui';
 import { useAuth } from '@/contexts/AuthContext';
 import { api } from '@/lib/api';
 import { testId } from '@/lib/i18nIds';
@@ -69,6 +69,8 @@ export function BugReportButton() {
 
 function BugReportModal({ onClose }: { onClose: () => void }) {
   const t = useTranslations('bug');
+  const tc = useTranslations('confirmDialog');
+  const { confirm, confirmDialog } = useConfirm({ confirmLabel: tc('confirm'), cancelLabel: tc('cancel') });
   const [title, setTitle] = useState('');
   const [detail, setDetail] = useState('');
   const [priority, setPriority] = useState<Priority>('normal');
@@ -89,9 +91,11 @@ function BugReportModal({ onClose }: { onClose: () => void }) {
   // through here. `submitting` already gates ESC via useModalEsc's second arg
   // below; backdrop/X/Cancel re-check it too so a stray call can't slip through
   // mid-submit. A dirty, unsent report asks for confirmation before discarding.
-  const requestClose = () => {
+  // The confirm's Escape stops propagation, so useModalEsc can't re-enter while
+  // it's open; a second call would only supersede (resolve false) the first.
+  const requestClose = async () => {
     if (submitting) return;
-    if (isDirty && !confirm(t('confirmDiscard'))) return;
+    if (isDirty && !(await confirm({ title: tc('title'), message: t('confirmDiscard'), tone: 'default' }))) return;
     onClose();
   };
 
@@ -306,6 +310,7 @@ function BugReportModal({ onClose }: { onClose: () => void }) {
           )}
         </div>
       </div>
+      {confirmDialog}
     </>
   );
 }

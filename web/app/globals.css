@@ -9,7 +9,7 @@ layer(base);
 @theme {
   --color-fg: var(--text);
 
-  --color-overlay: var(--overlay, rgba(0, 0, 0, 0.5));
+  --color-overlay: var(--overlay);
 
   --color-accent: var(--accent);
   --color-accent-dark: var(--accent-dk);

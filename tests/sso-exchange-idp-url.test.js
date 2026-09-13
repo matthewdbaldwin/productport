@@ -11,11 +11,22 @@
 jest.mock('../src/lib/db', () => ({ session: { update: jest.fn() } }));
 
 const crypto = require('crypto');
-const { publicKey } = crypto.generateKeyPairSync('rsa', { modulusLength: 2048 });
+const { publicKey, privateKey } = crypto.generateKeyPairSync('rsa', { modulusLength: 2048 });
+const jwt = require('jsonwebtoken');
 
 // middleware/auth loads at require time and needs these.
+const ISSUER = 'https://sales-dev.microport.com';
 process.env.SALESPORT_JWT_PUBLIC_KEY = Buffer.from(publicKey.export({ type: 'spki', format: 'pem' })).toString('base64');
-process.env.SALESPORT_JWT_ISSUER = 'https://sales-dev.microport.com';
+process.env.SALESPORT_JWT_ISSUER = ISSUER;
+
+// 2026-09-13: this fixture used to be the literal 'tok'. The seam now VERIFIES
+// before cookieing (hubport#21), so an unsigned placeholder no longer reaches the
+// routing assertion this suite is about. Routing claim unchanged.
+const SSO_TOKEN = jwt.sign(
+  { sub: 1, email: 'pm@microport.com', app_roles: { productport: 'viewer' } },
+  privateKey.export({ type: 'pkcs8', format: 'pem' }),
+  { algorithm: 'RS256', issuer: ISSUER, audience: 'productport', expiresIn: '8h' },
+);
 process.env.SSO_CLAIMS_MODE = 'off';
 
 // The two URLs whose split is under test.
@@ -38,7 +49,7 @@ describe('SSO exchange target (Slice 4h IdP split)', () => {
 
   test('relays the code to IDP_API_URL — NOT SALESPORT_API_URL', async () => {
     global.fetch = jest.fn().mockResolvedValue({
-      ok: true, status: 200, json: async () => ({ token: 'tok', role: 'viewer' }),
+      ok: true, status: 200, json: async () => ({ token: SSO_TOKEN, role: 'viewer' }),
     });
 
     const res = await request(makeApp())

@@ -20,6 +20,7 @@
     "close": "Close",
     "ssoNote": "Your name, email, and role are managed by the MicroPort hub.",
     "theme": "Theme",
+    "language": "Language",
     "manageAccount": "Manage your account",
     "signOut": "Sign out"
   },
@@ -79,5 +80,11 @@
     "placeholder": "Search pages and help…",
     "empty": "No results.",
     "goTo": "Go to"
+  },
+  "confirmDialog": {
+    "title": "Are you sure?",
+    "confirm": "Confirm",
+    "cancel": "Cancel",
+    "discardChanges": "Discard your unsaved changes?"
   }
 }

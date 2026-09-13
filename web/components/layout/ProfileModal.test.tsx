@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { render, screen, fireEvent } from '@testing-library/react';
 import React from 'react';
 import { NextIntlClientProvider } from 'next-intl';
@@ -24,9 +24,9 @@ vi.mock('@/components/ui/ThemePicker', () => ({ ThemePicker: () => null }));
 
 import { ProfileModal } from './ProfileModal';
 
-function renderModal() {
+function renderModal(locale = 'en-US') {
   return render(
-    <NextIntlClientProvider locale="en" messages={en}>
+    <NextIntlClientProvider locale={locale} messages={en}>
       <ProfileModal open onClose={() => {}} />
     </NextIntlClientProvider>,
   );
@@ -44,5 +44,48 @@ describe('ProfileModal sign-out (hubport#113)', () => {
     renderModal();
     fireEvent.click(screen.getByTestId('profile-sign-out'));
     expect(auth.logout).toHaveBeenCalledTimes(1);
+  });
+});
+
+// productport#8 — nothing wrote the NEXT_LOCALE cookie web/i18n.ts reads, so
+// every user was stuck on the default locale. The profile modal's language
+// picker is the writer.
+describe('ProfileModal language picker (productport#8)', () => {
+  const reload = vi.fn();
+  const realLocation = window.location;
+
+  beforeEach(() => {
+    reload.mockClear();
+    document.cookie = 'NEXT_LOCALE=; path=/; max-age=0';
+    // jsdom does not implement navigation; stub reload so the click is observable.
+    Object.defineProperty(window, 'location', {
+      configurable: true,
+      value: { ...realLocation, reload },
+    });
+  });
+  afterEach(() => {
+    Object.defineProperty(window, 'location', { configurable: true, value: realLocation });
+  });
+
+  it('renders one option per shipped locale, with the current one pressed', () => {
+    renderModal('en-US');
+    expect(screen.getByText('Language')).toBeInTheDocument();
+    expect(screen.getByTestId('profile-modal-locale-en-us')).toHaveAttribute('aria-pressed', 'true');
+    expect(screen.getByTestId('profile-modal-locale-zh-cn')).toHaveAttribute('aria-pressed', 'false');
+    expect(screen.getByTestId('profile-modal-locale-fr-fr')).toHaveAttribute('aria-pressed', 'false');
+  });
+
+  it('choosing a language writes the NEXT_LOCALE cookie and reloads', () => {
+    renderModal('en-US');
+    fireEvent.click(screen.getByTestId('profile-modal-locale-fr-fr'));
+    expect(document.cookie).toContain('NEXT_LOCALE=fr-FR');
+    expect(reload).toHaveBeenCalledTimes(1);
+  });
+
+  it('choosing the already-active language is a no-op', () => {
+    renderModal('en-US');
+    fireEvent.click(screen.getByTestId('profile-modal-locale-en-us'));
+    expect(document.cookie).not.toContain('NEXT_LOCALE=');
+    expect(reload).not.toHaveBeenCalled();
   });
 });
