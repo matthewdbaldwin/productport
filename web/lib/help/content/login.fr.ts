@@ -10,7 +10,7 @@ const login: HelpArticleContent = {
   slug:  'login',
   title: 'Connexion',
   intro: 'ProductPort n’a pas de mot de passe propre. Vous vous connectez via le Portail de l’entreprise (hub.microport.com), et ProductPort fait confiance à la réponse qu’il reçoit.',
-  lastUpdated: '2026-09-04',
+  lastUpdated: '2026-09-13',
   sections: [
     {
       id: 'how-it-works', heading: 'Fonctionnement de la connexion',
@@ -45,6 +45,7 @@ const login: HelpArticleContent = {
       id: 'profile', heading: 'Votre profil et la déconnexion',
       blocks: [
         { kind: 'paragraph', text: 'L’icône Profil dans la barre supérieure ouvre un panneau latéral affichant votre nom, votre e-mail et votre rôle. Ces informations sont gérées de manière centralisée et sont en lecture seule ici ; Gérer votre compte ouvre le Portail de l’entreprise dans un nouvel onglet.', labels: ['Profil', 'Gérer votre compte'] },
+        { kind: 'paragraph', text: 'Langue permet de passer ProductPort en English, 中文 ou Français. La page se recharge dans la langue choisie, et les articles d’aide, la recherche d’aide et la palette ⌘K suivent ce choix. Il est mémorisé dans ce navigateur uniquement : il n’est pas enregistré dans votre compte, donc un autre navigateur ou appareil conserve son propre réglage.', labels: ['Langue'] },
         { kind: 'paragraph', text: 'Le sélecteur Thème modifie l’apparence de ProductPort. Votre choix est enregistré dans votre compte et vous suit dans les autres applications MicroPort.', labels: ['Thème'] },
         { kind: 'paragraph', text: 'Le bouton Se déconnecter se trouve en bas du panneau ; c’est le seul endroit de ProductPort où vous pouvez vous déconnecter. Vous arrivez ensuite sur la page de connexion, qui relance immédiatement la connexion : fermez donc l’onglet si vous avez terminé.', labels: ['Se déconnecter'] },
       ],

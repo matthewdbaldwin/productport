@@ -17,9 +17,9 @@ import { useRouter } from 'next/navigation';
 import { HelpDropdown } from '@matthewdbaldwin/microport-ui/help';
 import type { HelpSearchDoc, HelpSearchResult } from '@matthewdbaldwin/microport-ui/help/logic';
 import { useAuth } from '@/contexts/AuthContext';
+import { useHelpLocale } from '@/lib/help/useHelpLocale';
 import { buildSearchDocs } from '@/lib/help/searchDocs';
 import { recordHelpSearchMiss } from '@/lib/help/searchMiss';
-import { DEFAULT_LOCALE } from '@/lib/locales';
 
 type GateUser = { role?: string; isSuperuser?: boolean } | null | undefined;
 
@@ -32,7 +32,7 @@ async function fuzzySearch(query: string, docs: HelpSearchDoc[], user: GateUser)
 export function HelpLauncher() {
   const { user } = useAuth();
   const router = useRouter();
-  const locale = user?.locale ?? DEFAULT_LOCALE;
+  const locale = useHelpLocale();
   const docs = useMemo(() => buildSearchDocs(locale), [locale]);
 
   if (!user) return null;

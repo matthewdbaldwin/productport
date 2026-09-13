@@ -25,11 +25,11 @@ layer(base);
   --color-muted-2: var(--muted2);
   --color-muted: var(--muted);
 
-  --color-green: #22c55e;
-  --color-red: #ff144b;
-  --color-yellow: #f59e0b;
-  --color-purple: #802cf1;
-  --color-blue: #3b82f6;
+  --color-green: var(--green, #22c55e);
+  --color-red: var(--red, #ff144b);
+  --color-yellow: var(--yellow, #f59e0b);
+  --color-purple: var(--purple, #802cf1);
+  --color-blue: var(--blue, #3b82f6);
   --color-orange: #f97316;
   --color-teal: #14b8a6;
   --color-navy: #002d72;
@@ -145,26 +145,16 @@ body {
   color: var(--text); /* --fg is not a token; the theme foreground is --text */
 }
 
-/* Raw custom-property aliases the shared microport-ui components read inline
-   (ToastProvider styles its text with var(--fg) and its error accent with
-   var(--danger); these are NOT Tailwind @theme tokens). Every other satellite
-   defines them this way — without them a mounted <ToastProvider> loses its
-   error-red border/icon. Mirrors clinicport. --danger carries the palette-red
-   hex fallback so the accent holds in any theme that doesn't set --red. */
+/* Raw custom-property alias the shared microport-ui components read inline
+   (ToastProvider styles its error accent with var(--danger); this is NOT a
+   Tailwind @theme token). microport-ui 0.58 now ships --fg/--danger-fill/
+   --danger-fill-fg itself (identical values, deleted here); --danger stays
+   local because it carries an extra hex fallback — `var(--red, #ff144b)` vs
+   the lib's fallback-less alias — so the accent still holds in a theme that
+   doesn't set --red. (--danger-fill vs --danger contrast rationale: lib
+   source, 2026-08-21.) */
 [data-theme] {
-  --fg: var(--text);
   --danger: var(--red, #ff144b);
-
-  /* SOLID destructive fill — a red that stays AA under WHITE text. Deliberately
-     NOT var(--red)/--danger: the per-theme palette red is tuned to be legible AS
-     TEXT on that theme's surface, which pulls it bright, and bright red under
-     white text measures 3.85:1 (#ff144b) / 3.41:1 (#ff4060) against the 4.5:1
-     floor. The frozen --status-danger is the opposite trade — 4.83:1 under white
-     — so fills use it and text keeps --danger. Repointing --danger itself would
-     regress the dark themes, where #dc2626 as TEXT drops to 4.02 (night) / 3.35
-     (graphite). Two roles, two tokens; don't collapse them. (2026-08-21.) */
-  --danger-fill:    var(--status-danger, #dc2626);
-  --danger-fill-fg: #ffffff;
 }
 
 /* reduced-motion kill-switch MUST cap iteration-count or infinite animations strobe.
@@ -177,51 +167,4 @@ body {
     animation-iteration-count: 1 !important;
     transition-duration: 0.01ms !important;
   }
-}
-
-@layer components {
-  .btn-primary {
-    /* min-height 44px = platform tap-target standard (feedback_tap_target_standard);
-       items-center + justify-center keep label centered (incl. full-width buttons). */
-    @apply inline-flex items-center justify-center rounded-md px-4 py-2 font-medium;
-    min-height: 44px;
-    background: var(--accent);
-    color: var(--accent-fg);
-  }
-
-  /* Toast / panel dismiss button (microport-ui renders className="btn-close").
-     44px hit-slop via a transparent border with background-clip keeping the
-     paint compact; the negative margin cancels the layout growth. Tap-target
-     standard; mirrors clinicport/execport. */
-  .btn-close {
-    @apply inline-flex items-center justify-center rounded-sm font-medium
-           px-2.5 py-1 text-xs text-white transition-colors
-           disabled:opacity-50 disabled:cursor-not-allowed;
-    background-color: var(--danger-fill);
-    background-clip: padding-box;
-    border: 6px solid transparent;
-    min-width: 44px;
-    min-height: 44px;
-    margin: -6px;
-  }
-  .btn-close:hover {
-    /* Darken rather than fade — opacity blends fill AND glyph toward the
-       surface, which drops white-on-red below AA exactly while hovered. */
-    background-color: color-mix(in srgb, var(--danger-fill) 88%, #000);
-  }
-
-  /* Neutral dismiss — closing a panel/toast/modal is navigation, not
-     destruction. Added 2026-08-21: productport defined only .btn-close (solid
-     destructive red) and had ZERO own uses of it, so microport-ui's Toast and
-     HelpButton — both neutral dismissals — were its only consumers and rendered
-     as destructive controls. Mirrors hubport's definition. */
-  .btn-icon-close {
-    @apply inline-flex items-center justify-center rounded-md transition-colors
-           disabled:opacity-60 disabled:cursor-not-allowed;
-    color: var(--muted);
-    min-width: 44px;
-    min-height: 44px;
-    margin: -10px;
-  }
-  .btn-icon-close:hover { color: var(--text); background: var(--surface2); }
 }

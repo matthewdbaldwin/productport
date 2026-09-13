@@ -10,7 +10,7 @@ const login: HelpArticleContent = {
   slug:  'login',
   title: 'Signing in',
   intro: 'ProductPort has no password of its own. You sign in through the Company Portal at hub.microport.com, and ProductPort trusts the answer it gets back.',
-  lastUpdated: '2026-09-04',
+  lastUpdated: '2026-09-13',
   sections: [
     {
       id: 'how-it-works', heading: 'How sign-in works',
@@ -45,6 +45,7 @@ const login: HelpArticleContent = {
       id: 'profile', heading: 'Your profile and signing out',
       blocks: [
         { kind: 'paragraph', text: 'The Profile icon in the top bar opens a side panel showing your name, email and role. They are managed centrally and are read-only here; Manage your account opens the Company Portal in a new tab.', labels: ['Profile', 'Manage your account'] },
+        { kind: 'paragraph', text: 'Language switches ProductPort between English, 中文 and Français. The page reloads in the language you pick, and help articles, help search and the ⌘K palette follow it too. The choice is remembered in this browser only: it is not saved to your account, so another browser or device keeps its own setting.', labels: ['Language'] },
         { kind: 'paragraph', text: 'The Theme picker changes how ProductPort looks. Your choice is saved to your account and follows you to other MicroPort apps.', labels: ['Theme'] },
         { kind: 'paragraph', text: 'Sign out is at the bottom of the panel, and it is the only place in ProductPort to sign out. Afterwards you land on the sign-in page, which starts sign-in again straight away, so close the tab if you are finished.', labels: ['Sign out'] },
       ],
