@@ -50,7 +50,7 @@ export function BugReportButton() {
           aria-label={t('label')}
           data-bug-report-launcher="true"
           {...testId(NS, 'launcher')}
-          className="group fixed bottom-20 right-4 md:bottom-4 z-40 inline-flex items-center justify-center min-w-11 min-h-11"
+          className="group fixed bottom-20 right-4 md:bottom-4 z-header inline-flex items-center justify-center min-w-11 min-h-11"
           style={{ color: 'var(--accent-fg)' }}
         >
           <span
@@ -217,8 +217,8 @@ function BugReportModal({ onClose }: { onClose: () => void }) {
 
   return (
     <>
-      <div className="fixed inset-0 z-50 bg-overlay" onClick={submitting ? undefined : requestClose} />
-      <div className="fixed inset-0 z-50 flex items-center justify-center p-4 pointer-events-none">
+      <div className="fixed inset-0 z-modal bg-overlay" onClick={submitting ? undefined : requestClose} />
+      <div className="fixed inset-0 z-modal flex items-center justify-center p-4 pointer-events-none">
         <div
           ref={trapRef}
           className="w-full max-w-lg rounded-xl shadow-xl border pointer-events-auto max-h-[90dvh] overflow-y-auto"

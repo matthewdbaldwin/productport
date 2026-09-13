@@ -75,6 +75,12 @@
     "exportCsvTooltip": "Télécharge le catalogue actuel au format CSV, avec les mêmes colonnes que celles attendues par Import CSV.",
     "signInHelpLink": "Aide à la connexion"
   },
+  "palette": {
+    "label": "Palette de commandes",
+    "placeholder": "Rechercher des pages et de l'aide…",
+    "empty": "Aucun résultat.",
+    "goTo": "Aller à"
+  },
   "confirmDialog": {
     "title": "Êtes-vous sûr ?",
     "confirm": "Confirmer",
