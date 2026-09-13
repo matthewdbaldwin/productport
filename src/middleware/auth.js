@@ -165,24 +165,39 @@ function isProductAdmin(user) {
 }
 
 // Catalog-write gate. Used by the editor + CSV import/export + disable/enable routes.
-function requireProductAdmin(req, res, next) {
-  if (isProductAdmin(req.user)) {
-    if (!isAdminByRole(req.user)) {
-      // ⚠ KNOWN AUDIT GAP (productport#11): ProductPort has no general-purpose
-      // AuditLog, only the catalog-scoped ProductAudit and UserLifecycleEvent,
-      // which records the flag being granted/revoked but not each use of it.
-      // Until one exists, a request admitted ONLY by fleetSuperuser is logged
-      // here with a distinct event tag, so it is never indistinguishable from
-      // ordinary admin activity. A real product_admin who also holds the flag
-      // is not a bypass and is not logged.
-      logger.warn(
-        { event: 'FLEET_SUPERUSER_BYPASS', userId: req.user.id, email: req.user.email, method: req.method, path: req.originalUrl },
-        '[audit-gap] fleetSuperuser bypass admitted a ProductPort admin request (no AuditLog in ProductPort; see productport#11)',
-      );
-    }
-    return next();
+//
+// Fleet superuser bypass (productport#11, productport#27; mirrors EngagePort
+// src/middleware/roles.js allow()): a request admitted ONLY by fleetSuperuser is
+// recorded as a durable ProductAudit row (action FLEET_SUPERUSER_BYPASS,
+// productId null, method + path in newValue), AWAITED before next(). If the
+// write throws, the request fails CLOSED with a 500: an unaudited bypass is
+// exactly what the record exists to prevent. A real product_admin who also
+// holds the flag is not a bypass and writes nothing. This is deliberately NOT
+// the products.js audit() helper, which swallows write errors.
+async function requireProductAdmin(req, res, next) {
+  if (!isProductAdmin(req.user)) {
+    return res.status(403).json({ error: 'Forbidden — ProductPort admin only' });
   }
-  return res.status(403).json({ error: 'Forbidden — ProductPort admin only' });
+  if (!isAdminByRole(req.user)) {
+    try {
+      await db.productAudit.create({
+        data: {
+          productId: null,
+          userId: req.user.id ?? null,
+          userEmail: req.user.email || 'unknown',
+          action: 'FLEET_SUPERUSER_BYPASS',
+          newValue: JSON.stringify({ method: req.method, path: req.originalUrl }),
+        },
+      });
+    } catch (err) {
+      logger.error(
+        { event: 'FLEET_SUPERUSER_BYPASS', err: err.message, userId: req.user.id, method: req.method, path: req.originalUrl },
+        '[auth] fleet superuser bypass audit write failed; refusing the request',
+      );
+      return res.status(500).json({ error: 'Authorization audit failed.' });
+    }
+  }
+  return next();
 }
 
 // ── SSO consumer seam (hubport#21; mirrors OpsPort#28, opsport f589a2b) ─────
