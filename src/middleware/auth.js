@@ -124,6 +124,9 @@ async function requireAuth(req, res, next) {
       locale: payload.locale || user.locale || null,
       appRoles: payload.app_roles || {},
       isSuperuser: !!payload.is_superuser,
+      // From the DB ROW only (productport#11): synced by lifecycle events, never
+      // by this upsert and never from a token claim.
+      fleetSuperuser: user.fleetSuperuser === true,
     };
     return next();
   } catch (err) {
@@ -147,13 +150,37 @@ function requireRole(...roles) {
 // resolves to role=viewer, so role alone would wrongly exclude them). Used both by
 // the write gate below and by read routes that widen visibility for admins (e.g.
 // disabled products are hidden from viewers but shown to admins).
-function isProductAdmin(user) {
+//
+// Third arm (productport#11, hubport#88): `fleetSuperuser` is the fleet-wide
+// bypass. It is the persisted User column synced from HubPort lifecycle events
+// and copied onto req.user by requireAuth, never a token claim. Strict `=== true`
+// so only the real boolean from the row counts.
+function isAdminByRole(user) {
   return !!user && (user.role === 'product_admin' || user.role === 'superuser' || !!user.isSuperuser);
+}
+
+function isProductAdmin(user) {
+  return isAdminByRole(user) || (!!user && user.fleetSuperuser === true);
 }
 
 // Catalog-write gate. Used by the editor + CSV import/export + disable/enable routes.
 function requireProductAdmin(req, res, next) {
-  if (isProductAdmin(req.user)) return next();
+  if (isProductAdmin(req.user)) {
+    if (!isAdminByRole(req.user)) {
+      // ⚠ KNOWN AUDIT GAP (productport#11): ProductPort has no general-purpose
+      // AuditLog, only the catalog-scoped ProductAudit and UserLifecycleEvent,
+      // which records the flag being granted/revoked but not each use of it.
+      // Until one exists, a request admitted ONLY by fleetSuperuser is logged
+      // here with a distinct event tag, so it is never indistinguishable from
+      // ordinary admin activity. A real product_admin who also holds the flag
+      // is not a bypass and is not logged.
+      logger.warn(
+        { event: 'FLEET_SUPERUSER_BYPASS', userId: req.user.id, email: req.user.email, method: req.method, path: req.originalUrl },
+        '[audit-gap] fleetSuperuser bypass admitted a ProductPort admin request (no AuditLog in ProductPort; see productport#11)',
+      );
+    }
+    return next();
+  }
   return res.status(403).json({ error: 'Forbidden — ProductPort admin only' });
 }
 

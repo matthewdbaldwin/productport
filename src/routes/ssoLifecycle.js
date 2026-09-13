@@ -117,11 +117,14 @@ router.post('/event', lifecycleGuard, async (req, res) => {
 
     const existing = await db.user.findUnique({
       where: { email: normEmail },
-      select: { id: true, active: true },
+      select: { id: true, active: true, fleetSuperuser: true },
     });
     const decision = decideUserUpdate(kind, existing, {
       newRole,
       mapRole: (wire) => mapRole('productport', wire),
+      // productport#11 — HubPort stamps the current flag on every event;
+      // undefined (older emitter) means no change. See lifecycleAction.js.
+      fleetSuperuser: parsed.data.fleetSuperuser,
     });
     if (decision.data) {
       await db.user.update({ where: { id: existing.id }, data: decision.data });
@@ -131,8 +134,12 @@ router.post('/event', lifecycleGuard, async (req, res) => {
       // true, locale keeps the schema default). The event carries no name —
       // placeholder from the email local-part; sync-on-login backfills the
       // real name + re-resolves the role from the SSO claim at first login.
+      const { role, fleetSuperuser } = decision.create;
       await db.user.create({
-        data: { email: normEmail, name: placeholderName(normEmail), role: decision.create.role },
+        data: {
+          email: normEmail, name: placeholderName(normEmail), role,
+          ...(fleetSuperuser !== undefined ? { fleetSuperuser } : {}),
+        },
       });
     } else if (decision.skip) {
       logger.warn({ correlationId, kind, email: normEmail }, '[sso-lifecycle] unknown event kind — audit row stashed');
