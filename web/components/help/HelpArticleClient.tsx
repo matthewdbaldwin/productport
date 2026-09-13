@@ -6,10 +6,13 @@
 // behind createHelpArticleClient; this file only supplies ProductPort's ports.
 //
 // Locale: useAuth().user.locale — the hub-provisioned DB column
-// (src/middleware/auth.js) — is the only per-user locale signal this app
-// carries (nothing writes the NEXT_LOCALE cookie next-intl reads), and it is
-// what the popovers (ProductEditModal) and the search corpus (HelpLauncher,
-// /help) resolve against too, so article, popover and search agree.
+// (src/middleware/auth.js). This app carries TWO locale signals: the
+// NEXT_LOCALE cookie next-intl reads for UI chrome (written by the
+// ProfileModal language picker, productport#8), and this per-user column.
+// Help content resolves against the column, as do the popovers
+// (ProductEditModal) and the search corpus (HelpLauncher, /help), so article,
+// popover and search agree with each other; they do NOT follow a
+// cookie-only language change made in the profile modal.
 //
 // Chrome strings come from the `help` namespace of messages/*.json. getStrings
 // is a plain port the generated component invokes AFTER its early

@@ -6,6 +6,7 @@
 // (token verify, session revocation, claims schema) are NOT reimplemented here.
 // prd_canonical_auth_guard_lib, prd_microport_contracts, b1_phase4_satellite_cookie_migration.
 'use strict';
+const jwt = require('jsonwebtoken'); // decode-only, for the seam's rejection classifier
 const db = require('../lib/db');
 const logger = require('../lib/logger');
 const { createVerifier, createWithFreshAccessToken } = require('@matthewdbaldwin/microport-auth');
@@ -124,6 +125,9 @@ async function requireAuth(req, res, next) {
       locale: payload.locale || user.locale || null,
       appRoles: payload.app_roles || {},
       isSuperuser: !!payload.is_superuser,
+      // From the DB ROW only (productport#11): synced by lifecycle events, never
+      // by this upsert and never from a token claim.
+      fleetSuperuser: user.fleetSuperuser === true,
     };
     return next();
   } catch (err) {
@@ -147,14 +151,67 @@ function requireRole(...roles) {
 // resolves to role=viewer, so role alone would wrongly exclude them). Used both by
 // the write gate below and by read routes that widen visibility for admins (e.g.
 // disabled products are hidden from viewers but shown to admins).
-function isProductAdmin(user) {
+//
+// Third arm (productport#11, hubport#88): `fleetSuperuser` is the fleet-wide
+// bypass. It is the persisted User column synced from HubPort lifecycle events
+// and copied onto req.user by requireAuth, never a token claim. Strict `=== true`
+// so only the real boolean from the row counts.
+function isAdminByRole(user) {
   return !!user && (user.role === 'product_admin' || user.role === 'superuser' || !!user.isSuperuser);
+}
+
+function isProductAdmin(user) {
+  return isAdminByRole(user) || (!!user && user.fleetSuperuser === true);
 }
 
 // Catalog-write gate. Used by the editor + CSV import/export + disable/enable routes.
 function requireProductAdmin(req, res, next) {
-  if (isProductAdmin(req.user)) return next();
+  if (isProductAdmin(req.user)) {
+    if (!isAdminByRole(req.user)) {
+      // ⚠ KNOWN AUDIT GAP (productport#11): ProductPort has no general-purpose
+      // AuditLog, only the catalog-scoped ProductAudit and UserLifecycleEvent,
+      // which records the flag being granted/revoked but not each use of it.
+      // Until one exists, a request admitted ONLY by fleetSuperuser is logged
+      // here with a distinct event tag, so it is never indistinguishable from
+      // ordinary admin activity. A real product_admin who also holds the flag
+      // is not a bypass and is not logged.
+      logger.warn(
+        { event: 'FLEET_SUPERUSER_BYPASS', userId: req.user.id, email: req.user.email, method: req.method, path: req.originalUrl },
+        '[audit-gap] fleetSuperuser bypass admitted a ProductPort admin request (no AuditLog in ProductPort; see productport#11)',
+      );
+    }
+    return next();
+  }
   return res.status(403).json({ error: 'Forbidden — ProductPort admin only' });
 }
 
-module.exports = { requireAuth, requireRole, requireProductAdmin, isProductAdmin, COOKIE_NAME, AUDIENCE, withFreshAccessToken };
+// ── SSO consumer seam (hubport#21; mirrors OpsPort#28, opsport f589a2b) ─────
+// Deliberately NARROWER than AUDIENCE. 'microport-apps' is a PROXY audience:
+// it may authenticate an ordinary request, but it must never SEAT a session.
+// `HandoffCode.targetApp` is enforced only at the IdP, which signs `aud` with the
+// target app, so the one thing the redeeming side must establish is that the
+// token was minted for productport. Same verifier as requireAuth (RS256, issuer,
+// dual-key/JWKS, claims mode); only the audience differs.
+const SEAM_AUDIENCE = 'productport';
+
+function verifySeamToken(token) {
+  return verify(token, { audience: SEAM_AUDIENCE });
+}
+
+// Classifier for the seam's REJECTION path only, never an authorisation input.
+// Re-verifies against the token's OWN declared audience, so it still proves
+// signature + issuer (a forgery returns null). Non-null means "genuine token
+// from an accepted signer, addressed elsewhere", as opposed to "cannot verify at
+// all", which is a key/issuer misconfiguration between our own services. The two
+// get different statuses so the first stays visible in the logs.
+function classifyForeignAudience(token) {
+  let aud;
+  try { aud = jwt.decode(token)?.aud; } catch { return null; }
+  if (!aud || (Array.isArray(aud) && aud.length === 0)) return null;
+  try { return verify(token, { audience: aud }); } catch { return null; }
+}
+
+module.exports = {
+  requireAuth, requireRole, requireProductAdmin, isProductAdmin, COOKIE_NAME, AUDIENCE, withFreshAccessToken,
+  SEAM_AUDIENCE, verifySeamToken, classifyForeignAudience,
+};

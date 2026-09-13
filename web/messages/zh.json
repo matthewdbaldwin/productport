@@ -20,6 +20,7 @@
     "close": "关闭",
     "ssoNote": "您的姓名、邮箱和角色由 MicroPort 中心统一管理。",
     "theme": "主题",
+    "language": "语言",
     "manageAccount": "管理您的账户",
     "signOut": "退出登录"
   },
@@ -73,5 +74,17 @@
     "sectionAccount": "账户",
     "exportCsvTooltip": "将当前目录下载为 CSV，列格式与“Import CSV”所需的格式相同。",
     "signInHelpLink": "登录帮助"
+  },
+  "palette": {
+    "label": "命令面板",
+    "placeholder": "搜索页面和帮助…",
+    "empty": "无结果。",
+    "goTo": "前往"
+  },
+  "confirmDialog": {
+    "title": "确定吗？",
+    "confirm": "确认",
+    "cancel": "取消",
+    "discardChanges": "放弃未保存的更改？"
   }
 }

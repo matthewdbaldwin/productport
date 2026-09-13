@@ -41,7 +41,7 @@
   border-bottom: 1px solid var(--lgrey);
   position: sticky;
   top: 0;
-  z-index: 20;
+  z-index: var(--z-header);
 }
 .tb {
   max-width: 1180px;
@@ -561,7 +561,7 @@
   display: flex;
   align-items: flex-start;
   justify-content: center;
-  z-index: 50;
+  z-index: var(--z-modal);
   padding: 34px 16px;
   overflow: auto;
 }

@@ -20,6 +20,7 @@
     "close": "Fermer",
     "ssoNote": "Votre nom, votre e-mail et votre rôle sont gérés par le hub MicroPort.",
     "theme": "Thème",
+    "language": "Langue",
     "manageAccount": "Gérer votre compte",
     "signOut": "Se déconnecter"
   },
@@ -73,5 +74,17 @@
     "sectionAccount": "Compte",
     "exportCsvTooltip": "Télécharge le catalogue actuel au format CSV, avec les mêmes colonnes que celles attendues par Import CSV.",
     "signInHelpLink": "Aide à la connexion"
+  },
+  "palette": {
+    "label": "Palette de commandes",
+    "placeholder": "Rechercher des pages et de l'aide…",
+    "empty": "Aucun résultat.",
+    "goTo": "Aller à"
+  },
+  "confirmDialog": {
+    "title": "Êtes-vous sûr ?",
+    "confirm": "Confirmer",
+    "cancel": "Annuler",
+    "discardChanges": "Abandonner les modifications non enregistrées ?"
   }
 }

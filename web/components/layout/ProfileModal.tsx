@@ -18,17 +18,27 @@
 import { useEffect } from 'react';
 import { createPortal } from 'react-dom';
 import { X, UserCircle, ExternalLink } from 'lucide-react';
-import { useTranslations } from 'next-intl';
+import { useLocale, useTranslations } from 'next-intl';
 import { Tooltip, useModalEsc, useFocusTrap } from '@matthewdbaldwin/microport-ui';
 import { useAuth } from '@/contexts/AuthContext';
 import { ThemePicker } from '@/components/ui/ThemePicker';
 import { SignOutSection } from '@/components/profile/SignOutSection';
 import { testId } from '@/lib/i18nIds';
+import { LOCALES } from '@/lib/locales';
 
 const NS = 'profileModal';
 
 function initials(nameOrEmail: string) {
   return nameOrEmail.slice(0, 2).toUpperCase();
+}
+
+// productport#8: web/i18n.ts resolves the locale from the NEXT_LOCALE cookie,
+// and this is the only thing that writes it. A full reload (not
+// router.refresh) so the server re-reads the cookie and every client bundle
+// picks up the new messages. Same shape as finport 8f96c3e.
+function setLocale(next: string) {
+  document.cookie = `NEXT_LOCALE=${next}; path=/; max-age=31536000; samesite=lax`;
+  window.location.reload();
 }
 
 interface Props {
@@ -38,6 +48,7 @@ interface Props {
 
 export function ProfileModal({ open, onClose }: Props) {
   const { user } = useAuth();
+  const locale = useLocale();
   const t = useTranslations('profile');
 
   useModalEsc(onClose);
@@ -53,7 +64,7 @@ export function ProfileModal({ open, onClose }: Props) {
   if (!open || !user || typeof document === 'undefined') return null;
 
   return createPortal(
-    <div className="fixed inset-0 z-50">
+    <div className="fixed inset-0 z-modal">
       <div className="absolute inset-0" style={{ background: 'var(--overlay)' }} onClick={onClose} />
 
       <div
@@ -102,6 +113,33 @@ export function ProfileModal({ open, onClose }: Props) {
           </div>
 
           <p className="text-xs" style={{ color: 'var(--muted)' }}>{t('ssoNote')}</p>
+
+          {/* Language — writes NEXT_LOCALE (productport#8) */}
+          <div className="pt-4 border-t" style={{ borderColor: 'var(--border)' }}>
+            <p className="text-sm font-medium mb-2" style={{ color: 'var(--fg)' }}>{t('language')}</p>
+            <div className="flex flex-wrap gap-2">
+              {LOCALES.map((opt) => {
+                const active = locale === opt.code;
+                return (
+                  <button
+                    key={opt.code}
+                    type="button"
+                    {...testId(NS, `locale-${opt.code}`)}
+                    onClick={() => { if (!active) setLocale(opt.code); }}
+                    aria-pressed={active}
+                    className="px-4 py-1.5 rounded-lg text-sm font-medium border transition-all min-h-11"
+                    style={{
+                      borderColor: active ? 'var(--accent)' : 'var(--border2)',
+                      background:  active ? 'color-mix(in srgb, var(--accent) 14%, transparent)' : 'transparent',
+                      color:       active ? 'var(--accent)' : 'var(--muted)',
+                    }}
+                  >
+                    {opt.label}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
 
           {/* Theme */}
           <div className="pt-4 border-t" style={{ borderColor: 'var(--border)' }}>

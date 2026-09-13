@@ -18,7 +18,7 @@
 'use strict';
 const express = require('express');
 const logger = require('../lib/logger');
-const { requireAuth } = require('../middleware/auth');
+const { requireAuth, verifySeamToken, classifyForeignAudience } = require('../middleware/auth');
 const { setSessionCookie, clearSessionCookie, REFRESH_COOKIE_NAME, setRefreshCookie, clearRefreshCookie } = require('../lib/cookies');
 const { revokeUpstreamRefresh } = require('../lib/refreshClient');
 const db = require('../lib/db');
@@ -89,6 +89,33 @@ router.post('/sso/exchange', async (req, res, next) => {
     const payload = await upstream.json().catch(() => ({}));
 
     if (upstream.ok && payload.token) {
+      // ⚠ VERIFY AT THE SEAM BEFORE COOKIEING (hubport#21; OpsPort#28 shape).
+      // This used to trust the IdP's response wholesale: whatever came back
+      // became the session cookie. `HandoffCode.targetApp` is enforced only at
+      // the IdP, so a code minted for ANOTHER app, relayed here, was cookied.
+      // requireAuth re-verifies on every later request, but it accepts the
+      // wider proxy audience ('microport-apps'), so it is not the check that
+      // belongs here. The seam SEATS the session: pin the addressee, once.
+      // Runs before EITHER cookie (access or refresh) is set.
+      try {
+        verifySeamToken(payload.token);
+      } catch (err) {
+        const misaddressed = classifyForeignAudience(payload.token);
+        if (misaddressed) {
+          logger.warn({ aud: misaddressed.aud, email: misaddressed.email },
+            '[sso] handoff token was minted for another app — refusing to seat a ProductPort session');
+          return res.status(403).json({
+            error: 'That sign-in link was issued for a different application.',
+            code:  'SSO_AUDIENCE_MISMATCH',
+          });
+        }
+        // Not verifiable at all: bad signature, wrong issuer, expired, or our
+        // own services disagree on keys. Fail loudly here rather than cookie it
+        // and 401 on every later request, which looks like a broken login.
+        logger.error({ err: err.message, idpApi: IDP_API },
+          '[sso] IdP token failed local verification — refusing to seat a session');
+        return res.status(502).json({ error: 'SSO could not be completed. Please try again.', code: 'SSO_TOKEN_UNVERIFIABLE' });
+      }
       if (refreshEnabled && payload.refreshToken) {
         const refreshRemainMs = Date.parse(payload.refreshTokenExpiresAt) - Date.now();
         setSessionCookie(res, payload.token,

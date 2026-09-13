@@ -11,14 +11,37 @@ const { toastSpy } = vi.hoisted(() => ({ toastSpy: vi.fn() }));
 
 // Mock microport-ui so the test doesn't pull the full ESM bundle (echarts/canvas)
 // into jsdom. useToast returns a spy so we can assert the modal fires a toast.
-vi.mock('@matthewdbaldwin/microport-ui', () => ({
-  useModalEsc: () => {},
-  useFocusTrap: () => ({ current: null }),
-  optimizeImageForUpload: async (f: File) => f,
-  ToastProvider: ({ children }: { children: React.ReactNode }) => children,
-  useToast: () => ({ toast: toastSpy }),
-  Tooltip: ({ children }: { children: React.ReactNode }) => children,
-}));
+// useConfirm is a minimal stand-in for the lib's awaitable hook: same contract
+// (confirm() → Promise<boolean>, render {confirmDialog} once) and the same button
+// testIds, so these tests pin the modal's wiring rather than the Radix dialog.
+vi.mock('@matthewdbaldwin/microport-ui', async () => {
+  const { useState } = await import('react');
+  return {
+    useModalEsc: () => {},
+    useFocusTrap: () => ({ current: null }),
+    optimizeImageForUpload: async (f: File) => f,
+    ToastProvider: ({ children }: { children: React.ReactNode }) => children,
+    useToast: () => ({ toast: toastSpy }),
+    Tooltip: ({ children }: { children: React.ReactNode }) => children,
+    useConfirm: () => {
+      const [pending, setPending] = useState<{ message: string; resolve: (v: boolean) => void } | null>(null);
+      const confirm = (o: { message: string }) =>
+        new Promise<boolean>((resolve) => setPending({ message: o.message, resolve }));
+      const settle = (v: boolean) => { pending?.resolve(v); setPending(null); };
+      const confirmDialog = pending ? (
+        <div role="alertdialog">
+          {pending.message}
+          <button data-testid="confirm-dialog-confirm-button" onClick={() => settle(true)}>fake-confirm</button>
+          <button data-testid="confirm-dialog-cancel-button" onClick={() => settle(false)}>fake-cancel</button>
+        </div>
+      ) : null;
+      return { confirm, confirmDialog };
+    },
+  };
+});
+
+// No NextIntlClientProvider in these bare renders — echo keys.
+vi.mock('next-intl', () => ({ useTranslations: () => (key: string) => key }));
 
 // Keep the real vocab constants (rendered by the form) but stub the network calls.
 vi.mock('@/lib/products', async (importActual) => ({
@@ -154,6 +177,47 @@ describe('ProductEditModal unified clearance save', () => {
   it('no longer renders a standalone "Save clearances" button', () => {
     renderModal();
     expect(screen.queryByRole('button', { name: 'Save clearances' })).toBeNull();
+  });
+});
+
+describe('ProductEditModal discard-changes guard', () => {
+  // Every dismissal path funnels through requestClose, which now awaits the
+  // shared useConfirm dialog (was native window.confirm) when the form is dirty.
+  const renderWithClose = () => {
+    const onClose = vi.fn();
+    render(<ProductEditModal mode="edit" initial={initial} onClose={onClose} onSaved={vi.fn()} />);
+    return onClose;
+  };
+
+  it('closes immediately without a confirm when the form is clean', async () => {
+    const onClose = renderWithClose();
+    fireEvent.click(screen.getByRole('button', { name: 'Cancel' }));
+
+    await waitFor(() => expect(onClose).toHaveBeenCalledTimes(1));
+    expect(screen.queryByTestId('confirm-dialog-confirm-button')).toBeNull();
+  });
+
+  it('keeps the modal open when the discard confirm is cancelled', async () => {
+    const onClose = renderWithClose();
+    fireEvent.change(screen.getByDisplayValue('Dnfinity115'), { target: { value: 'Renamed' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Cancel' }));
+
+    expect(await screen.findByText('discardChanges')).toBeInTheDocument();
+    fireEvent.click(await screen.findByTestId('confirm-dialog-cancel-button'));
+
+    await waitFor(() => expect(screen.queryByTestId('confirm-dialog-cancel-button')).toBeNull());
+    expect(onClose).not.toHaveBeenCalled();
+    expect(screen.getByDisplayValue('Renamed')).toBeInTheDocument();
+  });
+
+  it('closes when the discard confirm is accepted', async () => {
+    const onClose = renderWithClose();
+    fireEvent.change(screen.getByDisplayValue('Dnfinity115'), { target: { value: 'Renamed' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Close' }));
+
+    fireEvent.click(await screen.findByTestId('confirm-dialog-confirm-button'));
+
+    await waitFor(() => expect(onClose).toHaveBeenCalledTimes(1));
   });
 });
 

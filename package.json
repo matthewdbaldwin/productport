@@ -1,6 +1,6 @@
 {
   "name": "productport-api",
-  "version": "0.12.2",
+  "version": "0.12.3",
   "private": true,
   "engines": {
     "npm": "^10.0.0"

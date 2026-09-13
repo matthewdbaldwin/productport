@@ -37,6 +37,11 @@ model User {
   active      Boolean   @default(true)
   locale      String?   @default("en-US")
   password    String?   // null for SSO-only users
+  // Fleet-wide superuser bypass (productport#11, hubport#88). Synced ONLY from
+  // HubPort's lifecycle events (src/routes/ssoLifecycle.js); never read from a
+  // token claim and never written by any ProductPort route or UI. Distinct from
+  // the SalesPort-local `is_superuser` claim (req.user.isSuperuser).
+  fleetSuperuser Boolean @default(false)
   createdAt   DateTime  @default(now())
   updatedAt   DateTime  @updatedAt
   sessions    Session[]
