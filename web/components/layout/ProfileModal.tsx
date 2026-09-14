@@ -61,6 +61,10 @@ export function ProfileModal({ open, onClose }: Props) {
       onClose={onClose}
       variant="panel"
       title={t('title')}
+      // 0.60.1: the shell's ✕ carried a hardcoded English "Close" and lost this
+      // panel's testId when the container was hoisted. Both are props now.
+      closeLabel={t('close')}
+      closeProps={testId(NS, 'close')}
       // 28rem — the width this panel has always had; the panel default is 32rem.
       maxWidth="28rem"
       identity={
