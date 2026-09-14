@@ -13,13 +13,9 @@ const USER = { id: 1, email: 'a@b.c', name: 'Ada', role: 'product_admin' };
 vi.mock('@/contexts/AuthContext', () => ({
   useAuth: () => ({ user: USER, loading: false, logout: auth.logout }),
 }));
-// Same stub set ProductEditModal.test.tsx uses: keep the echarts/canvas ESM
-// bundle out of jsdom.
-vi.mock('@matthewdbaldwin/microport-ui', () => ({
-  useModalEsc: () => {},
-  useFocusTrap: () => ({ current: null }),
-  Tooltip: ({ children }: { children: React.ReactNode }) => children,
-}));
+// The panel container is microport-ui's ProfileModal (v0.60) and is rendered
+// for real — only the local ThemePicker is stubbed, to keep the echarts/canvas
+// ESM bundle out of jsdom.
 vi.mock('@/components/ui/ThemePicker', () => ({ ThemePicker: () => null }));
 
 import { ProfileModal } from './ProfileModal';
