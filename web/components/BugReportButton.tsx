@@ -77,9 +77,10 @@ export function BugReportButton() {
       // Auth-gated: only signed-in users file (mirrors the fleet). Never render
       // on the logged-out /login page.
       enabled={!!user}
-      // React's ButtonHTMLAttributes has no data-* index signature (those are
-      // only legal inline in JSX), so the spread needs a cast.
-      buttonProps={testId(NS, 'launcher') as React.ButtonHTMLAttributes<HTMLButtonElement>}
+      // No cast: since microport-ui 0.60.2 `buttonProps` is typed
+      // `& Record<string, unknown>`, which admits `data-*` keys directly (and
+      // rejects the old ButtonHTMLAttributes cast).
+      buttonProps={testId(NS, 'launcher')}
       submit={submit}
       appVersion={APP_VERSION}
       // The hub queue has always received the absolute URL for ProductPort,
