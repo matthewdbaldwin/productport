@@ -28,9 +28,6 @@ export function BugReportButton() {
   const { toast } = useToast();
 
   async function submit(p: BugReportPayload): Promise<BugReportResult> {
-    // The lib captures `pathname + search`; the hub queue has always received
-    // the absolute URL, which is what identifies the satellite in triage.
-    const pageUrl = typeof window !== 'undefined' ? window.location.origin + p.pageUrl : p.pageUrl;
     try {
       if (p.screenshot) {
         // Multipart path — the api() helper forces a JSON Content-Type, which
@@ -40,7 +37,7 @@ export function BugReportButton() {
         form.append('title', p.title);
         form.append('description', p.description);
         form.append('priority', p.priority);
-        form.append('pageUrl', pageUrl);
+        form.append('pageUrl', p.pageUrl);
         if (p.browserAgent) form.append('browserAgent', p.browserAgent);
         if (p.viewportSize) form.append('viewportSize', p.viewportSize);
         if (p.appVersion) form.append('appVersion', p.appVersion);
@@ -61,7 +58,7 @@ export function BugReportButton() {
             title: p.title,
             description: p.description,
             priority: p.priority,
-            pageUrl,
+            pageUrl: p.pageUrl,
             browserAgent: p.browserAgent,
             viewportSize: p.viewportSize,
             appVersion: p.appVersion,
@@ -85,6 +82,10 @@ export function BugReportButton() {
       buttonProps={testId(NS, 'launcher') as React.ButtonHTMLAttributes<HTMLButtonElement>}
       submit={submit}
       appVersion={APP_VERSION}
+      // The hub queue has always received the absolute URL for ProductPort,
+      // which is what identifies the satellite in triage. 0.60.1 made that a
+      // prop, replacing the location.origin reconstruction this file did.
+      capturePageUrl="href"
       confirmOnDirty
       onSuccess={() => toast(t('thanks'), 'ok')}
       labels={{
@@ -130,6 +131,17 @@ export function BugReportButton() {
         confirmDiscard: t('confirmDiscard'),
         confirmDiscardConfirm: tc('confirm'),
         confirmDiscardCancel: tc('cancel'),
+      }}
+      // Inner testIds the 0.60 hoist took with the markup they annotated;
+      // 0.60.1 gives them back as per-slot attribute spreads.
+      slotProps={{
+        close:       testId(NS, 'close'),
+        title:       testId(NS, 'title'),
+        description: testId(NS, 'detail'),
+        priority:    testId(NS, 'priority'),
+        screenshot:  testId(NS, 'screenshotInput'),
+        cancel:      testId(NS, 'cancel'),
+        submit:      testId(NS, 'submit'),
       }}
     />
   );
