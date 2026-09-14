@@ -11,17 +11,25 @@ import { LOCALES, DEFAULT_LOCALE, type LocaleCode } from '@/lib/locales';
 export { LOCALES, DEFAULT_LOCALE };
 export type { LocaleCode };
 
+// timeZone is passed through, not inherited: a provider rendered from a
+// client component gets NO config from i18n.ts (only one rendered directly
+// in a Server Component does), so without this every SSR'd formatter ran on
+// the container's zone and next-intl logged ENVIRONMENT_FALLBACK at every
+// task start. The layout reads it via getTimeZone() so i18n.ts stays the
+// single source. LocaleProvider.test.tsx pins it.
 export function LocaleProvider({
   locale,
   messages,
+  timeZone,
   children,
 }: {
   locale: string;
   messages: Record<string, unknown>;
+  timeZone?: string;
   children: ReactNode;
 }) {
   return (
-    <NextIntlClientProvider locale={locale} messages={messages}>
+    <NextIntlClientProvider locale={locale} messages={messages} timeZone={timeZone}>
       {children}
     </NextIntlClientProvider>
   );
