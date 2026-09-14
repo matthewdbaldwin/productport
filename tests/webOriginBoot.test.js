@@ -1,14 +1,15 @@
 'use strict';
 
-// The boot guard in src/app.js: WEB_ORIGIN must be set when NODE_ENV=production.
+// The CORS fail-closed guard in src/app.js: the parsed WEB_ORIGIN list must be
+// non-empty when NODE_ENV=production.
 //
-// Before the guard, an unset WEB_ORIGIN left corsOrigins empty and the CORS
-// middleware fell through to `origin: true`, which reflects the caller's own
-// Origin header back alongside `credentials: true` — i.e. ANY site could make
-// credentialed cross-origin calls to this API. A missing env var is a silent
-// misconfiguration, so it has to be fatal at boot rather than a live hole.
-// Mirrors salesport/execport/opsport/clinicport, which run the identical
-// production-only guard over their own FRONTEND_ORIGIN.
+// An empty list makes the CORS middleware fall through to `origin: true`, which
+// reflects the caller's own Origin header back alongside `credentials: true`,
+// so ANY site could make credentialed cross-origin calls to this API. A
+// misconfiguration like that has to be fatal at boot, not a live hole.
+// The guard checks the PARSED list, so a value that is truthy but holds no
+// origin (" ", ",") is rejected too; the earlier `!process.env.WEB_ORIGIN`
+// guard let those through.
 //
 // WEB_ORIGIN is blanked with '' rather than `delete`d on purpose. src/app.js
 // runs `require('dotenv').config()` at module load; dotenv does not override a
@@ -17,65 +18,57 @@
 // puts the real value straight back. Same trap, same fix, as documented in
 // hubport/tests/jest.setup.env.js.
 
-// A REAL pino instance with only .error swapped for a spy. A plain object of
-// jest.fn()s is not enough: src/app.js hands this same logger to pino-http,
-// which reads pino internals (logger.levels.values) at construction and throws
-// on a duck-typed stand-in.
+// A REAL pino instance (silenced). A plain object of jest.fn()s is not enough:
+// src/app.js hands this logger to pino-http, which reads pino internals
+// (logger.levels.values) at construction and throws on a duck-typed stand-in.
 // Slice 5a: src/routes/auth.js reads IDP_API_URL at MODULE LOAD and throws if
 // unset, so requiring src/app.js at all needs it present.
 process.env.IDP_API_URL = 'https://idp.example.com';
 
-const mockLoggerError = jest.fn();
-jest.mock('../src/lib/logger', () => {
-  const logger = jest.requireActual('pino')({ level: 'silent' });
-  logger.error = mockLoggerError;
-  return logger;
-});
+jest.mock('../src/lib/logger', () => jest.requireActual('pino')({ level: 'silent' }));
 jest.mock('../src/lib/db', () => ({ user: { findMany: jest.fn() } }));
 
 const ORIGINAL_NODE_ENV  = process.env.NODE_ENV;
 const ORIGINAL_WEB_ORIGIN = process.env.WEB_ORIGIN;
 
-let exitSpy;
-
-beforeEach(() => {
-  mockLoggerError.mockClear();
-  exitSpy = jest.spyOn(process, 'exit').mockImplementation(() => {});
-});
-
 afterEach(() => {
-  exitSpy.mockRestore();
   process.env.NODE_ENV = ORIGINAL_NODE_ENV;
   if (ORIGINAL_WEB_ORIGIN === undefined) delete process.env.WEB_ORIGIN;
   else process.env.WEB_ORIGIN = ORIGINAL_WEB_ORIGIN;
   jest.resetModules();
 });
 
-// A fresh module registry each time — the guard runs once, at require.
+// A fresh module registry each time: the guard runs once, at require.
 const loadApp = () => { jest.isolateModules(() => { require('../src/app'); }); };
 
-describe('src/app.js — WEB_ORIGIN boot guard', () => {
-  test('production with no WEB_ORIGIN logs and exits 1 instead of booting with open CORS', () => {
+const GUARD_MESSAGE = 'WEB_ORIGIN must be set in production';
+
+describe('src/app.js — CORS fail-closed boot guard', () => {
+  test.each([
+    ['empty', ''],
+    ['whitespace only', '   '],
+    ['separators only', ' , ,'],
+  ])('production with a %s WEB_ORIGIN refuses to boot', (_label, value) => {
     process.env.NODE_ENV = 'production';
-    process.env.WEB_ORIGIN = '';
-    loadApp();
-    expect(mockLoggerError).toHaveBeenCalledWith(
-      expect.stringContaining('WEB_ORIGIN env var is required in production'),
-    );
-    expect(exitSpy).toHaveBeenCalledWith(1);
+    process.env.WEB_ORIGIN = value;
+    expect(loadApp).toThrow(GUARD_MESSAGE);
   });
 
   test('production with WEB_ORIGIN set boots normally', () => {
     process.env.NODE_ENV = 'production';
     process.env.WEB_ORIGIN = 'https://product.microport.com';
-    loadApp();
-    expect(exitSpy).not.toHaveBeenCalled();
+    expect(loadApp).not.toThrow();
+  });
+
+  test('production with a comma-separated WEB_ORIGIN list boots normally', () => {
+    process.env.NODE_ENV = 'production';
+    process.env.WEB_ORIGIN = 'https://product.microport.com, https://product-dev.microport.com';
+    expect(loadApp).not.toThrow();
   });
 
   test('outside production a missing WEB_ORIGIN is not fatal — local dev is unaffected', () => {
     process.env.NODE_ENV = 'test';
     process.env.WEB_ORIGIN = '';
-    loadApp();
-    expect(exitSpy).not.toHaveBeenCalled();
+    expect(loadApp).not.toThrow();
   });
 });
