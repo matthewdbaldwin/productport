@@ -8,5 +8,9 @@ export default getRequestConfig(async () => {
   const cookieLocale = (await cookies()).get('NEXT_LOCALE')?.value;
   const match = LOCALES.find((l) => l.code === cookieLocale) || LOCALES.find((l) => l.code === DEFAULT_LOCALE)!;
   const messages = (await import(`./messages/${match.file}.json`)).default;
-  return { locale: match.code, messages };
+  // timeZone: without a global default next-intl raises ENVIRONMENT_FALLBACK
+  // on every server render (seen in prod at /ecs/productport-web) and formats
+  // dates in whichever zone the container happens to run in — a
+  // hydration-mismatch risk. UTC, like finport/hubport web/i18n.ts.
+  return { locale: match.code, messages, timeZone: 'UTC' };
 });
