@@ -1,301 +1,191 @@
-// SSO-lifecycle receiver boundary + integration: the HMAC gate rejects a bad
-// signature (401), a valid `disable` deactivates the local user, a retried
-// delivery (same X-Lifecycle-Event-Id) dedups, and /state returns the
-// microport-contracts LifecycleStateResponse shape. Mirrors the salesport sender
-// (signWebhookBody + x-salesport-signature) so signer↔verifier parity is proven.
+// tests/ssoLifecycle.test.js
+//
+// POST /api/sso/lifecycle/event — ProductPort's wiring of microport-auth's
+// shared lifecycle receiver (hubport#133). The pipeline's own behaviour (dedup,
+// the atomic claim, ordering, reclaim) is tested in microport-auth; this file
+// proves the mount is wired to it: the id-bound HubPort signature, the removed
+// legacy surfaces, and ProductPort's plugs (including create-on-grant) reached
+// through the real module.
+//
+// The event table is microport-auth's in-memory stand-in (a real
+// compare-and-swap, hubport#129); the User table stays mocked. HMAC is real.
 'use strict';
 
-const SECRET = 'lifecycle-test-secret';
-process.env.SALESPORT_LIFECYCLE_SECRET = SECRET;
+process.env.HUBPORT_LIFECYCLE_SECRET = 'pp-test-lifecycle-secret';
+delete process.env.ALLOW_UNSIGNED_LIFECYCLE;
 
-// Mock the DB before requiring the router.
-const mockStore = {
-  events: new Map(), // senderEventId -> row
-  user: { id: 7, email: 'gone@test.local', active: true, role: 'product_admin' },
-};
-jest.mock('../src/lib/db', () => ({
-  userLifecycleEvent: {
-    findUnique: jest.fn(async ({ where }) => mockStore.events.get(where.senderEventId) || null),
-    create: jest.fn(async ({ data }) => {
-      const row = { id: `evt_${mockStore.events.size + 1}`, ...data };
-      if (data.senderEventId) mockStore.events.set(data.senderEventId, row);
-      return row;
-    }),
-    update: jest.fn(async ({ where, data }) => {
-      for (const row of mockStore.events.values()) {
-        if (row.id === where.id) {
-          Object.assign(row, data);
-          return row;
-        }
-      }
-      return {};
-    }),
-    // Default to "wins the claim" so every existing test — which never
-    // exercises the race itself — keeps passing unmodified. Concurrency
-    // tests below override with mockResolvedValueOnce.
-    updateMany: jest.fn().mockResolvedValue({ count: 1 }),
-  },
-  user: {
-    findUnique: jest.fn(async () => (mockStore.user ? { id: mockStore.user.id, active: mockStore.user.active, role: mockStore.user.role } : null)),
-    update: jest.fn(async ({ data }) => { Object.assign(mockStore.user, data); return mockStore.user; }),
-    create: jest.fn(async ({ data }) => { mockStore.user = { id: 99, active: true, ...data }; return mockStore.user; }),
-  },
-}));
+jest.mock('../src/lib/db', () => {
+  const { createLifecycleEventsFake } = require('@matthewdbaldwin/microport-auth');
+  return {
+    user: { findUnique: jest.fn(), updateMany: jest.fn(), create: jest.fn() },
+    userLifecycleEvent: createLifecycleEventsFake(),
+  };
+});
+jest.mock('../src/lib/logger', () => ({ info: jest.fn(), warn: jest.fn(), error: jest.fn() }));
 
 const express = require('express');
 const request = require('supertest');
-const { signWebhookBody } = require('@matthewdbaldwin/microport-auth');
+const { signLifecycleBody, signWebhookBody } = require('@matthewdbaldwin/microport-auth');
 const db = require('../src/lib/db');
 
-function makeApp() {
-  const app = express();
-  app.use(express.json({ verify: (req, _res, buf) => { req.rawBody = buf; } }));
-  app.use('/api/sso/lifecycle', require('../src/routes/ssoLifecycle'));
-  return app;
-}
+const SECRET = 'pp-test-lifecycle-secret';
+const app = express();
+app.use(express.json({ verify: (req, _res, buf) => { req.rawBody = buf; } }));
+app.use('/api/sso/lifecycle', require('../src/routes/ssoLifecycle'));
 
-// Wire-accurate LifecycleEvent (matches salesport's sender: an `id` UUID + the
-// nullable-but-present prev/new/actor fields). The contract requires these keys.
+// Wire-accurate LifecycleEvent: the contract requires the nullable-but-present
+// prev/new/actor fields.
 const evt = (o = {}) => ({
-  id: 'ev-uuid-1', email: 'gone@test.local', kind: 'disable',
+  id: 'ev-uuid-1', email: 'Gone@Test.local', kind: 'disable',
   prevRole: null, newRole: null, actorEmail: 'admin@test.local', actorRole: 'admin', ...o,
 });
 
-const post = (app, path, body, { sig, eventId } = {}) => {
-  const raw = JSON.stringify(body);
-  let r = request(app).post(path).set('Content-Type', 'application/json');
-  if (sig !== null) r = r.set('x-salesport-signature', sig ?? signWebhookBody(SECRET, raw));
-  if (eventId) r = r.set('X-Lifecycle-Event-Id', eventId);
-  return r.send(raw);
-};
+let nextSeq = 1000;
+function postSigned(bodyObj, { eventId = String(++nextSeq), sign = 'id-bound', header = 'x-hubport-signature' } = {}) {
+  const str = JSON.stringify(bodyObj);
+  const signature = sign === 'id-bound' ? signLifecycleBody(SECRET, eventId, str) : signWebhookBody(SECRET, str);
+  return request(app).post('/api/sso/lifecycle/event')
+    .set('Content-Type', 'application/json')
+    .set('X-Lifecycle-Event-Id', eventId)
+    .set(header, signature)
+    .send(str);
+}
 
-describe('POST /api/sso/lifecycle/event', () => {
-  beforeEach(() => { mockStore.events.clear(); mockStore.user = { id: 7, email: 'gone@test.local', active: true, role: 'product_admin' }; jest.clearAllMocks(); });
+const activeUser = { id: 7, active: true, fleetSuperuser: false, lifecycleSeq: null };
 
-  test('bad signature → 401', async () => {
-    const app = makeApp();
-    const res = await post(app, '/api/sso/lifecycle/event',
-      evt(), { sig: 'sha256=deadbeef' });
-    expect(res.status).toBe(401);
-  });
+beforeEach(() => {
+  jest.clearAllMocks();
+  db.user.findUnique.mockResolvedValue(null);
+  db.user.updateMany.mockResolvedValue({ count: 1 });
+  db.user.create.mockImplementation(async ({ data }) => ({ id: 99, active: true, ...data }));
+});
 
-  test('valid disable → 200 + local user deactivated', async () => {
-    const app = makeApp();
-    const res = await post(app, '/api/sso/lifecycle/event', evt());
+describe('POST /event — wired to the shared receiver', () => {
+  it('a signed disable on an active user deactivates it, conditional on senderSeq, and settles one audit row', async () => {
+    db.user.findUnique.mockResolvedValue(activeUser);
+
+    const res = await postSigned(evt(), { eventId: '501' });
+
     expect(res.status).toBe(200);
-    expect(res.body.ok).toBe(true);
-    expect(mockStore.user.active).toBe(false);
-  });
-
-  test('retried delivery (same X-Lifecycle-Event-Id) dedups', async () => {
-    const app = makeApp();
-    const body = evt();
-    await post(app, '/api/sso/lifecycle/event', body, { eventId: 'ob-1' });
-    const second = await post(app, '/api/sso/lifecycle/event', body, { eventId: 'ob-1' });
-    expect(second.status).toBe(200);
-    expect(second.body.deduplicated).toBe(true);
-  });
-
-  test('retried delivery whose prior attempt never finished (processedAt: null) re-processes instead of deduping', async () => {
-    const app = makeApp();
-    // Simulate a prior delivery that logged the audit row but died mid-processing
-    // (e.g. a transient db.user.update failure) — the catch block sets `error`
-    // but leaves `processedAt: null` and 5xx's so the sender retries.
-    mockStore.events.set('ob-2', {
-      id: 'evt_prior', senderEventId: 'ob-2', email: 'gone@test.local', kind: 'disable',
-      prevRole: null, newRole: null, actorEmail: 'admin@test.local', actorRole: 'admin',
-      payload: evt(), processedAt: null, error: 'transient failure',
+    expect(res.body.outcome).toEqual({ kind: 'applied', reason: null, changes: ['active'] });
+    expect(db.user.findUnique).toHaveBeenCalledWith(expect.objectContaining({ where: { email: 'gone@test.local' } }));
+    expect(db.user.updateMany).toHaveBeenCalledWith({
+      where: { id: 7, OR: [{ lifecycleSeq: null }, { lifecycleSeq: { lte: 501 } }] },
+      data: { active: false, lifecycleSeq: 501 },
     });
-
-    const res = await post(app, '/api/sso/lifecycle/event', evt(), { eventId: 'ob-2' });
-
-    expect(res.status).toBe(200);
-    expect(res.body.deduplicated).toBeUndefined();
-    // Processing actually re-ran: the disable side-effect landed this time.
-    expect(mockStore.user.active).toBe(false);
-    expect(db.user.update).toHaveBeenCalled();
-    // The existing row was reused, not re-created (senderEventId is @unique —
-    // a second create() for the same id would throw a unique-constraint error).
-    expect(db.userLifecycleEvent.create).not.toHaveBeenCalled();
+    const rows = db.userLifecycleEvent.$rows().filter((r) => r.senderEventId === '501');
+    expect(rows).toHaveLength(1);
+    expect(rows[0]).toMatchObject({ email: 'gone@test.local', kind: 'disable', senderSeq: 501, error: null });
+    expect(rows[0].processedAt).toBeInstanceOf(Date);
   });
 
-  test('malformed payload → 200 dropped (soft-drop, no outbox retry)', async () => {
-    const app = makeApp();
-    const res = await post(app, '/api/sso/lifecycle/event', evt({ email: undefined })); // no email → contract reject
+  it('a redelivery of a settled event is a duplicate and never re-applies', async () => {
+    db.user.findUnique.mockResolvedValue(activeUser);
+    await postSigned(evt(), { eventId: '502' });
+    db.user.updateMany.mockClear();
+
+    const res = await postSigned(evt(), { eventId: '502' });
+
     expect(res.status).toBe(200);
-    expect(res.body.dropped).toBeDefined();
+    expect(res.body.outcome.kind).toBe('duplicate');
+    expect(db.user.updateMany).not.toHaveBeenCalled();
   });
 
-  test('well-formed event for an unknown user → 200 noop (no local row to touch)', async () => {
-    mockStore.user = null; // db.user.findUnique returns null
-    const app = makeApp();
-    const res = await post(app, '/api/sso/lifecycle/event', evt({ email: 'ghost@test.local' }));
+  it('a malformed payload is dropped with 200 (a retry cannot fix it)', async () => {
+    const res = await postSigned(evt({ email: undefined }));
     expect(res.status).toBe(200);
-    expect(res.body.ok).toBe(true);
+    expect(res.body.dropped).toBe('schema');
+    expect(db.user.findUnique).not.toHaveBeenCalled();
+  });
+
+  it('a disable for an unknown local user settles as noop without writing', async () => {
+    const res = await postSigned(evt({ email: 'nobody@test.local' }));
+    expect(res.status).toBe(200);
+    expect(res.body.outcome).toMatchObject({ kind: 'noop', reason: 'no-local-user' });
+    expect(db.user.updateMany).not.toHaveBeenCalled();
+    expect(db.user.create).not.toHaveBeenCalled();
+  });
+
+  it('a revoke is a noop on the active flag but still advances the watermark', async () => {
+    db.user.findUnique.mockResolvedValue(activeUser);
+    const res = await postSigned(evt({ kind: 'revoke', prevRole: 'product_admin' }), { eventId: '503' });
+    expect(res.status).toBe(200);
+    expect(res.body.outcome).toMatchObject({ kind: 'noop', reason: 'role-jit-on-login' });
+    expect(db.user.updateMany).toHaveBeenCalledWith(expect.objectContaining({ data: { lifecycleSeq: 503 } }));
   });
 });
 
 // Fleet decision (HubPort grant authority, 2026-08-19): a grant/reactivate for
-// an email with NO local row must CREATE it — mirroring the JIT-create shape in
-// middleware/auth.js (email + name + role; the event carries no name, so the
-// placeholder is the email local-part — sync-on-login backfills the real name
-// at first login). An unmappable role never creates; disable/revoke stay no-ops.
-describe('POST /api/sso/lifecycle/event — create-on-grant (no local row)', () => {
-  beforeEach(() => { mockStore.events.clear(); mockStore.user = null; jest.clearAllMocks(); });
-
-  test('grant for an unknown email with a mappable role → creates the local row', async () => {
-    const app = makeApp();
-    const res = await post(app, '/api/sso/lifecycle/event',
-      evt({ kind: 'grant', email: 'new.hire@test.local', newRole: 'product_admin' }));
+// an email with NO local row CREATES it when the event's role maps.
+describe('POST /event — create-on-grant through the shared receiver', () => {
+  it('a grant for an unknown email with a mappable role creates the row, stamped with senderSeq', async () => {
+    const res = await postSigned(evt({ kind: 'grant', email: 'New.Hire@test.local', newRole: 'product_admin' }), { eventId: '601' });
 
     expect(res.status).toBe(200);
-    expect(res.body.applied).toBe(true);
-    expect(res.body.created).toBe(true);
+    expect(res.body.outcome).toEqual({ kind: 'applied', reason: 'created', changes: ['created'] });
     expect(db.user.create).toHaveBeenCalledWith({
-      data: { email: 'new.hire@test.local', name: 'new.hire', role: 'product_admin' },
+      data: { email: 'new.hire@test.local', name: 'new.hire', role: 'product_admin', lifecycleSeq: 601 },
     });
-    expect(db.user.update).not.toHaveBeenCalled();
+    expect(db.user.updateMany).not.toHaveBeenCalled();
   });
 
-  test('reactivate for an unknown email with a mappable role → creates too (same fleet path)', async () => {
-    const app = makeApp();
-    const res = await post(app, '/api/sso/lifecycle/event',
-      evt({ kind: 'reactivate', email: 'Back.Again@test.local', newRole: 'viewer' }));
-
-    expect(res.status).toBe(200);
-    expect(res.body.created).toBe(true);
-    // Email is normalized (lowercased) before both the lookup and the create.
+  it('a reactivate for an unknown email with a mappable role creates too', async () => {
+    const res = await postSigned(evt({ kind: 'reactivate', email: 'back@test.local', newRole: 'viewer' }));
+    expect(res.body.outcome.reason).toBe('created');
     expect(db.user.create).toHaveBeenCalledWith({
-      data: { email: 'back.again@test.local', name: 'back.again', role: 'viewer' },
+      data: expect.objectContaining({ email: 'back@test.local', role: 'viewer' }),
     });
   });
 
-  test('grant with an unmappable role for an unknown email → 200 noop, never creates', async () => {
-    const app = makeApp();
-    const res = await post(app, '/api/sso/lifecycle/event',
-      evt({ kind: 'grant', email: 'ghost@test.local', newRole: 'not-a-real-role' }));
-
+  it('an unmappable role never creates', async () => {
+    const res = await postSigned(evt({ kind: 'grant', email: 'ghost@test.local', newRole: 'not-a-real-role' }));
     expect(res.status).toBe(200);
-    expect(res.body.ok).toBe(true);
-    expect(res.body.created).toBeUndefined();
+    expect(res.body.outcome).toMatchObject({ kind: 'noop', reason: 'unmapped-role' });
     expect(db.user.create).not.toHaveBeenCalled();
   });
 
-  test('disable for an unknown email stays a no-op — never creates', async () => {
-    const app = makeApp();
-    const res = await post(app, '/api/sso/lifecycle/event',
-      evt({ kind: 'disable', email: 'ghost@test.local' }));
-
-    expect(res.status).toBe(200);
-    expect(db.user.create).not.toHaveBeenCalled();
-    expect(db.user.update).not.toHaveBeenCalled();
-  });
-
-  test('grant on an EXISTING active user does not create a duplicate', async () => {
-    mockStore.user = { id: 7, email: 'gone@test.local', active: true, role: 'viewer' };
-    const app = makeApp();
-    const res = await post(app, '/api/sso/lifecycle/event',
-      evt({ kind: 'grant', email: 'gone@test.local', newRole: 'product_admin' }));
-
-    expect(res.status).toBe(200);
+  it('a grant on an existing active user does not create a duplicate', async () => {
+    db.user.findUnique.mockResolvedValue(activeUser);
+    const res = await postSigned(evt({ kind: 'grant', newRole: 'product_admin' }));
+    expect(res.body.outcome).toMatchObject({ kind: 'noop', reason: 'already-active' });
     expect(db.user.create).not.toHaveBeenCalled();
   });
-});
 
-describe('POST /api/sso/lifecycle/event — concurrent-delivery atomic claim', () => {
-  beforeEach(() => { mockStore.events.clear(); mockStore.user = { id: 7, email: 'gone@test.local', active: true, role: 'product_admin' }; jest.clearAllMocks(); });
-
-  // Seeds an existing-but-unprocessed audit row, same shape the dedup lookup
-  // (senderEventId → processedAt: null) reuses rather than re-creating.
-  const seedUnprocessed = (senderEventId, id) => {
-    mockStore.events.set(senderEventId, {
-      id, senderEventId, email: 'gone@test.local', kind: 'disable',
-      prevRole: null, newRole: null, actorEmail: 'admin@test.local', actorRole: 'admin',
-      payload: evt(), processedAt: null, error: null,
-    });
-  };
-
-  test('the claim is a single updateMany scoped by id AND processedAt: null, in the same statement that sets processedAt', async () => {
-    const app = makeApp();
-    seedUnprocessed('claim-1', 'evt_claim');
-
-    await post(app, '/api/sso/lifecycle/event', evt(), { eventId: 'claim-1' });
-
-    expect(db.userLifecycleEvent.updateMany).toHaveBeenCalledWith({
-      where: { id: 'evt_claim', processedAt: null },
-      data: { processedAt: expect.any(Date) },
-    });
-  });
-
-  test('two concurrent deliveries of the same unprocessed row: the User side-effect fires exactly once', async () => {
-    const app = makeApp();
-    // Both concurrent deliveries must read the row BEFORE either has committed.
-    // Queuing two identical processedAt:null snapshots (rather than the live
-    // seeded-row lookup) guarantees that, regardless of which request's event
-    // loop turn actually finishes first — supertest is real (if loopback) I/O,
-    // so that order isn't deterministic — neither dedup pre-check can be
-    // retroactively short-circuited by the other's completion. That would test
-    // Node scheduling, not the atomic claim below it.
-    db.userLifecycleEvent.findUnique
-      .mockResolvedValueOnce({ id: 'evt_race', senderEventId: 'race-1', processedAt: null, error: null })
-      .mockResolvedValueOnce({ id: 'evt_race', senderEventId: 'race-1', processedAt: null, error: null });
-    db.userLifecycleEvent.updateMany
-      .mockResolvedValueOnce({ count: 1 })
-      .mockResolvedValueOnce({ count: 0 });
-
-    const [r1, r2] = await Promise.all([
-      post(app, '/api/sso/lifecycle/event', evt(), { eventId: 'race-1' }),
-      post(app, '/api/sso/lifecycle/event', evt(), { eventId: 'race-1' }),
-    ]);
-
-    const deduped = [r1.body.deduplicated, r2.body.deduplicated];
-    expect(deduped.filter((d) => d === true)).toHaveLength(1);
-    expect(deduped.filter((d) => d !== true)).toHaveLength(1);
-    expect(db.user.update).toHaveBeenCalledTimes(1);
-  });
-
-  test('the loser of the atomic claim never reads or writes the User row', async () => {
-    const app = makeApp();
-    seedUnprocessed('lose-1', 'evt_lose');
-    db.userLifecycleEvent.updateMany.mockResolvedValueOnce({ count: 0 });
-
-    const res = await post(app, '/api/sso/lifecycle/event', evt(), { eventId: 'lose-1' });
-
-    expect(res.body.deduplicated).toBe(true);
-    expect(db.user.findUnique).not.toHaveBeenCalled();
-    expect(db.user.update).not.toHaveBeenCalled();
-  });
-
-  test('a processing failure after winning the claim resets processedAt back to null', async () => {
-    const app = makeApp();
-    seedUnprocessed('fail-1', 'evt_fail');
-    db.user.findUnique.mockRejectedValueOnce(new Error('boom'));
-
-    const res = await post(app, '/api/sso/lifecycle/event', evt(), { eventId: 'fail-1' });
-
+  it('a create that loses a race with a first login (unique violation) answers 500 so HubPort retries', async () => {
+    db.user.create.mockRejectedValue(Object.assign(new Error('Unique constraint failed'), { code: 'P2002' }));
+    const res = await postSigned(evt({ kind: 'grant', email: 'racer@test.local', newRole: 'viewer' }), { eventId: '602' });
     expect(res.status).toBe(500);
-    expect(db.userLifecycleEvent.update).toHaveBeenCalledWith(
-      expect.objectContaining({
-        where: { id: 'evt_fail' },
-        data: expect.objectContaining({ processedAt: null }),
-      })
-    );
+    const row = db.userLifecycleEvent.$rows().find((r) => r.senderEventId === '602');
+    expect(row.processedAt).toBeNull();
+    expect(row.claimedAt).toBeNull();
   });
 });
 
-describe('POST /api/sso/lifecycle/state', () => {
-  beforeEach(() => { mockStore.user = { id: 7, email: 'gone@test.local', active: true, role: 'product_admin' }; jest.clearAllMocks(); });
-
-  test('existing user → contract-shaped state', async () => {
-    const app = makeApp();
-    const res = await post(app, '/api/sso/lifecycle/state', { email: 'gone@test.local' });
-    expect(res.status).toBe(200);
-    expect(res.body).toEqual({ exists: true, role: 'product_admin', status: 'active', deletedAt: null });
+describe('POST /event — signature', () => {
+  it('rejects a body-only signature (the pre-0.17 HubPort sender) with 401', async () => {
+    const res = await postSigned(evt(), { sign: 'body-only' });
+    expect(res.status).toBe(401);
+    expect(db.user.findUnique).not.toHaveBeenCalled();
   });
 
-  test('/state without email → 400', async () => {
-    const app = makeApp();
-    const res = await post(app, '/api/sso/lifecycle/state', {});
-    expect(res.status).toBe(400);
+  it('rejects the retired SalesPort header with 401', async () => {
+    const res = await postSigned(evt(), { header: 'x-salesport-signature' });
+    expect(res.status).toBe(401);
+  });
+
+  it('rejects a delivery without X-Lifecycle-Event-Id with 401', async () => {
+    const str = JSON.stringify(evt());
+    const res = await request(app).post('/api/sso/lifecycle/event')
+      .set('Content-Type', 'application/json')
+      .set('x-hubport-signature', signWebhookBody(SECRET, str))
+      .send(str);
+    expect(res.status).toBe(401);
+  });
+});
+
+describe('removed surfaces', () => {
+  it('POST /state no longer exists', async () => {
+    const res = await request(app).post('/api/sso/lifecycle/state').send({ email: 'gone@test.local' });
+    expect(res.status).toBe(404);
   });
 });

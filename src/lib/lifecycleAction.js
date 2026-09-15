@@ -1,31 +1,32 @@
-// src/lib/lifecycleAction.js — pure policy for the SSO-lifecycle receiver.
+// src/lib/lifecycleAction.js — ProductPort's plugs for microport-auth's shared
+// lifecycle receiver (createLifecycleReceiver, hubport#133).
 //
 // ProductPort is a UNIVERSAL / JIT app (see src/lib/resolveRole.js): every
 // authenticated employee is at least a `viewer`, and the effective role is
 // re-resolved from the SSO claim on EVERY login. So — unlike opsport/clinicport
 // which persist role + soft-delete on grant/revoke — ProductPort persists NO
-// role from a lifecycle event. The only local state a lifecycle event touches
-// is the account-active flag, so an offboarded (disabled) employee loses access
-// before their current access token expires instead of waiting it out.
+// role from a lifecycle event on an existing row. The local state an event
+// touches is the account-active flag and the HubPort-owned fleetSuperuser flag,
+// so an offboarded (disabled) employee loses access before their current access
+// token expires instead of waiting it out.
 //
-//   grant / reactivate — if a local user exists but is disabled, re-enable it
-//                        (this is also the reconciler's backfill path for
-//                        "disabled locally but active on salesport" drift).
+//   grant / reactivate — if a local user exists but is disabled, re-enable it.
 //                        Role is NOT written — it re-resolves JIT on next login.
 //                        If NO local row exists and the event's role maps,
 //                        CREATE the row (fleet decision, HubPort grant
 //                        authority 2026-08-19): a hub grant used to be a noop
-//                        here, leaving the user invisible to the census/state
-//                        probes until first login. An unmappable/absent role
-//                        never creates — same conservatism as the fleet's
+//                        here, leaving the user invisible to the census probe
+//                        until first login. An unmappable/absent role never
+//                        creates — same conservatism as the fleet's
 //                        unknown-role skip (clinicport/opsport/reviewport).
-//   revoke             — no-op. Losing the productport grant just drops the
-//                        employee back to `viewer` on their next login; they're
-//                        still an employee, so we don't deactivate.
+//   revoke             — no-op on the active flag. Losing the productport grant
+//                        just drops the employee back to `viewer` on their next
+//                        login; they're still an employee, so we don't deactivate.
 //   disable            — deactivate the local user (active=false).
 //
-// Kept pure (no prisma/express) so the policy is unit-tested in isolation
-// (tests/lifecycleAction.test.js); the route wires it to db.user.updateMany.
+// decideUserUpdate and placeholderName are pure (tests/lifecycleAction.test.js).
+// loadCurrent and applyLifecycle take the Prisma client as their first argument
+// so the route can inject it lazily.
 'use strict';
 
 // decideUserUpdate(kind, existing, ctx) → one of:
@@ -90,17 +91,80 @@ function placeholderName(email) {
   return local || null;
 }
 
-// stateResponse(user) → the microport-contracts LifecycleStateResponse shape the
-// salesport reconciler diffs. PP has no soft-delete column, so deletedAt is
-// always null; `active` maps to the status string the reconciler compares.
-function stateResponse(user) {
-  if (!user) return { exists: false };
-  return {
-    exists: true,
-    role: user.role,
-    status: user.active ? 'active' : 'disabled',
-    deletedAt: null,
-  };
+// Neither Prisma call accepts an AbortSignal, so both plugs check it before
+// touching the DB, and every statement is bounded by db.js's statement_timeout
+// (30s default), below the receiver's 60s applyTimeoutMs.
+function throwIfAborted(signal) {
+  if (signal && signal.aborted) throw signal.reason;
 }
 
-module.exports = { decideUserUpdate, stateResponse, placeholderName };
+// loadCurrent(db, email, { signal }) → the local user row the policy reads, or
+// null. The receiver hands over the email already lowercased and trimmed.
+async function loadCurrent(db, email, { signal } = {}) {
+  throwIfAborted(signal);
+  return db.user.findUnique({
+    where: { email },
+    select: { id: true, active: true, fleetSuperuser: true, lifecycleSeq: true },
+  });
+}
+
+// applyLifecycle(db, { event, current, senderSeq, signal, mapRole }) → receiver Outcome.
+//
+// The receiver's hard requirements for an apply plug (kevlar round 2):
+//  1. Conditional on senderSeq. An update lands only where the row's
+//     lifecycleSeq is null or not newer than this event's, and it stamps
+//     lifecycleSeq in the same statement. A zero count means a newer event has
+//     already been written, so this one must not overwrite it. `lte` rather than
+//     `lt` lets a retry of this same event rewrite identical values. A created
+//     row is stamped with this event's senderSeq.
+//  2. Honours the signal (checked before each write) and the statement timeout.
+//  3. Idempotent: it writes the event's absolute state ("active = X"), never a
+//     delta. A retry after a successful create finds the row and takes the
+//     conditional update, which writes the same values.
+//
+// An existing row is written even when decideUserUpdate says noop, so the
+// watermark still advances: otherwise a late older event could overwrite the
+// state a newer no-op event confirmed.
+//
+// Create-on-grant can race a first login's JIT upsert on the email's unique
+// index. That create throws (P2002); the receiver releases the claim and
+// answers 500, and HubPort's retry finds the row and updates it instead.
+async function applyLifecycle(db, { event, current, senderSeq, signal, mapRole }) {
+  throwIfAborted(signal);
+  const decision = decideUserUpdate(event.kind, current, {
+    newRole: event.newRole,
+    mapRole,
+    fleetSuperuser: event.fleetSuperuser,
+  });
+  if (decision.skip) return { kind: 'skip', reason: decision.reason };
+
+  if (!current) {
+    if (!decision.create) return { kind: 'noop', reason: decision.reason };
+    const { role, fleetSuperuser } = decision.create;
+    throwIfAborted(signal);
+    await db.user.create({
+      data: {
+        email: event.email, name: placeholderName(event.email), role,
+        ...(fleetSuperuser !== undefined ? { fleetSuperuser } : {}),
+        lifecycleSeq: senderSeq,
+      },
+    });
+    return { kind: 'applied', reason: 'created', changes: ['created'] };
+  }
+
+  const data = { lifecycleSeq: senderSeq };
+  if (event.kind === 'disable') data.active = false;
+  if (event.kind === 'grant' || event.kind === 'reactivate') data.active = true;
+  if (typeof event.fleetSuperuser === 'boolean') data.fleetSuperuser = event.fleetSuperuser;
+
+  throwIfAborted(signal);
+  const result = await db.user.updateMany({
+    where: { id: current.id, OR: [{ lifecycleSeq: null }, { lifecycleSeq: { lte: senderSeq } }] },
+    data,
+  });
+  if (result.count === 0) return { kind: 'noop', reason: 'superseded' };
+  if (decision.noop) return { kind: 'noop', reason: decision.reason };
+  return { kind: 'applied', changes: Object.keys(decision.data) };
+}
+
+module.exports = { decideUserUpdate, placeholderName, loadCurrent, applyLifecycle };
