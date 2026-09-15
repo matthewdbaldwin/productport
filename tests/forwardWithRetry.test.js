@@ -16,7 +16,7 @@
 //                                   body can't be re-sent), invoked once per send.
 'use strict';
 
-const { forwardWithRetry } = require('../src/lib/forwardWithRetry');
+const { forwardWithRetry } = require('@matthewdbaldwin/microport-auth');
 
 const noSleep = () => Promise.resolve();
 const resp = (status) => ({ status, ok: status >= 200 && status < 300, json: async () => ({}) });

@@ -22,7 +22,7 @@
 
 import { defineConfig, devices } from '@playwright/test';
 import { RAW_DIR } from './e2e/help-captures/helpers/paths';
-import { assertCaptureTargetAllowed } from '../prisma/seed-guard';
+import { assertCaptureTargetAllowed } from '@matthewdbaldwin/microport-auth';
 
 const VIEWPORT = { width: 1280, height: 720 };
 
@@ -108,7 +108,8 @@ const BASE_URL = resolveBaseURL(process.env.BASE_URL);
 // app was started by hand, in a different process, possibly a while ago.
 // Refuses a non-local DATABASE_URL outright (this process is stricter than
 // the seed guard: no "-dev" host, no "_dev"/"_test" db-name free pass — see
-// prisma/seed-guard.js for why); warns and proceeds when DATABASE_URL isn't
+// @matthewdbaldwin/microport-auth's seedGuard module for why); warns and
+// proceeds when DATABASE_URL isn't
 // set here at all, since that's the common case and doesn't by itself mean
 // the app is pointed anywhere unsafe.
 assertCaptureTargetAllowed();

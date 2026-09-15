@@ -24,9 +24,10 @@
 //      actually stops them.
 //
 // Ported from reviewport/src/middleware/upload.js, which has shipped this gate
-// since the 2026-06-15 security review. Kept as a per-repo copy to match how the
-// fleet already carries logRedact.js — see the hoist finding in the 07-31 audit
-// backlog for the eventual microport-auth extraction.
+// since the 2026-06-15 security review. Kept as a per-repo copy — logRedact.js
+// (the precedent this comment used to cite) has since been hoisted into
+// @matthewdbaldwin/microport-auth (W1.3); this file's own extraction is a
+// separate, not-yet-scheduled follow-up, still tracked in the hoist backlog.
 
 'use strict';
 

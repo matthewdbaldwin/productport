@@ -1,7 +1,7 @@
 const {
   classifySeedTarget, assertSeedTargetAllowed,
   classifyCaptureTarget, assertCaptureTargetAllowed,
-} = require('../prisma/seed-guard');
+} = require('@matthewdbaldwin/microport-auth');
 
 const url = (host, db) => `postgresql://user:pass@${host}:5432/${db}?schema=public`;
 const PROD = url('platform-db.czi8ie8iy77d.eu-central-1.rds.amazonaws.com', 'salesport');
