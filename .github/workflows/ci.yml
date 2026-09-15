@@ -31,7 +31,8 @@ jobs:
       - name: No credentials in ENV / ARG / --build-arg
         run: ./scripts/check-build-secrets.sh
 
-  api:
+  api-test:
+    name: API test
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
@@ -44,7 +45,7 @@ jobs:
       # feedback_private_gh_packages_dep_needs_token_in_ci_test_job. The repo must
       # also be GRANTED Manage-Actions(Read) on each package.
       # feedback_new_private_package_ci_access.
-      # Lockfile-drift guard; see the web job and scripts/check-lockfile.sh.
+      # Lockfile-drift guard; see the web-build job and scripts/check-lockfile.sh.
       - name: Verify package-lock.json installs under npm 10
         run: ./scripts/check-lockfile.sh .
         env:
@@ -57,7 +58,17 @@ jobs:
         env:
           NODE_AUTH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
-  web:
+  # Job id is `web-build` for fleet-wide vocabulary consistency (api-lint /
+  # api-test / web-lint / web-test / web-build / e2e), but this single job
+  # runs lint, unit tests, AND the build sequentially — it is NOT split into
+  # separate web-lint / web-test / web-build jobs because that would
+  # duplicate the checkout/install steps and add CI minutes, which the
+  # 2026-09-13 CI-unification decision explicitly rules out (naming pass
+  # only, no added spend). `web-build` was chosen as the id since a green
+  # build is this job's terminal, most consequential gate and what `e2e`
+  # below depends on.
+  web-build:
+    name: Web lint + test + build
     runs-on: ubuntu-latest
     defaults:
       run:
@@ -176,10 +187,10 @@ jobs:
   # loop-guard with no backend — it logs an ECONNREFUSED proxying /api/auth/me
   # and still passes (1 passed, ~17s, web dev server only). A database and an
   # API boot here would buy nothing and cost minutes on every run.
-  e2e-public:
+  e2e:
     name: E2E public smoke
     if: github.ref != 'refs/heads/develop'
-    needs: web
+    needs: web-build
     runs-on: ubuntu-latest
     # A hung Playwright job otherwise burns the runner's 6h default, which is
     # the opposite of the spend discipline this job is gated for.
