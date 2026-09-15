@@ -38,7 +38,7 @@ permissions:
 
 jobs:
   deploy-dev:
-    uses: matthewdbaldwin/microport-infra/.github/workflows/deploy-dev-reusable.yml@feat/deploy-dev-reusable-workflow
+    uses: matthewdbaldwin/microport-infra/.github/workflows/deploy-dev-reusable.yml@main
     with:
       slug: productport
       api_port: "4006"
