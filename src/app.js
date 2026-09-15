@@ -86,8 +86,8 @@ app.use('/api', withFreshAccessToken);
 // ── Unauthenticated, signature-authed ingress FIRST ──────────────────────────
 // Mounted BEFORE the bare-/api requireAuth routers so requireAuth doesn't 401
 // the webhook before its own HMAC check runs. feedback_express_mount_prefix_path_check.
-// Inbound SSO-lifecycle events from salesport (grant/revoke/disable/reactivate)
-// + the hourly /state reconciliation probe. Fleet-canonical path + HMAC.
+// Inbound SSO-lifecycle events from HubPort (grant/revoke/disable/reactivate),
+// via microport-auth's shared receiver. Fleet-canonical path + HMAC.
 app.use('/api/sso/lifecycle', require('./routes/ssoLifecycle'));
 
 // HubPort fleet-union census pull (read-only, HMAC-signed, dedicated secret —

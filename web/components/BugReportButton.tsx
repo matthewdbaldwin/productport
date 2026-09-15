@@ -1,188 +1,48 @@
 'use client';
 
-// Floating "Report a bug" — a discreet round red bug-icon launcher (mirrors the
-// fleet: opsport/reviewport/clinicport/salesport) that opens a modal form. Every
-// AUTHED user can file; the form POSTs to /api/bug-reports, which signs + forwards
-// to the SalesPort central queue. Rendered into document.body via a portal so the
-// fixed launcher escapes the app shell's stacking/overflow (and Firefox paints it).
-// bug-report-fanout, feedback_helpbutton_inline_zindex.
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { createPortal } from 'react-dom';
+// Floating "Report a bug" — the fleet launcher + form, now the shared
+// microport-ui `BugReportLauncher` (v0.60). ProductPort keeps three things of
+// its own: the transport (multipart when a screenshot is attached, JSON via
+// api() otherwise), its `bug`/`confirmDialog` i18n keys, and the dirty-discard
+// guard — which is why the lib grew `confirmOnDirty`.
+//
+// Every AUTHED user can file; the form POSTs to /api/bug-reports, which signs +
+// forwards to the SalesPort central queue. The lib portals the launcher into
+// document.body so the fixed button escapes the app shell's stacking/overflow
+// (and Firefox paints it). bug-report-fanout, feedback_helpbutton_inline_zindex.
 import { useTranslations } from 'next-intl';
-import { Bug, Upload, X } from 'lucide-react';
-import { Tooltip, useModalEsc, useFocusTrap, optimizeImageForUpload, useConfirm } from '@matthewdbaldwin/microport-ui';
+import { BugReportLauncher, type BugReportPayload, type BugReportResult } from '@matthewdbaldwin/microport-ui';
 import { useAuth } from '@/contexts/AuthContext';
+import { useToast } from '@/components/ui/Toast';
 import { api } from '@/lib/api';
 import { testId } from '@/lib/i18nIds';
 
 const NS = 'bugReport';
 
-type Priority = 'low' | 'normal' | 'high' | 'critical';
-const PRIORITIES: Priority[] = ['low', 'normal', 'high', 'critical'];
 const APP_VERSION = process.env.NEXT_PUBLIC_APP_VERSION || '';
-const SCREENSHOT_MAX_BYTES = 2 * 1024 * 1024;
-
-// Minted at module scope, not in render — react-hooks/purity forbids Date.now()
-// (and other impure calls) inside a component/hook body; the fleet pattern is a
-// plain top-level helper the rule doesn't trace into.
-function mintEventId(): string {
-  return typeof crypto !== 'undefined' && crypto.randomUUID ? crypto.randomUUID() : `evt-${Date.now()}`;
-}
 
 export function BugReportButton() {
   const t = useTranslations('bug');
-  const { user } = useAuth();
-  const [mounted, setMounted] = useState(false);
-  const [open, setOpen] = useState(false);
-
-  // eslint-disable-next-line react-hooks/set-state-in-effect -- one-shot createPortal mount guard
-  useEffect(() => setMounted(true), []);
-  // Auth-gated: only signed-in users file (mirrors the fleet). Never render on
-  // the logged-out /login page.
-  if (!user || !mounted) return null;
-
-  return createPortal(
-    <>
-      <Tooltip content={t('label')} placement="left">
-        <button
-          type="button"
-          onClick={() => setOpen(true)}
-          aria-label={t('label')}
-          data-bug-report-launcher="true"
-          {...testId(NS, 'launcher')}
-          className="group fixed bottom-20 right-4 md:bottom-4 z-header inline-flex items-center justify-center min-w-11 min-h-11"
-          style={{ color: 'var(--accent-fg)' }}
-        >
-          <span
-            className="inline-flex items-center justify-center w-9 h-9 rounded-full shadow-lg transition-transform group-hover:scale-105"
-            style={{ background: 'var(--red)' }}
-          >
-            <Bug size={18} aria-hidden="true" />
-          </span>
-        </button>
-      </Tooltip>
-      {open && <BugReportModal onClose={() => setOpen(false)} />}
-    </>,
-    document.body,
-  );
-}
-
-function BugReportModal({ onClose }: { onClose: () => void }) {
-  const t = useTranslations('bug');
   const tc = useTranslations('confirmDialog');
-  const { confirm, confirmDialog } = useConfirm({ confirmLabel: tc('confirm'), cancelLabel: tc('cancel') });
-  const [title, setTitle] = useState('');
-  const [detail, setDetail] = useState('');
-  const [priority, setPriority] = useState<Priority>('normal');
-  const [screenshot, setScreenshot] = useState<File | null>(null);
-  const [preview, setPreview] = useState<string | null>(null);
-  const [optimizing, setOptimizing] = useState(false);
-  const [submitting, setSubmitting] = useState(false);
-  const [sent, setSent] = useState(false);
-  const [error, setError] = useState('');
-  const [titleInvalid, setTitleInvalid] = useState(false);
-  const [detailInvalid, setDetailInvalid] = useState(false);
-  const fileInputRef = useRef<HTMLInputElement>(null);
+  const { user } = useAuth();
+  const { toast } = useToast();
 
-  // Any typed content (or an attached screenshot / a priority moved off the
-  // default) is worth confirming before it's discarded.
-  const isDirty = !!title.trim() || !!detail.trim() || !!screenshot || priority !== 'normal';
-  // Every dismissal path (ESC, backdrop click, the X button, Cancel) funnels
-  // through here. `submitting` already gates ESC via useModalEsc's second arg
-  // below; backdrop/X/Cancel re-check it too so a stray call can't slip through
-  // mid-submit. A dirty, unsent report asks for confirmation before discarding.
-  // The confirm's Escape stops propagation, so useModalEsc can't re-enter while
-  // it's open; a second call would only supersede (resolve false) the first.
-  const requestClose = async () => {
-    if (submitting) return;
-    if (isDirty && !(await confirm({ title: tc('title'), message: t('confirmDiscard'), tone: 'default' }))) return;
-    onClose();
-  };
-
-  useModalEsc(requestClose, !submitting);
-  const trapRef = useFocusTrap<HTMLDivElement>();
-
-  // Accept an image (file-picker or clipboard paste). Shrink it in-browser
-  // first, then apply the 2 MB gate to the OPTIMIZED bytes — the API enforces
-  // the same ceiling, so a large screenshot that compresses under the cap is
-  // now accepted instead of rejected outright. optimizeImageForUpload never
-  // throws and falls back to the original file if it can't help. A revocable
-  // object-URL drives the preview.
-  const acceptScreenshot = useCallback(async (file: File): Promise<void> => {
-    setError('');
-    setOptimizing(true);
+  async function submit(p: BugReportPayload): Promise<BugReportResult> {
     try {
-      const optimized = await optimizeImageForUpload(file);
-      if (optimized.size > SCREENSHOT_MAX_BYTES) { setError(t('errorScreenshotTooLarge')); return; }
-      setScreenshot(optimized);
-      setPreview(URL.createObjectURL(optimized));
-    } finally {
-      setOptimizing(false);
-    }
-  }, [t]);
-
-  // Ctrl/Cmd+V grabs an image from the clipboard while the modal is open.
-  useEffect(() => {
-    function onPaste(e: ClipboardEvent) {
-      if (!e.clipboardData) return;
-      for (const item of e.clipboardData.items) {
-        if (item.type.startsWith('image/')) {
-          const file = item.getAsFile();
-          if (file) { acceptScreenshot(file); e.preventDefault(); return; }
-        }
-      }
-    }
-    document.addEventListener('paste', onPaste);
-    return () => document.removeEventListener('paste', onPaste);
-  }, [acceptScreenshot]);
-
-  // Release the object-URL when the preview changes / the modal unmounts.
-  useEffect(() => () => { if (preview) URL.revokeObjectURL(preview); }, [preview]);
-
-  function handleFileChange(e: React.ChangeEvent<HTMLInputElement>) {
-    const file = e.target.files?.[0];
-    if (file) acceptScreenshot(file);
-  }
-
-  // Auto-captured context, computed once. Shown read-only to the reporter (fleet
-  // transparency parity) and sent with the report.
-  const ctx = useMemo(() => ({
-    pageUrl: typeof window !== 'undefined' ? window.location.href : '',
-    viewportSize: typeof window !== 'undefined' ? `${window.innerWidth}x${window.innerHeight}` : '',
-    browserAgent: typeof navigator !== 'undefined' ? navigator.userAgent : '',
-    appVersion: APP_VERSION,
-  }), []);
-  // Idempotency key minted once per open, so a retry after a lost response dedups
-  // on SalesPort instead of double-filing (fleet parity).
-  const eventId = useMemo(() => mintEventId(), []);
-
-  const inputStyle = { background: 'var(--surface2, var(--surface))', borderColor: 'var(--border)', color: 'var(--text)' } as const;
-
-  async function submit(e: React.FormEvent) {
-    e.preventDefault();
-    setError('');
-    const titleBad = !title.trim();
-    const detailBad = !detail.trim();
-    setTitleInvalid(titleBad);
-    setDetailInvalid(detailBad);
-    if (titleBad) { setError(t('errorTitle')); return; }
-    if (detailBad) { setError(t('errorDetail')); return; }
-    setSubmitting(true);
-    try {
-      if (screenshot) {
+      if (p.screenshot) {
         // Multipart path — the api() helper forces a JSON Content-Type, which
         // breaks the multipart boundary, so raw fetch with the CSRF header +
         // cookies (NO Content-Type; the browser sets the multipart boundary).
         const form = new FormData();
-        form.append('title', title.trim());
-        form.append('description', detail.trim());
-        form.append('priority', priority);
-        form.append('pageUrl', ctx.pageUrl);
-        if (ctx.browserAgent) form.append('browserAgent', ctx.browserAgent);
-        if (ctx.viewportSize) form.append('viewportSize', ctx.viewportSize);
-        if (ctx.appVersion) form.append('appVersion', ctx.appVersion);
-        form.append('eventId', eventId);
-        form.append('screenshot', screenshot);
+        form.append('title', p.title);
+        form.append('description', p.description);
+        form.append('priority', p.priority);
+        form.append('pageUrl', p.pageUrl);
+        if (p.browserAgent) form.append('browserAgent', p.browserAgent);
+        if (p.viewportSize) form.append('viewportSize', p.viewportSize);
+        if (p.appVersion) form.append('appVersion', p.appVersion);
+        form.append('eventId', p.eventId);
+        form.append('screenshot', p.screenshot);
         const res = await fetch('/api/bug-reports', {
           method: 'POST',
           credentials: 'include',
@@ -195,122 +55,95 @@ function BugReportModal({ onClose }: { onClose: () => void }) {
         await api('/api/bug-reports', {
           method: 'POST',
           body: JSON.stringify({
-            title: title.trim(),
-            description: detail.trim(),
-            priority,
-            pageUrl: ctx.pageUrl,
-            browserAgent: ctx.browserAgent,
-            viewportSize: ctx.viewportSize,
-            appVersion: ctx.appVersion,
-            eventId,
+            title: p.title,
+            description: p.description,
+            priority: p.priority,
+            pageUrl: p.pageUrl,
+            browserAgent: p.browserAgent,
+            viewportSize: p.viewportSize,
+            appVersion: p.appVersion,
+            eventId: p.eventId,
           }),
         });
       }
-      setSent(true);
-      setTimeout(onClose, 1400);
+      return { ok: true };
     } catch {
-      setError(t('errorSend'));
-    } finally {
-      setSubmitting(false);
+      return { error: t('errorSend') };
     }
   }
 
   return (
-    <>
-      <div className="fixed inset-0 z-modal bg-overlay" onClick={submitting ? undefined : requestClose} />
-      <div className="fixed inset-0 z-modal flex items-center justify-center p-4 pointer-events-none">
-        <div
-          ref={trapRef}
-          className="w-full max-w-lg rounded-xl shadow-xl border pointer-events-auto max-h-[90dvh] overflow-y-auto"
-          style={{ background: 'var(--surface)', borderColor: 'var(--border)' }}
-          role="dialog" aria-modal="true" aria-labelledby="bug-modal-title"
-        >
-          <div className="flex items-center justify-between px-5 py-3.5 border-b" style={{ borderColor: 'var(--border)' }}>
-            <h2 id="bug-modal-title" className="text-base font-semibold inline-flex items-center gap-2" style={{ color: 'var(--text)' }}>
-              <span style={{ color: 'var(--red)' }}><Bug size={18} aria-hidden="true" /></span>{t('label')}
-            </h2>
-            <Tooltip content={t('close')}>
-              <button type="button" onClick={requestClose} aria-label={t('close')} disabled={submitting} {...testId(NS, 'close')}
-                className="inline-flex items-center justify-center rounded"
-                style={{ color: 'var(--muted)', fontSize: 22, lineHeight: 1, width: 44, height: 44 }}>&times;</button>
-            </Tooltip>
-          </div>
-
-          {sent ? (
-            <p className="px-5 py-6 text-sm" style={{ color: 'var(--text)' }}>{t('thanks')}</p>
-          ) : (
-            <form onSubmit={submit} className="p-5 space-y-3">
-              {error && <p role="alert" className="text-sm" style={{ color: 'var(--red)' }}>{error}</p>}
-              <div className="space-y-1">
-                <label htmlFor="bug-title" className="text-xs font-medium" style={{ color: 'var(--muted)' }}>{t('titleLabel')}</label>
-                <input id="bug-title" className="w-full rounded border px-2.5 py-2 text-sm min-h-11"
-                  style={titleInvalid ? { ...inputStyle, borderColor: 'var(--red)' } : inputStyle}
-                  aria-invalid={titleInvalid ? true : undefined}
-                  value={title} onChange={(e) => { setTitle(e.target.value); setTitleInvalid(false); }} maxLength={200} autoFocus {...testId(NS, 'title')}
-                  placeholder={t('titlePlaceholder')} />
-              </div>
-              <div className="space-y-1">
-                <label htmlFor="bug-detail" className="text-xs font-medium" style={{ color: 'var(--muted)' }}>{t('detailLabel')}</label>
-                <textarea id="bug-detail" className="w-full rounded border px-2.5 py-2 text-sm resize-none min-h-11"
-                  style={detailInvalid ? { ...inputStyle, borderColor: 'var(--red)' } : inputStyle}
-                  aria-invalid={detailInvalid ? true : undefined}
-                  rows={4} value={detail} onChange={(e) => { setDetail(e.target.value); setDetailInvalid(false); }} maxLength={10000} {...testId(NS, 'detail')}
-                  placeholder={t('detailPlaceholder')} />
-              </div>
-              <div className="space-y-1">
-                <label htmlFor="bug-priority" className="text-xs font-medium" style={{ color: 'var(--muted)' }}>{t('priorityLabel')}</label>
-                <select id="bug-priority" className="w-full rounded border px-2.5 py-2 text-sm min-h-11" style={inputStyle}
-                  value={priority} onChange={(e) => setPriority(e.target.value as Priority)} {...testId(NS, 'priority')}>
-                  {PRIORITIES.map((p) => <option key={p} value={p}>{t(`priority_${p}`)}</option>)}
-                </select>
-              </div>
-              <div className="space-y-1">
-                <label className="text-xs font-medium" style={{ color: 'var(--muted)' }}>{t('screenshotLabel')}</label>
-                <p className="text-xs" style={{ color: 'var(--muted)' }}>{t('screenshotHint')}</p>
-                <input ref={fileInputRef} type="file" accept="image/*" onChange={handleFileChange} className="hidden" {...testId(NS, 'screenshotInput')} />
-                <button type="button" onClick={() => fileInputRef.current?.click()} disabled={optimizing} {...testId(NS, 'screenshotChoose')}
-                  className="inline-flex items-center gap-2 rounded border px-3 py-2 text-sm min-h-11 disabled:opacity-60" style={inputStyle}>
-                  <Upload size={14} aria-hidden="true" />
-                  {screenshot ? t('screenshotReplace') : t('screenshotChoose')}
-                </button>
-                {optimizing && <p className="text-xs mt-2" role="status" style={{ color: 'var(--muted)' }}>{t('screenshotOptimizing')}</p>}
-                {preview && (
-                  <div className="mt-2 relative inline-block">
-                    <img src={preview} alt={t('screenshotPreviewAlt')} className="max-h-48 rounded border" style={{ borderColor: 'var(--border)' }} />
-                    <Tooltip content={t('screenshotRemove')}>
-                      <button type="button" aria-label={t('screenshotRemove')} {...testId(NS, 'screenshotRemove')}
-                        onClick={() => { setScreenshot(null); setPreview(null); if (fileInputRef.current) fileInputRef.current.value = ''; }}
-                        className="absolute top-1 right-1 inline-flex items-center justify-center rounded-full border w-11 h-11"
-                        style={{ background: 'var(--surface)', borderColor: 'var(--border)', color: 'var(--text)' }}>
-                        <X size={14} aria-hidden="true" />
-                      </button>
-                    </Tooltip>
-                  </div>
-                )}
-              </div>
-              {/* Read-only preview of what's attached — fleet transparency parity. */}
-              <details className="text-xs" style={{ color: 'var(--muted)' }}>
-                <summary className="cursor-pointer">{t('capturedContext')}</summary>
-                <dl className="mt-1.5 space-y-0.5">
-                  <div><span className="font-medium">{t('ctxPage')}:</span> {ctx.pageUrl}</div>
-                  <div><span className="font-medium">{t('ctxViewport')}:</span> {ctx.viewportSize}</div>
-                  {ctx.appVersion && <div><span className="font-medium">{t('ctxAppVersion')}:</span> {ctx.appVersion}</div>}
-                  <div className="truncate"><span className="font-medium">{t('ctxBrowser')}:</span> {ctx.browserAgent}</div>
-                </dl>
-              </details>
-              <div className="flex justify-end gap-2 pt-1">
-                <button type="button" className="rounded px-3 py-2 text-sm min-h-11" style={{ color: 'var(--muted)' }} onClick={requestClose} disabled={submitting} {...testId(NS, 'cancel')}>
-                  {t('cancel')}
-                </button>
-                <button type="submit" className="btn-primary rounded px-4 py-2 text-sm min-h-11" disabled={submitting || optimizing || !title.trim() || !detail.trim()} {...testId(NS, 'submit')}>
-                  {submitting ? t('sending') : t('send')}
-                </button>
-              </div>
-            </form>
-          )}
-        </div>
-      </div>
-      {confirmDialog}
-    </>
+    <BugReportLauncher
+      // Auth-gated: only signed-in users file (mirrors the fleet). Never render
+      // on the logged-out /login page.
+      enabled={!!user}
+      // No cast: since microport-ui 0.60.2 `buttonProps` is typed
+      // `& Record<string, unknown>`, which admits `data-*` keys directly (and
+      // rejects the old ButtonHTMLAttributes cast).
+      buttonProps={testId(NS, 'launcher')}
+      submit={submit}
+      appVersion={APP_VERSION}
+      // The hub queue has always received the absolute URL for ProductPort,
+      // which is what identifies the satellite in triage. 0.60.1 made that a
+      // prop, replacing the location.origin reconstruction this file did.
+      capturePageUrl="href"
+      confirmOnDirty
+      onSuccess={() => toast(t('thanks'), 'ok')}
+      labels={{
+        title: t('label'),
+        launcher: t('label'),
+        fieldTitle: t('titleLabel'),
+        fieldTitlePlaceholder: t('titlePlaceholder'),
+        fieldDescription: t('detailLabel'),
+        fieldDescriptionPlaceholder: t('detailPlaceholder'),
+        fieldPriority: t('priorityLabel'),
+        priorityLow: t('priority_low'),
+        priorityNormal: t('priority_normal'),
+        priorityHigh: t('priority_high'),
+        priorityCritical: t('priority_critical'),
+        fieldScreenshot: t('screenshotLabel'),
+        screenshotPrivacyWarning: t('screenshotPrivacy'),
+        screenshotAddTitle: t('screenshotAdd'),
+        screenshotDropHint: t('screenshotHint'),
+        screenshotDropActive: t('screenshotDropActive'),
+        screenshotMaxSize: t('screenshotMaxSize'),
+        screenshotOptimizing: t('screenshotOptimizing'),
+        screenshotPreviewAlt: t('screenshotPreviewAlt'),
+        chooseScreenshot: t('screenshotChoose'),
+        replaceScreenshot: t('screenshotReplace'),
+        removeScreenshot: t('screenshotRemove'),
+        capturedContext: t('capturedContext'),
+        ctxPage: t('ctxPage'),
+        ctxViewport: t('ctxViewport'),
+        ctxAppVersion: t('ctxAppVersion'),
+        ctxBrowser: t('ctxBrowser'),
+        errorTitleRequired: t('errorTitle'),
+        errorDescriptionRequired: t('errorDetail'),
+        errorScreenshotTooLarge: t('errorScreenshotTooLarge'),
+        errorScreenshotNotAnImage: t('errorScreenshotNotImage'),
+        errorSubmitFailed: t('errorSend'),
+        cancel: t('cancel'),
+        submit: t('send'),
+        submitting: t('sending'),
+        close: t('close'),
+        // confirmOnDirty strings — the shared confirmDialog namespace supplies
+        // the chrome, `bug.confirmDiscard` the message.
+        confirmDiscardTitle: tc('title'),
+        confirmDiscard: t('confirmDiscard'),
+        confirmDiscardConfirm: tc('confirm'),
+        confirmDiscardCancel: tc('cancel'),
+      }}
+      // Inner testIds the 0.60 hoist took with the markup they annotated;
+      // 0.60.1 gives them back as per-slot attribute spreads.
+      slotProps={{
+        close:       testId(NS, 'close'),
+        title:       testId(NS, 'title'),
+        description: testId(NS, 'detail'),
+        priority:    testId(NS, 'priority'),
+        screenshot:  testId(NS, 'screenshotInput'),
+        cancel:      testId(NS, 'cancel'),
+        submit:      testId(NS, 'submit'),
+      }}
+    />
   );
 }

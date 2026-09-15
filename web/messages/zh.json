@@ -47,7 +47,11 @@
     "close": "关闭",
     "thanks": "问题报告已提交。",
     "screenshotLabel": "截图（可选）",
-    "screenshotHint": "附加图片，或使用 Ctrl/Cmd+V 粘贴。",
+    "screenshotPrivacy": "屏幕上可见的所有内容都会被一并上传，请先确认其中没有个人信息或患者数据。",
+    "screenshotAdd": "添加截图",
+    "screenshotHint": "附加图片，使用 Ctrl/Cmd+V 粘贴，或将图片拖到此处。",
+    "screenshotDropActive": "释放即可附加",
+    "screenshotMaxSize": "压缩后最大 2 MB。",
     "screenshotChoose": "选择截图",
     "screenshotReplace": "更换截图",
     "screenshotRemove": "移除截图",
@@ -56,6 +60,7 @@
     "errorTitle": "请填写标题。",
     "errorDetail": "请填写描述。",
     "errorScreenshotTooLarge": "截图不得超过 2 MB。",
+    "errorScreenshotNotImage": "该文件不是图片。",
     "errorSend": "提交失败，请重试。"
   },
   "help": {

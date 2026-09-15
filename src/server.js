@@ -9,5 +9,9 @@ logger.info(`${pkg.name}@${pkg.version} start`);
 
 const app = require('./app');
 
+// Lifecycle receiver reclaim sweep (hubport#133). Not in app.js, so tests that
+// require the app never start a timer.
+require('./routes/ssoLifecycle').startReclaim();
+
 const PORT = process.env.PORT || 4006;
 app.listen(PORT, () => logger.info(`ProductPort API listening on :${PORT}`));

@@ -42,6 +42,10 @@ model User {
   // token claim and never written by any ProductPort route or UI. Distinct from
   // the SalesPort-local `is_superuser` claim (req.user.isSuperuser).
   fleetSuperuser Boolean @default(false)
+  // hubport#133: senderSeq of the last lifecycle event written to this row. A
+  // lifecycle write lands only when the incoming senderSeq is not older, so a
+  // late or retried older event can never overwrite a newer one.
+  lifecycleSeq Int?
   createdAt   DateTime  @default(now())
   updatedAt   DateTime  @updatedAt
   sessions    Session[]
@@ -259,9 +263,16 @@ model UserLifecycleEvent {
   receivedAt    DateTime  @default(now())
   processedAt   DateTime?
   error         String?   @db.Text
+  // hubport#133 (microport-auth createLifecycleReceiver): the claim-ownership
+  // token, compared for equality, so millisecond precision; stays set after
+  // settle as history.
+  claimedAt     DateTime? @db.Timestamp(3)
+  // X-Lifecycle-Event-Id as an integer; null = written before adoption.
+  senderSeq     Int?
 
   @@index([email])
   @@index([receivedAt])
+  @@index([email, senderSeq])
   @@map("user_lifecycle_events")
 }
 
