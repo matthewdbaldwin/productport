@@ -1,8 +1,21 @@
 name: Deploy to AWS (dev)
 
 # Builds the develop branch into :dev images and rolls the productport-dev service
-# in the microport-dev cluster. Mirrors the fleet (clinicport) two-image pattern:
-# <app>-api (root Dockerfile) + <app>-web (web/Dockerfile). Same OIDC role.
+# in the microport-dev cluster (the dev mesh), via the fleet's reusable
+# deploy-dev workflow hosted in microport-infra. See
+# matthewdbaldwin/microport-infra .github/workflows/deploy-dev-reusable.yml
+# for the full job body, permissions, and secrets rationale — this file only
+# keeps the parts that must stay local to this repo: the trigger, the
+# concurrency group, the `permissions:` ceiling the reusable job needs, and
+# this repo's own slug/port/build-arg values.
+#
+# Mirrors the fleet two-image pattern: <app>-api (root Dockerfile) +
+# <app>-web (web/Dockerfile). Same OIDC role.
+#
+# REF CAVEAT: pinned to @feat/deploy-dev-reusable-workflow (a branch, not yet a tag/main) because
+# matthewdbaldwin/microport-infra's companion PR introducing this reusable
+# workflow has not merged yet. Update this ref to @main (or a released tag)
+# once that PR merges — do not leave it pointed at a branch long-term.
 
 on:
   push:
@@ -23,75 +36,12 @@ permissions:
   contents: read
   packages: read
 
-env:
-  AWS_REGION: eu-central-1
-  ECR_REGISTRY: 682624892433.dkr.ecr.eu-central-1.amazonaws.com
-  ECS_CLUSTER: microport-dev
-  ECS_SERVICE: productport-dev
-
 jobs:
   deploy-dev:
-    name: Build & Deploy (dev)
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v7
-
-      - name: Configure AWS credentials (OIDC)
-        uses: aws-actions/configure-aws-credentials@v6
-        with:
-          role-to-assume: arn:aws:iam::682624892433:role/GitHubActionsDeployRole
-          aws-region: ${{ env.AWS_REGION }}
-
-      - name: Log in to Amazon ECR
-        uses: aws-actions/amazon-ecr-login@v2
-
-      - name: Build and push productport-api:dev
-        env:
-          DOCKER_BUILDKIT: 1
-          NODE_AUTH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: |
-          docker build --secret id=npm_token,env=NODE_AUTH_TOKEN -t $ECR_REGISTRY/productport-api:dev .
-          docker push $ECR_REGISTRY/productport-api:dev
-
-      - name: Build and push productport-web:dev
-        env:
-          DOCKER_BUILDKIT: 1
-          NODE_AUTH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          NEXT_PUBLIC_SENTRY_DSN: ${{ secrets.NEXT_PUBLIC_SENTRY_DSN }}
-          SENTRY_AUTH_TOKEN:      ${{ secrets.SENTRY_AUTH_TOKEN }}
-        run: |
-          docker build \
-            --build-arg API_URL=http://localhost:4006 \
-            --secret id=npm_token,env=NODE_AUTH_TOKEN \
-            --build-arg NEXT_PUBLIC_SENTRY_DSN=$NEXT_PUBLIC_SENTRY_DSN \
-            --secret id=sentry_token,env=SENTRY_AUTH_TOKEN \
-            --build-arg NEXT_PUBLIC_SENTRY_ENVIRONMENT=development \
-            -t $ECR_REGISTRY/productport-web:dev ./web
-          docker push $ECR_REGISTRY/productport-web:dev
-
-      - name: Deploy to ECS (dev)
-        run: |
-          # Re-pin to the LATEST registered task-def revision so a task-def CONFIG change
-          # (env var, Secrets Manager migration) actually gets adopted — the flag-less
-          # --force-new-deployment only ever redeployed the already-pinned revision, silently
-          # stranding config/secrets changes. Requires iam:PassRole on the dev task role for
-          # GitHubActionsDeployRole. No `| cat`: the step runs under `bash -e` without
-          # pipefail, so a pipe masks a failed deploy as green; --no-cli-pager avoids the
-          # pager without a pipe. See feedback_ecs_update_service_omits_task_definition.
-          LATEST_TD=$(aws ecs describe-task-definition --task-definition "$ECS_SERVICE" \
-            --query 'taskDefinition.taskDefinitionArn' --output text)
-          echo "Deploying task definition: $LATEST_TD"
-          aws ecs update-service \
-            --cluster $ECS_CLUSTER \
-            --service $ECS_SERVICE \
-            --task-definition "$LATEST_TD" \
-            --force-new-deployment \
-            --no-cli-pager \
-            --output json \
-            --query "service.{service:serviceName,taskDefinition:taskDefinition,status:status}"
-
-      - name: Wait for ECS rollover (dev)
-        run: |
-          aws ecs wait services-stable --cluster $ECS_CLUSTER --services $ECS_SERVICE --region $AWS_REGION \
-          || aws ecs wait services-stable --cluster $ECS_CLUSTER --services $ECS_SERVICE --region $AWS_REGION
+    uses: matthewdbaldwin/microport-infra/.github/workflows/deploy-dev-reusable.yml@main
+    with:
+      slug: productport
+      api_port: "4006"
+    secrets:
+      NEXT_PUBLIC_SENTRY_DSN: ${{ secrets.NEXT_PUBLIC_SENTRY_DSN }}
+      SENTRY_AUTH_TOKEN: ${{ secrets.SENTRY_AUTH_TOKEN }}
