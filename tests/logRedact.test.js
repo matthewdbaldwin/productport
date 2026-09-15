@@ -22,7 +22,7 @@ const pinoHttp = require('pino-http');
 const { Writable } = require('stream');
 const fs = require('fs');
 const path = require('path');
-const logRedact = require('../src/lib/logRedact');
+const logRedact = require('@matthewdbaldwin/microport-auth');
 
 const SENTINEL = 'a'.repeat(64); // stands in for a live 64-char credential
 
@@ -187,8 +187,8 @@ describe('log redaction — wiring', () => {
     throw new Error('unbalanced pinoHttp( call');
   }
 
-  it('app.js passes the logRedact serializers to pinoHttp', () => {
-    expect(pinoHttpCall()).toContain('logRedact.serializers');
+  it('app.js passes the microport-auth serializers to pinoHttp', () => {
+    expect(pinoHttpCall()).toContain('authSerializers');
   });
 
   // Count the key, don't just look for the word. On 2026-08-01 the allowlist

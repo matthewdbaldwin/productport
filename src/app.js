@@ -6,8 +6,7 @@ const helmet       = require('helmet');
 const pinoHttp     = require('pino-http');
 const cookieParser = require('cookie-parser');
 const logger       = require('./lib/logger');
-const logRedact    = require('./lib/logRedact');
-const { errorHandler, correlationReqId } = require('@matthewdbaldwin/microport-auth');
+const { errorHandler, correlationReqId, serializers: authSerializers } = require('@matthewdbaldwin/microport-auth');
 const { csrfGuard } = require('./middleware/csrf');
 const { requireAuth, withFreshAccessToken } = require('./middleware/auth');
 
@@ -52,8 +51,10 @@ app.use(pinoHttp({
   logger, genReqId: correlationReqId,
   // `serializers` carries the header allowlist and MUST be passed here, not to
   // pino() — pino-http overrides the base logger's serializers, so wiring it on
-  // the logger looks correct and is silently inert. See lib/logRedact.js.
-  serializers: logRedact.serializers,
+  // the logger looks correct and is silently inert. See
+  // @matthewdbaldwin/microport-auth's logRedact module (src/lib/logger.js
+  // wires its `redact` half onto the base logger).
+  serializers: authSerializers,
 }));
 
 // Capture the raw body so webhook receivers can verify the HMAC over the exact
