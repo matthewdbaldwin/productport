@@ -5,14 +5,16 @@ const pino = require('pino');
 // Credential redaction — pino-http logs req/res headers, and
 // authorization/cookie/set-cookie carry live tokens. See
 // @matthewdbaldwin/microport-auth's logRedact module (src/app.js wires the
-// `serializers` half onto pinoHttp()).
-const { redact } = require('@matthewdbaldwin/microport-auth');
+// `serializers` half onto pinoHttp()). `formatters` deep-redacts merged log
+// objects at any depth, beyond what the `redact` paths list covers.
+const { redact, formatters } = require('@matthewdbaldwin/microport-auth');
 
 const logger = pino({
   name: 'productport-api',
   level: process.env.LOG_LEVEL || 'info',
   base: { service: 'productport-api', env: process.env.NODE_ENV || 'development' },
   redact,
+  formatters,
 });
 
 module.exports = logger;
